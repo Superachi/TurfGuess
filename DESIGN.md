@@ -4,7 +4,7 @@
 
 ## 1. Concept
 
-A Discord bot for a **single server** runs one round of a guessing game per day. Each round it posts an image of a procedurally generated, symmetric arena. Two colors of paint have flowed into it, one from the left spawn and one from the right. One color covers slightly more floor than the other. Players vote on which color they think won by clicking one of two buttons on the message. At the next daily round time (normally 24 hours later) the bot reveals the exact percentages and posts the next round.
+A Discord bot runs one round of a guessing game per day. Today it plays in a **single server**. The plan is to play **one shared daily puzzle across every server it's invited to**, Wordle style (section 12). Each round it posts an image of a procedurally generated, symmetric arena. Two colors of paint have flowed into it, one from the left spawn and one from the right. One color covers slightly more floor than the other. Players vote on which color they think won by clicking one of two buttons on the message. At the next daily round time (normally 24 hours later) the bot reveals the exact percentages and posts the next round.
 
 The fun comes from:
 - **Close calls.** Margins are small and tunable, so it really takes eyeballing.
@@ -472,8 +472,9 @@ All replies are ephemeral (only the person who used the command sees them).
 1. ✅ **Generator prototype:** `TurfGuess.Core` (map generation, paint, rendering) plus the `TurfGuess.Preview` console app, producing a contact sheet of 12 seeds. *This is where we find out whether it's fun.*
 2. ✅ **Tune:** map styles, margin ranges, visual polish. The colorblind check is deferred.
 3. 🟡 **Bot MVP:** daily post, button voting, the reveal at the next RoundTime with the list of correct guessers, SQLite, restart catch-up. The code and unit tests are done. A live run on a test server is still to do.
-4. **Engagement:** streaks, leaderboard, reveal GIF, map names.
-5. **Hosting:** a small VPS or Raspberry Pi. Publish it as a self-contained app (`dotnet publish -r linux-arm64 --self-contained`) and run it as a systemd service through `Microsoft.Extensions.Hosting.Systemd`. On Windows it can run as a service instead (`Microsoft.Extensions.Hosting.WindowsServices`).
+4. **Multiple servers:** one shared daily puzzle for every server the bot is in, Wordle style, with setup through `/turf-admin setup` instead of config (section 12).
+5. **Engagement:** streaks, leaderboard, reveal GIF, map names.
+6. **Hosting:** a small VPS or Raspberry Pi. Publish it as a self-contained app (`dotnet publish -r linux-arm64 --self-contained`) and run it as a systemd service through `Microsoft.Extensions.Hosting.Systemd`. On Windows it can run as a service instead (`Microsoft.Extensions.Hosting.WindowsServices`).
 
 ---
 
@@ -481,7 +482,7 @@ All replies are ephemeral (only the person who used the command sees them).
 
 | Question | Decision |
 |---|---|
-| Single server or multiple guilds? | **Single server.** One channel, set in config. |
+| Single server or multiple guilds? | **Now:** single server, one channel set in config. **Planned (milestone 4):** any number of servers, all playing **one shared daily puzzle** on one global schedule, with each server choosing its channel by command. See section 12. |
 | Fixed team colors or varying? | **A different color pair each round**, picked from the seed. Team names are the color names. |
 | Name the correct guessers at reveal? | **Yes**, listed by name with **no pings** (`AllowedMentions.None`). |
 | Language? | **C# / .NET 10**, because it's the language the author knows best. Python offered nothing this project needs. |
@@ -493,4 +494,200 @@ All replies are ephemeral (only the person who used the command sees them).
 
 ## 11. Open questions
 
-- None at the moment.
+- None at the moment. The welcome message and the failure threshold for multiple servers are decided in section 12.2.
+
+---
+
+## 12. Multiple servers: one shared daily puzzle (planned, milestone 4)
+
+> **Status:** designed, not built. The bot currently runs in one server, with the channel set in config (sections 2, 6 and 7). Once this is built, the sections it changes get folded back into the main text.
+
+### 12.1 Overview
+
+The bot can be invited to any number of servers. **Every server plays the same puzzle on the same day**, Wordle style:
+
+- Once a day, at one global release time, a new **puzzle** is generated: one map, one color pair, one answer. It's numbered: *Judd's Judgment #42*.
+- Every server that has set the game up gets that puzzle posted in its channel. All servers reveal it at the same moment, then the next puzzle goes out.
+- Each server sees its own votes and its own correct guessers. The reveal also shows how players did across all servers.
+
+What a server admin does: invite the bot, run `/turf-admin setup` once, pick a channel. They never deal with tokens, config files or IDs.
+
+### 12.2 Decisions
+
+| Question | Decision | Why |
+|---|---|---|
+| Shared map or one per server? | **One shared puzzle per day.** | Same puzzle for everyone makes it a shared daily ritual, allows cross-server results, and the map is only generated and rendered once a day. |
+| Can servers choose their own round time? | **No. One global schedule** (`Game:RoundTime` in `Game:TimeZone`, set by the operator). | With per-server times, a server revealing at 09:00 would spoil the answer for a server still voting until 18:00. One schedule makes spoilers impossible and keeps cross-server results meaningful. |
+| What can a server configure? | **The channel**, and whether the game is enabled. | Everything else is part of the shared puzzle. |
+| Votes per server or per player? | **Per server.** A vote belongs to (puzzle, server, player). | A server only sees its own players' votes. Telling which servers a player belongs to would need the privileged *Server Members* intent, which we avoid. Someone who plays in two servers votes in each. |
+| A server sets up mid-puzzle? | **It gets the current puzzle straight away**, with the same global reveal time. | Like opening Wordle late in the day: you still play today's puzzle. |
+| Welcome when the bot joins? | **Yes, a one-time rundown, sent as a DM to whoever invited the bot.** If that fails, it goes to the server owner, then to the system channel. | The person who added the bot is the one who wants to know how to start, without the bot posting in a public channel before it's set up. See 12.9. |
+| When does a broken server stop getting posts? | **After 3 consecutive failed days** (`Discord:MaxFailedDays`). | Long enough to ride out a temporary permission mix-up, short enough to stop retrying a deleted channel. |
+| Old single-server setup? | **Keeps working.** If `Discord:ChannelId` is set, that server is set up automatically on startup. | No breaking change for the existing install. |
+
+### 12.3 Puzzle numbering and seeds
+
+- Puzzles are numbered from 1 and stored in a `puzzles` table. The number shows in titles: *Judd's Judgment #42*. It replaces today's round number.
+- Each puzzle's seed is **random** and stored when the puzzle is created, rather than derived from the date. That way nobody can work out tomorrow's answer from the code. Cheating is out of scope, but there's no reason to make it trivial.
+- The puzzle's images are rendered once and reused for every server.
+
+### 12.4 The two lifecycles
+
+There are now two layers, each following the same idempotent "advance one step" pattern as today (section 2, Round lifecycle):
+
+**Puzzle (global):** `Open → Closed`
+
+| Step | When |
+|---|---|
+| Create (seed, generate, render, store) | Whenever there's no open puzzle |
+| `Open → Closed` | At its `reveal_at`. **This closes voting in every server at once.** |
+
+**Server post (one per server per puzzle):** `Pending → Open → Revealed → Done`. It's today's round lifecycle, keyed by (puzzle, server):
+
+| Status | Meaning |
+|---|---|
+| `Pending` | Row written, message maybe not posted yet |
+| `Open` | Puzzle message posted in that server's channel |
+| `Revealed` | The puzzle is closed. That server's results are final, and its reveal may not be posted yet. |
+| `Done` | That server's reveal is posted |
+
+**At the round time:**
+1. Close the current puzzle (one database update closes voting everywhere).
+2. Move every server's post forward: disable the buttons and post that server's reveal.
+3. Create the next puzzle.
+4. Post it in every enabled server.
+
+Steps 2 and 4 go through servers one at a time, within Discord's rate limits. The order between servers doesn't matter, because voting already closed for everyone in step 1.
+
+Recovery works exactly as today, per server: before posting, the bot looks in that server's channel for a message it already posted (by button id or reveal footer).
+
+**One broken server never blocks the others.** If posting to a server fails (channel deleted, permissions removed), the error is logged, that server's `failure_count` goes up, and the other servers carry on. After `Discord:MaxFailedDays` (default 3) consecutive failed days, the server is marked `needs_setup` and skipped until an admin runs `/turf-admin setup` again.
+
+### 12.5 Voting
+
+- Button ids become `vote:{puzzleId}:{side}`. The server comes from the interaction itself.
+- The conditional upsert (section 2, Voting rules) checks that the **puzzle** is `Open` and that the server's post is `Open`. So one statement still closes voting everywhere at the reveal.
+
+### 12.6 The reveal
+
+Per server, as today: winner, coverage, unpainted share, that server's vote counts and correct guessers (named without pings). One new line:
+
+> **Across all servers:** 63% guessed right (412 players in 14 servers).
+
+This line counts every vote for the puzzle, so a player who voted in two servers counts twice. That's acceptable for a fun stat.
+
+### 12.7 Data model changes
+
+```sql
+guilds (
+  guild_id        INTEGER PRIMARY KEY,
+  channel_id      INTEGER,            -- NULL until set up
+  enabled         INTEGER NOT NULL,   -- 0/1; 0 after /turf-admin disable or when the bot is removed
+  needs_setup     INTEGER NOT NULL,   -- 1 after repeated posting failures
+  failure_count   INTEGER NOT NULL,
+  joined_at       INTEGER NOT NULL,
+  configured_at   INTEGER,
+  welcomed_at     INTEGER             -- set once the one-time welcome went out (or was attempted)
+)
+
+puzzles (                             -- today's `rounds`, minus the Discord-specific columns
+  id                INTEGER PRIMARY KEY AUTOINCREMENT,   -- the puzzle number
+  status            TEXT NOT NULL,    -- 'Open' | 'Closed'
+  seed, generator_version, image_path, reveal_image_path,
+  created_at, reveal_at,
+  left_name, left_color, left_emoji, right_name, right_color, right_emoji,
+  winner, winner_share, share_left, share_right, unpainted
+)
+
+guild_rounds (                        -- one post of a puzzle in one server
+  puzzle_id         INTEGER NOT NULL REFERENCES puzzles (id),
+  guild_id          INTEGER NOT NULL REFERENCES guilds (guild_id),
+  channel_id        INTEGER NOT NULL, -- copied at posting time, so later channel changes don't break recovery
+  status            TEXT NOT NULL,    -- 'Pending' | 'Open' | 'Revealed' | 'Done'
+  message_id        INTEGER,
+  reveal_message_id INTEGER,
+  posted_at         INTEGER,
+  PRIMARY KEY (puzzle_id, guild_id)
+)
+
+votes (
+  puzzle_id, guild_id, user_id, choice, voted_at,
+  PRIMARY KEY (puzzle_id, guild_id, user_id)
+)
+```
+
+- **Invariants:** at most one `Open` puzzle (a partial unique index, as today), and at most one unfinished `guild_rounds` row per server.
+- **Schema versions:** a `schema_version` table. On startup, migration v1 → v2 turns existing `rounds` into `puzzles` plus `guild_rounds` rows for the configured server, and keeps their votes. The existing install upgrades in place.
+
+### 12.8 Commands
+
+| Command | Who | What |
+|---|---|---|
+| `/turf-admin setup channel:#…` | Server admins | Sets the game channel and enables the game. Checks that the bot can view, send, embed and attach there, and says what's missing if not. Posts the current puzzle straight away if one is open. Running it again changes the channel; the current puzzle moves to the new channel at the next post. |
+| `/turf-admin disable` | Server admins | Stops posting in this server. Existing messages stay. |
+| `/turf-admin status` | Server admins | This server's channel and status, the current puzzle number and reveal time, and this server's vote count. |
+| `/turf-owner reveal-now`, `/turf-owner status` | Bot operator only | `reveal-now` now affects **every** server, so it moves to owner-only commands. They're registered only in the operator's home server (`Discord:HomeGuildId`) and also check `Discord:OwnerIds`. |
+
+Admin commands are registered **globally**, so they work in every server. Owner commands stay guild-registered in the home server only.
+
+### 12.9 Joining and leaving servers
+
+- **Bot added** (`JoinedGuild`): insert a `guilds` row (not set up) and send a **one-time welcome** with a quick rundown (below). It's sent once per server: `welcomed_at` is stored, so re-invites and restarts don't repeat it.
+- **Bot removed** (`LeftGuild`): mark the server `enabled = 0`. History stays, so re-inviting the bot picks up where it left off after setup.
+- **Channel deleted or permissions revoked:** handled by the failure counting in 12.4.
+
+#### Who gets the welcome
+
+Discord doesn't tell a bot who invited it, so the bot works down this list and stops at the first one that succeeds:
+
+1. **A DM to the person who invited the bot.** Found in the server's audit log: the newest *Bot Add* entry whose target is this bot names the user who added it. This needs the **View Audit Log** permission, which the invite link asks for. If an admin unticks it, this step is skipped.
+2. **A DM to the server owner.** The owner is always known, so this works even without audit log access.
+3. **A post in the server's system channel** (where Discord posts "X joined"), when both DMs fail, for example because the person doesn't accept DMs from server members.
+4. **Nothing.** The failure is logged, and an admin can still discover the game through the `/turf-admin` commands.
+
+#### The welcome message (draft)
+
+> **Thanks for adding Judd's Judgment to {server}!** 🎨
+>
+> Every day, every server playing gets the same puzzle: an arena where two teams of paint fought over the floor. Players guess which color painted more by clicking a button. The next day the answer is revealed, along with who in your server got it right and how everyone did across all servers.
+>
+> **To start:** an admin runs `/turf-admin setup channel:#your-channel` in {server}. The first puzzle is posted there right away.
+>
+> - A new puzzle comes out daily at <t:{nextRoundTime}:t> (your local time).
+> - The bot needs to view, send messages, embed links and attach files in that channel. `/turf-admin setup` checks this for you.
+> - `/turf-admin status` shows the current puzzle, and `/turf-admin disable` stops the game.
+
+- `{server}` is the server's name. `<t:…:t>` shows the daily release time in each reader's own time zone.
+- The DM version and the system-channel version use the same text. In the channel version, "Thanks for adding" becomes "Thanks for having me in".
+
+### 12.10 Configuration changes
+
+| Setting | Change |
+|---|---|
+| `Discord:ChannelId` | Becomes optional: if set, that channel's server is set up automatically (the single-server shortcut) |
+| `Discord:HomeGuildId` | New: where owner commands are registered |
+| `Discord:OwnerIds` | New: user ids allowed to use owner commands |
+| `Game:RoundTime`, `Game:TimeZone` | Unchanged, now explicitly global |
+| `Discord:MaxFailedDays` | New, default `3`: consecutive failed days before a server is marked `needs_setup` |
+| `Discord:SendWelcome` | New, default `true`: the one-time welcome when the bot joins a server |
+
+**Invite link:** the permissions grow from `117760` to `117888`, adding *View Audit Log* (`128`) so the welcome can reach the person who invited the bot. The rest is unchanged: View Channel, Send Messages, Embed Links, Attach Files, Read Message History. Scopes are still `bot` and `applications.commands`.
+
+### 12.11 Scale notes
+
+- **Verification:** Discord requires a bot to be verified before it can join more than about 100 servers.
+- **Sharding:** past about 2,500 servers, swap `DiscordSocketClient` for `DiscordShardedClient`. The game's load is tiny (two posts per server per day), so this is the only scaling step expected.
+- **Posting time:** about two REST calls per server at the round time. That's seconds for dozens of servers and a few minutes for thousands. Spoilers aren't a risk, because voting closes for everyone before any reveal is posted.
+- **Intents:** still only `Guilds`. No privileged intents. Sending DMs and reading the audit log need no extra intents, only the View Audit Log permission for the latter.
+
+### 12.12 Tests to add
+
+- Two servers share one puzzle and one seed. Each gets its own post, votes and correct guessers.
+- Closing the puzzle rejects votes in every server.
+- A server that fails to post doesn't block the others. Three failed days mark it `needs_setup`.
+- A server that sets up mid-puzzle gets the current puzzle with the global reveal time.
+- Crash recovery per server: no duplicate posts in any server.
+- The cross-server stat counts all servers.
+- Migration v1 → v2 keeps existing rounds and votes.
+- The `Discord:ChannelId` shortcut still sets up that server.
+- The welcome goes to the inviter from the audit log, falls back to the owner, then to the system channel, and is sent only once per server (with a fake that refuses DMs).

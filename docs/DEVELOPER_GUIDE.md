@@ -147,7 +147,7 @@ flowchart TD
    ```
    u = max(nL·(1 − dL/max), nR·(1 − dR/max)) + 0.7·holes + 0.06·jitter + 0.02·grain
    ```
-   - **Diligence:** `n` is 1.0 for a normal team and 0.25 for a team that painted its spawn diligently. Each team is diligent with probability `DiligentSpawnChance` (30%), drawn from `Rng.Derive(paintSeed, 7)` and exposed as `PaintResult.DiligentLeft/Right`. The unpainted share then shifts to the other spawn, or toward the middle when both teams were diligent.
+   - **Diligence:** `n` is 1.0 for a normal team and 0.25 for a team that painted its spawn diligently. Both teams are diligent together or not at all: a single draw with probability `DiligentSpawnChance` (30%), from `Rng.Derive(paintSeed, 7)` and exposed as `PaintResult.DiligentLeft/Right`. The unpainted share then shifts toward the middle when both teams are diligent.
    - **Spawn trail:** pixels within a cost-distance of `2.5 · (1 + 0.8·jitter)` of a pad are never unpainted. The jitter makes the trail's edge ragged rather than a smooth ring.
    - **Sputters (4b):** `jitter` and `grain` make the paint/unpainted edge ragged. A preliminary quantile gives the estimated border `u₀`. Then 14–25 small splats (radius 0.35–0.9 cells, 3–7 droplets each) are stamped at pixels near a spawn (closeness ≥ 0.4) with `u₀ ≤ u < u₀ + 0.15`, setting `u = −∞` (forced painted). Only after that does the final quantile run.
 5. **Ownership score.** For painted pixels, `s = ln(dR+1) − ln(dL+1) + 0.10·jitter + 0.035·grain`. Positive means closer to the left team.
@@ -335,7 +335,7 @@ All options are mutable classes, so the bot can bind them from `appsettings.json
 |---|---|---|---|
 | `UnpaintedMin` / `UnpaintedMax` | 0.03 / 0.10 | 0 ≤ min ≤ max < 0.5 | Unpainted share of the floor, picked per round |
 | `Splatter` | true | | Splats in the fight zone and sputters at the unpainted border near spawns |
-| `DiligentSpawnChance` | 0.3 | 0–1 | Per team, per round: chance it painted its own spawn area diligently |
+| `DiligentSpawnChance` | 0.3 | 0–1 | Per round: chance both teams painted their own spawn area diligently (otherwise neither did) |
 | `PixelsPerCell` | 16 | 2–64 | Mask and image resolution |
 | `CornerRadius` | 0.75 | 0–<1 | Outer corner radius, in cells |
 | `InnerCornerRadius` | 0.5 | 0–<1 | Inner corner radius, in cells |

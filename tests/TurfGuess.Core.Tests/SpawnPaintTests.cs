@@ -49,6 +49,16 @@ public class SpawnPaintTests
     }
 
     [Fact]
+    public void Both_teams_are_diligent_or_neither_is()
+    {
+        for (ulong seed = 1; seed <= 30; seed++)
+        {
+            var p = RoundGenerator.Generate(seed, Options(0.5)).Paint;
+            Assert.Equal(p.DiligentLeft, p.DiligentRight);
+        }
+    }
+
+    [Fact]
     public void Diligent_teams_leave_less_unpainted_floor_near_their_spawn()
     {
         int lazy = 0, diligent = 0;

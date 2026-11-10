@@ -116,8 +116,10 @@ public static class PaintSimulator
         //    Key u: closeness to a spawn (scaled per team by how much it neglected its spawn)
         //    + holes noise + a rough border. The highest u become unpainted.
         var diligence = new Rng(Rng.Derive(seed, 7));
+        // One draw for both teams: either both neglect their spawn or both paint it diligently,
+        // so the winner can't be read off which side has the barer spawn.
         bool diligentLeft = diligence.Chance(options.DiligentSpawnChance);
-        bool diligentRight = diligence.Chance(options.DiligentSpawnChance);
+        bool diligentRight = diligentLeft;
         double neglectLeft = diligentLeft ? DiligentNeglect : SpawnNeglect;
         double neglectRight = diligentRight ? DiligentNeglect : SpawnNeglect;
 

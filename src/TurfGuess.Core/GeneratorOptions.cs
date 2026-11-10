@@ -64,8 +64,8 @@ public sealed class PaintOptions
     public bool Splatter { get; set; } = true;
 
     /// <summary>
-    /// Chance, per team and per round, that the team painted its own spawn area diligently.
-    /// A diligent team leaves far less unpainted floor near its spawn.
+    /// Chance, per round, that both teams painted their own spawn area diligently (otherwise neither did).
+    /// Diligent teams leave far less unpainted floor near its spawn.
     /// </summary>
     public double DiligentSpawnChance { get; set; } = 0.3;
 

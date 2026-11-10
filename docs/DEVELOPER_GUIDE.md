@@ -36,7 +36,7 @@ flowchart LR
 | `src/TurfGuess.Preview` | ✅ | Console app that writes sample rounds and contact sheets |
 | `src/TurfGuess.Bot` | 🟡 Built, not yet run live | Discord bot: scheduler, round lifecycle, voting buttons, SQLite, reveals, admin commands |
 | `tests/TurfGuess.Core.Tests` | ✅ | xUnit tests for Core (77 tests) |
-| `tests/TurfGuess.Bot.Tests` | ✅ | xUnit tests for the bot's game logic, data and text (39 tests) |
+| `tests/TurfGuess.Bot.Tests` | ✅ | xUnit tests for the bot's game logic, data, text and logs (45 tests) |
 
 **The one rule to remember:** the **paint mask** is the single source of truth. The score is counted from it and the renderer only draws it. Nothing visual may ever change what's counted.
 
@@ -48,7 +48,7 @@ flowchart LR
 
 ```bash
 dotnet build                                   # whole solution
-dotnet test                                    # 116 tests (77 Core + 39 Bot), ~10 s
+dotnet test                                    # 122 tests (77 Core + 45 Bot), ~10 s
 dotnet run --project src/TurfGuess.Preview -c Release -- --count 12 --seed 42
 ```
 
@@ -289,6 +289,22 @@ Each database write happens **before** the Discord call it prepares for, and eac
 - **Round message:** an embed with a title, a description with `<t:unix:R>` timestamps (each client shows them in its own time zone), an attached PNG and the footer `Round #{id}`, plus two grey buttons with the team emoji and name. Every edit (vote count, closing) builds the embed from scratch with the image as `attachment://round_{id}.png`. Copying the existing embed would bring the image back as a CDN link, and Discord would then show the attachment a second time above the embed.
 - **Reveal:** an embed in the winner's color, with the winner, coverage, unpainted share and vote counts, the correct guessers as `<@id>` mentions, the reveal PNG and the footer `Round #{id} · Results`. It's sent with **`AllowedMentions.None`**, so names render but nobody is pinged. The list stops at `MaxListedWinners` and within 2000 characters ("…and N more").
 
+### Logging
+
+Standard `ILogger` with message templates, so the values are structured fields (`{RoundId}`, `{UserName}`, `{Team}` …) for any structured log sink added later. The console uses the simple formatter, with one line per entry and a timestamp (`Program.cs`). Percentages are formatted with the invariant culture, so logs read the same on every machine.
+
+| Where | What |
+|---|---|
+| `RoundService.CreateRound` | Colors, seed, **the answer** (winner and coverage), reveal time in the configured time zone |
+| `RoundService.PostAsync` | Channel id, message id, colors, voting deadline. Adopted messages after a restart are logged too. |
+| `RoundService.AdvanceAsync` | Voting closed, with the vote count |
+| `RoundService.LogRevealStats` | One entry with the winner, coverage, votes per team, and correct guessers by username (capped at 50 names). Logged on a normal reveal and when an existing reveal is adopted. |
+| `VoteService.Cast` | Every click: first vote, changed vote (old → new team), repeat, or rejected because voting closed. Who voted comes from `user_name`, which is stored with each vote and updated on every click. |
+| `AdminModule` | Who ran which admin command, and what happened |
+| `DiscordBotService` | Discord.Net's own log messages, mapped to `ILogger` levels |
+
+`votes.user_name` was added after the first release. `Database.EnsureSchema` adds the column to older databases (`AddColumnIfMissing`), so upgrading needs no manual step.
+
 ### Discord ids and time in the database
 
 Snowflakes are `ulong` in Discord.Net and `INTEGER` (signed 64-bit) in SQLite. The repository works with `long`, and the code casts at the edges. This is safe because current snowflakes are far below 2^63. Times are Unix seconds. Seeds are kept below 2^63 for the same reason.
@@ -360,6 +376,7 @@ dotnet test
 | `RoundServiceTests` | First start creates and posts a round; nothing happens before the reveal time; reveal plus next round at the round time; correct guessers (including changed votes); votes rejected after reveal; multi-day downtime reveals once and posts one round; **a crash right after posting a round or a reveal never posts it twice**; missing images regenerated; `RevealNow` |
 | `RoundScheduleTests` | Today vs tomorrow; catch-up rounds are shorter; 25-hour and 23-hour rounds across daylight-saving changes; skipped times; the first-round minimum |
 | `RepositoryTests` | Round round-trip; only one unfinished round; status only moves forward; votes only while open and changeable; large snowflakes; repeatable schema creation |
+| `LoggingTests` | Posting, every kind of vote (first, changed, repeat, rejected) and the reveal stats are logged; old databases get the `user_name` column |
 | `MessagePreviewTests` | The preview shows every message, resolves mentions and timestamps, and `--raw` keeps the markup |
 | `MessageAndOptionsTests` | Reveal text (winner, coverage, votes, mentions, cut-off, 2000-character limit, no votes); round description; button ids; config validation |
 

@@ -165,6 +165,24 @@ If something's wrong with the settings, the bot won't start and lists every prob
 
 **Downtime is fine.** If the bot was off when a round should have been revealed, it reveals that round as soon as it's back and posts a new one. That new round still ends at the normal round time, so the schedule never drifts. Clicks while the bot is offline fail with "This interaction failed". Players can simply click again once it's back. The bot never posts a round or reveal twice, even after a crash.
 
+### Logs
+
+The bot writes one line per event to its console, with a timestamp. When it runs as a service, the service manager collects these lines, e.g. `journalctl` on Linux. What it logs:
+
+| Event | Example |
+|---|---|
+| A new round is created, **with the answer** | `Round 12: created, Pink vs Green, seed 4821…. Answer: Pink wins with 53.85% of the painted floor (coverage Pink 46.2%, Green 39.6%, 14.1% unpainted). Reveal at 2026-11-11 09:00 +01:00.` |
+| The round is posted | `Round 12: posted in channel 1234… (message 5678…), Pink vs Green. Voting is open until 2026-11-11 09:00 +01:00.` |
+| Someone votes | `Round 12: alice (1111…) voted Pink.` |
+| Someone changes their vote | `Round 12: alice (1111…) changed their vote from Pink to Green.` |
+| Someone clicks their current choice again | `Round 12: alice (1111…) voted Green again (no change).` |
+| A click after voting closed | `Round 12: bob (2222…) clicked left after voting closed; rejected.` |
+| Voting closes | `Round 12: voting closed with 11 votes.` |
+| The reveal, with full stats | `Round 12: revealed (message 9999…). Pink wins with 53.85% of the painted floor. Coverage: Pink 46.2%, Green 39.6%, 14.1% unpainted. Votes: 11 (Pink 7, Green 4). Correct: 7/11 (64%): alice, carol, ….` |
+| An admin command | `Admin dave (3333…) ran /turf-admin reveal-now; revealing the current round early.` |
+
+The answer is in the log from the moment a round is created, so don't share the logs with players. The log level is set in `appsettings.json` under `Logging:LogLevel`.
+
 ### Admin commands
 
 These slash commands are only visible to server administrators. Replies are only visible to you.

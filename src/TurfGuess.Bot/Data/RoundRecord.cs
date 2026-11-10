@@ -68,6 +68,10 @@ public sealed class VoteRecord
 {
     public long RoundId { get; set; }
     public long UserId { get; set; }
+
+    /// <summary>Discord username at the time of the latest vote, for logs.</summary>
+    public string UserName { get; set; } = "";
+
     public string Choice { get; set; } = "";
     public long VotedAt { get; set; }
 

@@ -295,6 +295,7 @@ rounds (
 votes (
   round_id  INTEGER NOT NULL REFERENCES rounds (id),
   user_id   INTEGER NOT NULL,
+  user_name TEXT    NOT NULL,           -- Discord username at the latest vote, for logs (added by an automatic upgrade)
   choice    TEXT    NOT NULL,           -- 'left' | 'right'
   voted_at  INTEGER NOT NULL,           -- time of the latest change
   PRIMARY KEY (round_id, user_id)

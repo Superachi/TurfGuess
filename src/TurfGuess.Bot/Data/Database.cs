@@ -38,6 +38,15 @@ public sealed class Database
         using var c = Open();
         c.Execute("PRAGMA journal_mode = WAL;");
         c.Execute(Schema);
+
+        // Upgrades for databases created by older versions.
+        AddColumnIfMissing(c, "votes", "user_name", "TEXT NOT NULL DEFAULT ''");
+    }
+
+    private static void AddColumnIfMissing(SqliteConnection c, string table, string column, string definition)
+    {
+        bool exists = c.Query<string>($"SELECT name FROM pragma_table_info('{table}')").Contains(column);
+        if (!exists) c.Execute($"ALTER TABLE {table} ADD COLUMN {column} {definition}");
     }
 
     private const string Schema = """
@@ -73,6 +82,7 @@ public sealed class Database
         CREATE TABLE IF NOT EXISTS votes (
             round_id  INTEGER NOT NULL REFERENCES rounds (id),
             user_id   INTEGER NOT NULL,
+            user_name TEXT    NOT NULL DEFAULT '',
             choice    TEXT    NOT NULL CHECK (choice IN ('left', 'right')),
             voted_at  INTEGER NOT NULL,
             PRIMARY KEY (round_id, user_id)

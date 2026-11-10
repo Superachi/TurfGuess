@@ -16,6 +16,8 @@ public sealed class TestEnvironment : IDisposable
     public FixedSeeds Seeds { get; } = new();
     public RoundImages Images { get; }
     public RoundService Rounds { get; }
+    public VoteService Votes { get; }
+    public ListLogger Log { get; } = new();
 
     public TestEnvironment()
     {
@@ -32,13 +34,33 @@ public sealed class TestEnvironment : IDisposable
         Database.EnsureSchema();
         Repo = new RoundRepository(Database);
         Images = new RoundImages(Options, NullLogger<RoundImages>.Instance);
-        Rounds = new RoundService(Repo, Channel, Images, Options, Seeds, NullLogger<RoundService>.Instance);
+        Rounds = new RoundService(Repo, Channel, Images, Options, Seeds, Log.For<RoundService>());
+        Votes = new VoteService(Repo, TimeProvider.System, Log.For<VoteService>());
     }
 
     public void Dispose()
     {
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
         try { Directory.Delete(Folder, recursive: true); } catch (IOException) { }
+    }
+}
+
+/// <summary>Collects formatted log messages from every logger it hands out.</summary>
+public sealed class ListLogger
+{
+    private readonly List<string> _messages = [];
+    public IReadOnlyList<string> Messages { get { lock (_messages) return _messages.ToList(); } }
+
+    public Microsoft.Extensions.Logging.ILogger<T> For<T>() => new Logger<T>(this);
+
+    private void Add(string message) { lock (_messages) _messages.Add(message); }
+
+    private sealed class Logger<T>(ListLogger owner) : Microsoft.Extensions.Logging.ILogger<T>
+    {
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(Microsoft.Extensions.Logging.LogLevel logLevel) => true;
+        public void Log<TState>(Microsoft.Extensions.Logging.LogLevel logLevel, Microsoft.Extensions.Logging.EventId eventId,
+            TState state, Exception? exception, Func<TState, Exception?, string> formatter) => owner.Add(formatter(state, exception));
     }
 }
 

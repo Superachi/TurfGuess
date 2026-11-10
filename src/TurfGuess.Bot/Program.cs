@@ -18,6 +18,13 @@ var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
     ContentRootPath = AppContext.BaseDirectory,
 });
 
+// One line per log entry, with a timestamp.
+builder.Logging.AddSimpleConsole(o =>
+{
+    o.SingleLine = true;
+    o.TimestampFormat = "yyyy-MM-dd HH:mm:ss ";
+});
+
 // appsettings.json < user secrets (development) < TURFGUESS_* environment variables.
 builder.Configuration.AddUserSecrets(Assembly.GetExecutingAssembly(), optional: true);
 builder.Configuration.AddEnvironmentVariables(prefix: "TURFGUESS_");

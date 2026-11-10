@@ -90,23 +90,33 @@ public sealed class RoundRepository(Database db)
     /// Records or changes a vote, but only while the round is Open, in one statement (DESIGN.md §2).
     /// Returns false when voting is closed or the round doesn't exist.
     /// </summary>
-    public bool TryUpsertVote(long roundId, long userId, Side choice, long votedAt)
+    public bool TryUpsertVote(long roundId, long userId, string userName, Side choice, long votedAt)
     {
         using var c = db.Open();
         int rows = c.Execute("""
-            INSERT INTO votes (round_id, user_id, choice, voted_at)
-            SELECT @roundId, @userId, @choice, @votedAt
+            INSERT INTO votes (round_id, user_id, user_name, choice, voted_at)
+            SELECT @roundId, @userId, @userName, @choice, @votedAt
             WHERE EXISTS (SELECT 1 FROM rounds WHERE id = @roundId AND status = 'Open')
-            ON CONFLICT (round_id, user_id) DO UPDATE SET choice = excluded.choice, voted_at = excluded.voted_at;
-            """, new { roundId, userId, choice = SideCodec.Format(choice), votedAt });
+            ON CONFLICT (round_id, user_id) DO UPDATE
+                SET choice = excluded.choice, user_name = excluded.user_name, voted_at = excluded.voted_at;
+            """, new { roundId, userId, userName, choice = SideCodec.Format(choice), votedAt });
         return rows > 0;
+    }
+
+    /// <summary>A player's current vote in a round, if any.</summary>
+    public VoteRecord? GetVote(long roundId, long userId)
+    {
+        using var c = db.Open();
+        return c.QuerySingleOrDefault<VoteRecord>(
+            "SELECT round_id, user_id, user_name, choice, voted_at FROM votes WHERE round_id = @roundId AND user_id = @userId",
+            new { roundId, userId });
     }
 
     public IReadOnlyList<VoteRecord> GetVotes(long roundId)
     {
         using var c = db.Open();
         return c.Query<VoteRecord>(
-            "SELECT round_id, user_id, choice, voted_at FROM votes WHERE round_id = @roundId ORDER BY voted_at, user_id",
+            "SELECT round_id, user_id, user_name, choice, voted_at FROM votes WHERE round_id = @roundId ORDER BY voted_at, user_id",
             new { roundId }).AsList();
     }
 

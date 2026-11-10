@@ -59,7 +59,7 @@ public sealed class RoundService(
                 case RoundStatus.Open:
                     if (now < round.RevealAtTime) return round.RevealAtTime;
                     repo.MarkRevealed(round.Id);
-                    logger.LogInformation("Round {Id}: voting closed.", round.Id);
+                    logger.LogInformation("Round {RoundId}: voting closed with {Votes} votes.", round.Id, repo.CountVotes(round.Id));
                     break;
 
                 case RoundStatus.Revealed:
@@ -114,9 +114,20 @@ public sealed class RoundService(
         var (imagePath, revealPath) = images.Save(record, generated);
         repo.SetImagePaths(record.Id, imagePath, revealPath);
 
-        logger.LogInformation("Round {Id}: created ({Left} vs {Right}, reveal at {RevealAt:u}).",
-            record.Id, record.LeftName, record.RightName, revealAt);
+        // The answer is logged on purpose: logs are for the operator, not for players.
+        logger.LogInformation(
+            "Round {RoundId}: created, {Left} vs {Right}, seed {Seed}. Answer: {Winner} wins with {WinnerShare} of the painted floor " +
+            "(coverage {Left} {ShareLeft}, {Right} {ShareRight}, {Unpainted} unpainted). Reveal at {RevealAt}.",
+            record.Id, record.LeftName, record.RightName, seed, record.TeamName(record.WinnerSide), Pct(record.WinnerShare, 2),
+            record.LeftName, Pct(record.ShareLeft), record.RightName, Pct(record.ShareRight), Pct(record.Unpainted), LocalTime(revealAt));
     }
+
+    private string LocalTime(DateTimeOffset at) =>
+        TimeZoneInfo.ConvertTime(at, options.Game.ParsedTimeZone)
+            .ToString("yyyy-MM-dd HH:mm zzz", System.Globalization.CultureInfo.InvariantCulture);
+
+    private static string Pct(double share, int decimals = 1) =>
+        (share * 100).ToString("F" + decimals, System.Globalization.CultureInfo.InvariantCulture) + "%";
 
     private async Task PostAsync(RoundRecord round, DateTimeOffset now, CancellationToken ct)
     {
@@ -125,11 +136,13 @@ public sealed class RoundService(
         {
             var (imagePath, _) = images.Ensure(round);
             messageId = await channel.PostRoundAsync(round, imagePath, ct);
-            logger.LogInformation("Round {Id}: posted.", round.Id);
+            logger.LogInformation(
+                "Round {RoundId}: posted in channel {ChannelId} (message {MessageId}), {Left} vs {Right}. Voting is open until {RevealAt}.",
+                round.Id, options.Discord.ChannelId, messageId, round.LeftName, round.RightName, LocalTime(round.RevealAtTime));
         }
         else
         {
-            logger.LogInformation("Round {Id}: found the message posted before a restart; adopting it.", round.Id);
+            logger.LogInformation("Round {RoundId}: found message {MessageId} posted before a restart; adopting it.", round.Id, messageId);
         }
 
         repo.MarkOpen(round.Id, (long)messageId.Value, now.ToUnixTimeSeconds());
@@ -151,14 +164,41 @@ public sealed class RoundService(
 
             var (_, revealPath) = images.Ensure(round);
             revealId = await channel.PostRevealAsync(round, summary, revealPath, ct);
-            logger.LogInformation("Round {Id}: revealed ({Winner} wins, {Correct}/{Total} guessed right).",
-                round.Id, round.TeamName(winner), summary.CorrectGuessers.Count, votes.Count);
+            LogRevealStats(round, votes, revealId.Value);
         }
         else
         {
-            logger.LogInformation("Round {Id}: found the reveal posted before a restart; adopting it.", round.Id);
+            logger.LogInformation("Round {RoundId}: found reveal message {MessageId} posted before a restart; adopting it.", round.Id, revealId);
+            LogRevealStats(round, votes, revealId.Value);
         }
 
         repo.MarkDone(round.Id, (long)revealId.Value);
+    }
+
+    private const int MaxNamesInLog = 50;
+
+    /// <summary>One log entry with the full results of a round.</summary>
+    private void LogRevealStats(RoundRecord round, IReadOnlyList<VoteRecord> votes, ulong revealMessageId)
+    {
+        var winner = round.WinnerSide;
+        var loser = winner.Opposite();
+        var correct = votes.Where(v => v.ChoiceSide == winner).ToList();
+        int winnerVotes = correct.Count;
+        int loserVotes = votes.Count - winnerVotes;
+        string correctPct = votes.Count == 0 ? "-" : Pct(correct.Count / (double)votes.Count, 0);
+
+        var names = correct.Take(MaxNamesInLog).Select(v => v.UserName.Length > 0 ? v.UserName : v.UserId.ToString()).ToList();
+        string guessers = names.Count == 0 ? "nobody" : string.Join(", ", names);
+        if (correct.Count > MaxNamesInLog) guessers += $" and {correct.Count - MaxNamesInLog} more";
+
+        logger.LogInformation(
+            "Round {RoundId}: revealed (message {MessageId}). {Winner} wins with {WinnerShare} of the painted floor. " +
+            "Coverage: {Left} {ShareLeft}, {Right} {ShareRight}, {Unpainted} unpainted. " +
+            "Votes: {TotalVotes} ({Winner} {WinnerVotes}, {Loser} {LoserVotes}). " +
+            "Correct: {CorrectCount}/{TotalVotes} ({CorrectPct}): {CorrectGuessers}.",
+            round.Id, revealMessageId, round.TeamName(winner), Pct(round.WinnerShare, 2),
+            round.LeftName, Pct(round.ShareLeft), round.RightName, Pct(round.ShareRight), Pct(round.Unpainted),
+            votes.Count, round.TeamName(winner), winnerVotes, round.TeamName(loser), loserVotes,
+            correct.Count, votes.Count, correctPct, guessers);
     }
 }

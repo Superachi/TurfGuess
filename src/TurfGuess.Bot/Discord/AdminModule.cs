@@ -1,5 +1,6 @@
 using Discord;
 using Discord.Interactions;
+using Microsoft.Extensions.Logging;
 using TurfGuess.Bot.Data;
 using TurfGuess.Bot.Game;
 
@@ -15,17 +16,22 @@ public sealed class AdminModule(
     RoundService rounds,
     RoundRepository repo,
     SchedulerSignal scheduler,
-    TimeProvider clock) : InteractionModuleBase<SocketInteractionContext>
+    TimeProvider clock,
+    ILogger<AdminModule> logger) : InteractionModuleBase<SocketInteractionContext>
 {
     [SlashCommand("reveal-now", "Reveal the current round now and post the next one.")]
     public async Task RevealNowAsync()
     {
         if (!rounds.RevealNow(clock.GetUtcNow()))
         {
+            logger.LogInformation("Admin {UserName} ({UserId}) ran /turf-admin reveal-now, but no round was open.",
+                Context.User.Username, Context.User.Id);
             await RespondAsync("There's no open round to reveal right now.", ephemeral: true);
             return;
         }
 
+        logger.LogInformation("Admin {UserName} ({UserId}) ran /turf-admin reveal-now; revealing the current round early.",
+            Context.User.Username, Context.User.Id);
         scheduler.Wake();
         await RespondAsync("Revealing the current round now. The next round follows straight after.", ephemeral: true);
     }
@@ -33,6 +39,7 @@ public sealed class AdminModule(
     [SlashCommand("status", "Show the current round.")]
     public async Task StatusAsync()
     {
+        logger.LogInformation("Admin {UserName} ({UserId}) ran /turf-admin status.", Context.User.Username, Context.User.Id);
         var round = repo.GetActive();
         if (round is null)
         {

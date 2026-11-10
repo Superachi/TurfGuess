@@ -49,13 +49,13 @@ public class RoundServiceTests
         await env.Rounds.AdvanceAsync(Local(10, 12), default);
         var first = env.Repo.GetActive()!;
 
-        var votes = new VoteService(env.Repo, TimeProvider.System);
+        var votes = env.Votes;
         var winner = first.WinnerSide;
-        votes.Cast(first.Id, 1, winner);
-        votes.Cast(first.Id, 2, winner.Opposite());
-        votes.Cast(first.Id, 3, winner);
-        votes.Cast(first.Id, 3, winner.Opposite()); // changed their mind
-        votes.Cast(first.Id, 3, winner);            // and back
+        votes.Cast(first.Id, 1, "player1", winner);
+        votes.Cast(first.Id, 2, "player2", winner.Opposite());
+        votes.Cast(first.Id, 3, "player3", winner);
+        votes.Cast(first.Id, 3, "player3", winner.Opposite()); // changed their mind
+        votes.Cast(first.Id, 3, "player3", winner);            // and back
 
         var next = await env.Rounds.AdvanceAsync(Local(11, 9), default);
 
@@ -81,9 +81,9 @@ public class RoundServiceTests
         var first = env.Repo.GetActive()!;
         await env.Rounds.AdvanceAsync(Local(11, 9), default);
 
-        var votes = new VoteService(env.Repo, TimeProvider.System);
-        Assert.Equal(VoteResult.Closed, votes.Cast(first.Id, 42, Side.Left));
-        Assert.Equal(VoteResult.Closed, votes.Cast(999, 42, Side.Left)); // unknown round
+        var votes = env.Votes;
+        Assert.Equal(VoteResult.Closed, votes.Cast(first.Id, 42, "player42", Side.Left));
+        Assert.Equal(VoteResult.Closed, votes.Cast(999, 42, "player42", Side.Left)); // unknown round
     }
 
     [Fact]

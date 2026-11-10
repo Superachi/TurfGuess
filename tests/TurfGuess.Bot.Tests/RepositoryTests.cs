@@ -65,12 +65,12 @@ public class RepositoryTests
         using var env = new TestEnvironment();
         long id = env.Repo.Insert(NewRound());
 
-        Assert.False(env.Repo.TryUpsertVote(id, 1, Side.Left, 10)); // Pending
+        Assert.False(env.Repo.TryUpsertVote(id, 1, "player", Side.Left, 10)); // Pending
 
         env.Repo.MarkOpen(id, 77, 150);
-        Assert.True(env.Repo.TryUpsertVote(id, 1, Side.Left, 11));
-        Assert.True(env.Repo.TryUpsertVote(id, 1, Side.Right, 12)); // change
-        Assert.True(env.Repo.TryUpsertVote(id, 2, Side.Left, 13));
+        Assert.True(env.Repo.TryUpsertVote(id, 1, "player", Side.Left, 11));
+        Assert.True(env.Repo.TryUpsertVote(id, 1, "player", Side.Right, 12)); // change
+        Assert.True(env.Repo.TryUpsertVote(id, 2, "player", Side.Left, 13));
 
         var votes = env.Repo.GetVotes(id);
         Assert.Equal(2, votes.Count);
@@ -78,7 +78,7 @@ public class RepositoryTests
         Assert.Equal(2, env.Repo.CountVotes(id));
 
         env.Repo.MarkRevealed(id);
-        Assert.False(env.Repo.TryUpsertVote(id, 3, Side.Left, 14)); // closed
+        Assert.False(env.Repo.TryUpsertVote(id, 3, "player", Side.Left, 14)); // closed
         Assert.Equal(2, env.Repo.CountVotes(id));
     }
 
@@ -89,7 +89,7 @@ public class RepositoryTests
         long id = env.Repo.Insert(NewRound());
         ulong snowflake = 1_234_567_890_123_456_789;
         env.Repo.MarkOpen(id, (long)snowflake, 1);
-        env.Repo.TryUpsertVote(id, (long)snowflake, Side.Left, 2);
+        env.Repo.TryUpsertVote(id, (long)snowflake, "player", Side.Left, 2);
 
         Assert.Equal(snowflake, (ulong)env.Repo.Get(id)!.MessageId!.Value);
         Assert.Equal(snowflake, (ulong)env.Repo.GetVotes(id).Single().UserId);

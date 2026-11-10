@@ -19,7 +19,7 @@ public sealed class VoteModule(VoteService votes, RoundRepository repo) : Intera
             return;
         }
 
-        var result = votes.Cast(roundId, Context.User.Id, side);
+        var result = votes.Cast(roundId, Context.User.Id, Context.User.Username, side);
         var round = result == VoteResult.Accepted ? repo.Get(roundId) : null;
 
         // Only the voter sees the reply, so nobody can see how others voted.

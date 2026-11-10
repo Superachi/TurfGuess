@@ -120,6 +120,18 @@ public sealed class RoundRepository(Database db)
             new { roundId }).AsList();
     }
 
+    /// <summary>
+    /// Everyone who voted in a round, for the round message, sorted by name. Not by vote time:
+    /// changing a vote updates voted_at, so that order would show who switched sides.
+    /// </summary>
+    public IReadOnlyList<ulong> GetVoterIds(long roundId)
+    {
+        using var c = db.Open();
+        return c.Query<long>(
+            "SELECT user_id FROM votes WHERE round_id = @roundId ORDER BY user_name COLLATE NOCASE, user_id",
+            new { roundId }).Select(id => (ulong)id).ToList();
+    }
+
     public int CountVotes(long roundId)
     {
         using var c = db.Open();

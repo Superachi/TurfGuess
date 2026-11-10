@@ -7,8 +7,8 @@ using TurfGuess.Bot.Options;
 namespace TurfGuess.Bot.Game;
 
 /// <summary>
-/// Keeps "N players have voted" on the round message up to date, editing at most once per
-/// interval (debounced) to stay within Discord's rate limits. Shows only the total, never the split.
+/// Keeps the list of who has voted on the round message up to date, editing at most once per
+/// interval (debounced) to stay within Discord's rate limits. Shows who voted, never what they picked.
 /// </summary>
 public sealed class VoteCountService : BackgroundService
 {
@@ -45,11 +45,11 @@ public sealed class VoteCountService : BackgroundService
                 {
                     var round = _repo.Get(roundId);
                     if (round is not { Status: RoundStatus.Open }) continue;
-                    await _channel.UpdateVoteCountAsync(round, _repo.CountVotes(roundId), stoppingToken);
+                    await _channel.UpdateVotersAsync(round, _repo.GetVoterIds(roundId), stoppingToken);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
-                    _logger.LogWarning(ex, "Updating the vote count of round {Id} failed.", roundId);
+                    _logger.LogWarning(ex, "Updating the voter list of round {Id} failed.", roundId);
                 }
             }
         }

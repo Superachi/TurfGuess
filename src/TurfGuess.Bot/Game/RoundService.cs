@@ -151,7 +151,7 @@ public sealed class RoundService(
     private async Task RevealAsync(RoundRecord round, CancellationToken ct)
     {
         var votes = repo.GetVotes(round.Id);
-        await channel.CloseRoundMessageAsync(round, options.Game.ShowVoteCount ? votes.Count : null, ct);
+        await channel.CloseRoundMessageAsync(round, options.Game.ShowVoteCount ? repo.GetVoterIds(round.Id) : null, ct);
 
         ulong? revealId = await channel.FindRevealMessageAsync(round.Id, ct);
         if (revealId is null)

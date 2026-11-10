@@ -61,6 +61,7 @@ public class RoundServiceTests
 
         Assert.Equal(RoundStatus.Done, env.Repo.Get(first.Id)!.Status);
         Assert.Contains(first.Id, env.Channel.ClosedRounds);
+        Assert.Equal(new ulong[] { 1, 2, 3 }, env.Channel.ClosedWithVoters[first.Id]);
         var (roundId, summary) = Assert.Single(env.Channel.Reveals);
         Assert.Equal(first.Id, roundId);
         Assert.Equal(new ulong[] { 1, 3 }, summary.CorrectGuessers);

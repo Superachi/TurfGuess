@@ -44,7 +44,7 @@ Day 3 09:00   Reveal R2 → Post R3
 - **Voting uses message buttons.** The round message has two buttons, one per team, each labeled with that round's color emoji and name (e.g. `🩷 Pink` / `💚 Green`, see [Colors](#colors)). One click is a vote, with no commands or extra steps.
 - **Votes are hidden.** A click gets an **ephemeral** reply that only the voter sees ("You voted 🟧 Orange. You can change it until the reveal."). Nobody can see the running split, so players can't just follow the crowd.
 - **One vote per player.** Clicking the other button changes the vote, and the newest click wins.
-- **Live vote counter (optional):** the round message can show "N players have voted" and be updated as votes come in. It shows only the total, never the split. Edits are debounced (e.g. at most once every 30 s) to stay within rate limits.
+- **Live voter list (optional):** the round message can show who has voted ("N players have voted: @a, @b, …"), sorted by name, and be updated as votes come in. It shows who voted, never what they picked. Edits are debounced (e.g. at most once every 30 s) to stay within rate limits.
 
 **Source of truth:** each click is written to the `votes` table straight away (an upsert on `(round_id, user_id)`).
 
@@ -331,7 +331,7 @@ Streaks, accuracy and the leaderboard can be computed from `votes` joined with `
     "Name": "Judd's Judgment",     // shown in message titles, image captions and the reveal
     "RoundTime": "09:00",
     "TimeZone": "Europe/Amsterdam",   // IANA id; .NET resolves it on Windows and Linux
-    "ShowVoteCount": true,            // "N players have voted" on the round message
+    "ShowVoteCount": true,            // who has voted (names only) on the round message
     "MaxListedWinners": 50,           // extra names are cut off with "…and N more"
     "MinRoundLength": "06:00:00",     // first-start rounds shorter than this skip to the following RoundTime
     "Ink": "Marbled"                  // "Marbled" | "Flat" | "Shaded"
@@ -372,7 +372,7 @@ Streaks, accuracy and the leaderboard can be computed from `votes` joined with `
   },
   "Discord": {
     "ChannelId": 0,
-    "VoteCountInterval": "00:00:30"   // at most one vote-count edit per interval
+    "VoteCountInterval": "00:00:30"   // at most one voter-list edit per interval
     // The token is never stored in this file. It comes from the environment variable
     // TURFGUESS_Discord__Token, or from `dotnet user-secrets` during development.
   },
@@ -438,7 +438,7 @@ TurfGuess/
       Game/MessageText.cs        #   all player-facing text (Discord-free, unit-tested)
       Game/MessagePreview.cs     #   --preview-messages: print all messages for a sample round
       Game/VoteService.cs        #   votes; closing enforced by the database
-      Game/VoteCountService.cs   #   debounced "N players have voted" edits
+      Game/VoteCountService.cs   #   debounced voter list edits
       Game/IRoundChannel.cs      #   what the game needs from the chat platform
       Discord/DiscordBotService.cs   # client login, command registration, interaction routing
       Discord/DiscordRoundChannel.cs # IRoundChannel on Discord: post, close, find, reveal

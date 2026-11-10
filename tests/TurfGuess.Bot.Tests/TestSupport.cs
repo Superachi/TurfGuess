@@ -79,7 +79,8 @@ public sealed class FakeChannel : IRoundChannel
     public List<Message> Messages { get; } = [];
     public List<(long RoundId, RevealSummary Summary)> Reveals { get; } = [];
     public HashSet<long> ClosedRounds { get; } = [];
-    public List<(long RoundId, int Voters)> VoteCountUpdates { get; } = [];
+    public List<(long RoundId, IReadOnlyList<ulong> Voters)> VoterUpdates { get; } = [];
+    public Dictionary<long, IReadOnlyList<ulong>?> ClosedWithVoters { get; } = [];
 
     /// <summary>When set, the next post succeeds on "Discord" but then throws, like a crash right after sending.</summary>
     public bool CrashAfterNextPost { get; set; }
@@ -96,15 +97,16 @@ public sealed class FakeChannel : IRoundChannel
         return Post(round.Id, "round");
     }
 
-    public Task CloseRoundMessageAsync(RoundRecord round, int? voters, CancellationToken ct)
+    public Task CloseRoundMessageAsync(RoundRecord round, IReadOnlyList<ulong>? voters, CancellationToken ct)
     {
         ClosedRounds.Add(round.Id);
+        ClosedWithVoters[round.Id] = voters;
         return Task.CompletedTask;
     }
 
-    public Task UpdateVoteCountAsync(RoundRecord round, int voters, CancellationToken ct)
+    public Task UpdateVotersAsync(RoundRecord round, IReadOnlyList<ulong> voters, CancellationToken ct)
     {
-        VoteCountUpdates.Add((round.Id, voters));
+        VoterUpdates.Add((round.Id, voters));
         return Task.CompletedTask;
     }
 

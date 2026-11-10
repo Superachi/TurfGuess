@@ -227,7 +227,7 @@ flowchart LR
     subgraph Hosted["Hosted services"]
         DBS[DiscordBotService<br/>login, commands, routing]
         SCH[RoundScheduler<br/>wakes at reveal times]
-        VCS[VoteCountService<br/>debounced count edits]
+        VCS[VoteCountService<br/>debounced voter list edits]
     end
     subgraph Game["Game (Discord-free)"]
         RS[RoundService<br/>lifecycle state machine]
@@ -260,7 +260,7 @@ flowchart LR
 4. Register the services and start three hosted services:
    - `DiscordBotService` logs in with `GatewayIntents.Guilds` only. On `Ready` it registers the slash commands to the channel's server (guild commands appear instantly) and completes `ChannelReadySignal`.
    - `RoundScheduler` waits for that signal, then loops: `next = RoundService.AdvanceAsync(now)`, then sleeps until `next`. It caps each sleep at 5 minutes, so a changed system clock can't make it oversleep, and wakes early when `SchedulerSignal.Wake()` is called. On an error it logs and retries after a minute.
-   - `VoteCountService` edits "N players have voted" at most once per `VoteCountInterval`, for rounds that got new votes.
+   - `VoteCountService` edits the voter list ("N players have voted: @a, @b, …") at most once per `VoteCountInterval`, for rounds that got new votes. Voters come from `RoundRepository.GetVoterIds`, sorted by name rather than vote time: changing a vote updates `voted_at`, so time order would show who switched.
 
 ### The round lifecycle (`Game/RoundService.cs`)
 
@@ -288,8 +288,8 @@ Each database write happens **before** the Discord call it prepares for, and eac
 
 ### Messages (`Game/MessageText.cs` + `Discord/DiscordRoundChannel.cs`)
 
-- **Round message:** an embed with a title, a description with `<t:unix:R>` timestamps (each client shows them in its own time zone), an attached PNG and the footer `Round #{id}`, plus two grey buttons with the team emoji and name. Every edit (vote count, closing) builds the embed from scratch with the image as `attachment://round_{id}.png`. Copying the existing embed would bring the image back as a CDN link, and Discord would then show the attachment a second time above the embed.
-- **Reveal:** an embed in the winner's color, with the winner, coverage, unpainted share and vote counts, the correct guessers as `<@id>` mentions, the reveal PNG and the footer `Round #{id} · Results`. It's sent with **`AllowedMentions.None`**, so names render but nobody is pinged. The list stops at `MaxListedWinners` and within 2000 characters ("…and N more").
+- **Round message:** an embed with a title, a description with `<t:unix:R>` timestamps (each client shows them in its own time zone), an attached PNG and the footer `Round #{id}`, plus two grey buttons with the team emoji and name. Every edit (voter list, closing) builds the embed from scratch with the image as `attachment://round_{id}.png`. Copying the existing embed would bring the image back as a CDN link, and Discord would then show the attachment a second time above the embed.
+- **Reveal:** an embed in the winner's color, with the winner, coverage, unpainted share and vote counts, the correct guessers as `<@id>` mentions, the reveal PNG and the footer `Round #{id} · Results`. It's sent with **`AllowedMentions.None`**, so names render but nobody is pinged. The list stops at `MaxListedWinners` and within 2000 characters ("…and N more"). The voter list on the round message uses the same mentions, capped at 50 names and the 4096-character embed limit.
 
 ### Logging
 

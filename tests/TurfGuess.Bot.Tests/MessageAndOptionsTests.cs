@@ -55,13 +55,33 @@ public class MessageTextTests
     }
 
     [Fact]
-    public void Round_description_uses_discord_timestamps_and_vote_count()
+    public void Round_description_uses_discord_timestamps_and_lists_voters()
     {
-        var open = MessageText.RoundDescription(Round(), 3, closed: false);
+        var open = MessageText.RoundDescription(Round(), [1, 2, 3], closed: false);
         Assert.Contains("<t:1800000000:R>", open);
-        Assert.Contains("3 players have voted.", open);
-        Assert.DoesNotContain("voted", MessageText.RoundDescription(Round(), null, closed: false));
-        Assert.Contains("closed", MessageText.RoundDescription(Round(), 3, closed: true));
+        Assert.Contains("**3 players have voted:** <@1>, <@2>, <@3>", open);
+        Assert.Contains("No votes yet.", MessageText.RoundDescription(Round(), [], closed: false));
+        Assert.Contains("**1 player has voted:** <@7>", MessageText.RoundDescription(Round(), [7], closed: false));
+        Assert.DoesNotContain("vote", MessageText.RoundDescription(Round(), null, closed: false).Replace("Cast your vote", ""));
+
+        var closed = MessageText.RoundDescription(Round(), [1, 2, 3], closed: true);
+        Assert.Contains("closed", closed);
+        Assert.Contains("<@1>, <@2>, <@3>", closed);
+    }
+
+    [Fact]
+    public void Voter_list_is_cut_off_and_stays_within_the_embed_limit()
+    {
+        var ids = Enumerable.Range(1, 500).Select(i => 1_000_000_000_000_000_000UL + (ulong)i).ToList();
+
+        var capped = MessageText.RoundDescription(Round(), ids, closed: false, maxListed: 4);
+        Assert.Contains("**500 players have voted:** ", capped);
+        Assert.Equal(4, capped.Split("<@").Length - 1);
+        Assert.EndsWith("…and 496 more", capped);
+
+        var all = MessageText.RoundDescription(Round(), ids, closed: false, maxListed: 500);
+        Assert.True(all.Length <= MessageText.EmbedDescriptionLimit, $"{all.Length} characters");
+        Assert.Contains("more", all);
     }
 
     [Theory]
@@ -75,8 +95,8 @@ public class MessageTextTests
         var round = Round();
         round.WinnerShare = winnerShare;
         string line = expected + "\n";
-        Assert.Contains(line, MessageText.RoundDescription(round, 3, closed: false));
-        Assert.Contains(line, MessageText.RoundDescription(round, 3, closed: true) + "\n");
+        Assert.Contains(line, MessageText.RoundDescription(round, [1, 2, 3], closed: false));
+        Assert.Contains(line, MessageText.RoundDescription(round, [1, 2, 3], closed: true) + "\n");
     }
 
     [Fact]

@@ -15,11 +15,14 @@ public interface IRoundChannel
     /// <summary>Posts the round image with the two vote buttons. Returns the message id.</summary>
     Task<ulong> PostRoundAsync(RoundRecord round, string imagePath, CancellationToken ct);
 
-    /// <summary>Disables the buttons and marks the round message closed. Must be safe to call twice.</summary>
-    Task CloseRoundMessageAsync(RoundRecord round, int? voters, CancellationToken ct);
+    /// <summary>
+    /// Disables the buttons and marks the round message closed. <paramref name="voters"/> is null
+    /// when the voter list is turned off. Must be safe to call twice.
+    /// </summary>
+    Task CloseRoundMessageAsync(RoundRecord round, IReadOnlyList<ulong>? voters, CancellationToken ct);
 
-    /// <summary>Updates "N players have voted" on the round message.</summary>
-    Task UpdateVoteCountAsync(RoundRecord round, int voters, CancellationToken ct);
+    /// <summary>Updates the list of who has voted on the round message (names only, never their choice).</summary>
+    Task UpdateVotersAsync(RoundRecord round, IReadOnlyList<ulong> voters, CancellationToken ct);
 
     /// <summary>Looks for an already posted reveal for this round. Returns the message id.</summary>
     Task<ulong?> FindRevealMessageAsync(long roundId, CancellationToken ct);

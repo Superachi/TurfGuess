@@ -27,7 +27,7 @@ public sealed class DiscordRoundChannel(DiscordSocketClient client, BotOptions o
     {
         var channel = await ChannelAsync();
         string fileName = Path.GetFileName(imagePath);
-        int? voters = options.Game.ShowVoteCount ? 0 : null;
+        IReadOnlyList<ulong>? voters = options.Game.ShowVoteCount ? [] : null;
 
         var embed = RoundEmbed(round, MessageText.RoundDescription(round, voters, closed: false), fileName);
 
@@ -37,7 +37,7 @@ public sealed class DiscordRoundChannel(DiscordSocketClient client, BotOptions o
         return message.Id;
     }
 
-    public async Task CloseRoundMessageAsync(RoundRecord round, int? voters, CancellationToken ct)
+    public async Task CloseRoundMessageAsync(RoundRecord round, IReadOnlyList<ulong>? voters, CancellationToken ct)
     {
         var message = await RoundMessageAsync(round, ct);
         if (message is null) return;
@@ -48,7 +48,7 @@ public sealed class DiscordRoundChannel(DiscordSocketClient client, BotOptions o
         }, Request(ct));
     }
 
-    public async Task UpdateVoteCountAsync(RoundRecord round, int voters, CancellationToken ct)
+    public async Task UpdateVotersAsync(RoundRecord round, IReadOnlyList<ulong> voters, CancellationToken ct)
     {
         var message = await RoundMessageAsync(round, ct);
         if (message is null) return;

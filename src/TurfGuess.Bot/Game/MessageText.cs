@@ -33,7 +33,18 @@ public static class MessageText
 
     public static string ButtonIdPrefix(long roundId) => $"vote:{roundId}:";
 
-    public static string RoundDescription(RoundRecord round, int? voters, bool closed)
+    /// <summary>Discord's limit for an embed description.</summary>
+    public const int EmbedDescriptionLimit = 4096;
+
+    /// <summary>Most voters named on the round message; the rest are counted.</summary>
+    public const int MaxListedVoters = 50;
+
+    /// <summary>
+    /// The round message. <paramref name="voters"/> are the players who voted, in display order,
+    /// or null to leave the voter line out (Game:ShowVoteCount off). Only who voted, never what.
+    /// </summary>
+    public static string RoundDescription(RoundRecord round, IReadOnlyList<ulong>? voters, bool closed,
+        int maxListed = MaxListedVoters, int limit = EmbedDescriptionLimit)
     {
         var sb = new StringBuilder();
         if (closed)
@@ -48,8 +59,17 @@ public static class MessageText
             sb.Append($"Results <t:{round.RevealAt}:R> (<t:{round.RevealAt}:f>).");
         }
 
-        if (voters is { } n)
-            sb.Append($"\n\n{VoterCount(n)}");
+        if (voters is null) return sb.ToString();
+
+        sb.Append("\n\n");
+        if (voters.Count == 0)
+        {
+            sb.Append("No votes yet.");
+            return sb.ToString();
+        }
+
+        sb.Append(voters.Count == 1 ? "**1 player has voted:** " : $"**{voters.Count} players have voted:** ");
+        AppendMentions(sb, voters, maxListed, limit);
         return sb.ToString();
     }
 
@@ -63,13 +83,6 @@ public static class MessageText
         int flames = (int)rank + 1; // C = 1 … X = 5
         return $"{rank}-rank difficulty {string.Concat(Enumerable.Repeat("🔥", flames))}";
     }
-
-    public static string VoterCount(int n) => n switch
-    {
-        0 => "No votes yet.",
-        1 => "1 player has voted.",
-        _ => $"{n} players have voted.",
-    };
 
     public static string VoteAccepted(RoundRecord round, Side side) =>
         $"You voted {round.TeamEmoji(side)} **{round.TeamName(side)}**. You can change your vote until the reveal.";
@@ -100,13 +113,22 @@ public static class MessageText
             return sb.ToString();
         }
 
-        string header = $"**Correct guessers ({s.CorrectGuessers.Count}):** ";
-        sb.Append(header);
+        sb.Append($"**Correct guessers ({s.CorrectGuessers.Count}):** ");
+        AppendMentions(sb, s.CorrectGuessers, maxListed, limit);
+        return sb.ToString();
+    }
 
+    /// <summary>
+    /// Appends players as mentions (the bot sends them with mentions disabled, so nobody is pinged),
+    /// at most <paramref name="maxListed"/> of them and keeping the whole text within
+    /// <paramref name="limit"/> characters. Anyone left out is counted: "…and N more".
+    /// </summary>
+    private static void AppendMentions(StringBuilder sb, IReadOnlyList<ulong> ids, int maxListed, int limit)
+    {
         int listed = 0;
         int budget = limit - sb.Length - 30; // room for "…and N more"
         var names = new StringBuilder();
-        foreach (var id in s.CorrectGuessers)
+        foreach (var id in ids)
         {
             if (listed >= maxListed) break;
             string part = (listed == 0 ? "" : ", ") + $"<@{id}>";
@@ -116,9 +138,8 @@ public static class MessageText
         }
 
         sb.Append(names);
-        int rest = s.CorrectGuessers.Count - listed;
+        int rest = ids.Count - listed;
         if (rest > 0) sb.Append(listed == 0 ? $"{rest} players" : $" …and {rest} more");
-        return sb.ToString();
     }
 
     private static string Pct(double share) => (share * 100).ToString("0.0", CultureInfo.InvariantCulture) + "%";

@@ -31,7 +31,7 @@ What makes it fun:
 ## How to play
 
 1. **Every day at the round time** (for example 09:00), the bot posts a new arena in the game channel, with two buttons, one per team color, e.g. `🩷 Pink` and `💚 Green`.
-2. **Click the color you think covers more floor.** Only you see your vote: the bot confirms it with a message nobody else can see. Nobody can see how others voted, so you can't just follow the crowd.
+2. **Click the color you think covers more floor.** Only you see your vote: the bot confirms it with a message nobody else can see. The round message lists **who** has voted, but never what they picked, so you can't just follow the crowd.
 3. **Changed your mind?** Click the other button. Your latest click counts, right up until the reveal.
 4. **At the next round time**, voting closes and the bot posts the result:
    - the winning color,
@@ -129,7 +129,7 @@ To find the **channel ID**:
 2. Right-click the game channel and choose **Copy Channel ID**.
 
 **Playing in a thread.** The game can also run in a thread, including a forum post. Right-click the thread, copy its ID the same way, and use that as the channel ID. Some things to set up:
-- **Archiving.** Discord archives a thread after a period without new messages. The bot can't update the vote count or close the round in an archived thread. In the thread's settings, set **Hide After Inactivity** to **1 Week**, so the daily posts keep it open.
+- **Archiving.** Discord archives a thread after a period without new messages. The bot can't update the voter list or close the round in an archived thread. In the thread's settings, set **Hide After Inactivity** to **1 Week**, so the daily posts keep it open.
 - **Permissions.** Posting in a thread needs **Send Messages in Threads**. The invite link doesn't ask for it, but most servers allow it for everyone. If the bot can't post, check this permission for the bot in the parent channel.
 - **Private threads.** Add the bot to the thread, e.g. by mentioning it there.
 
@@ -157,7 +157,7 @@ The other settings are in [`src/TurfGuess.Bot/appsettings.json`](../src/TurfGues
 | `Game:RoundTime` | `09:00` | Time of day when the round is revealed and the next one posted |
 | `Game:TimeZone` | `Europe/Amsterdam` | Time zone for the round time (daylight saving is handled) |
 | `Game:Name` | `Judd's Judgment` | The game's name, shown in message titles, image captions and the reveal. Change it to anything you like. |
-| `Game:ShowVoteCount` | `true` | Show "N players have voted" on the round message. Only the total, never the split. |
+| `Game:ShowVoteCount` | `true` | List who has voted on the round message, e.g. "3 players have voted: @alice, @bob, @carol". Names only, never what they picked. Sorted by name, and at most 50 names, then "…and N more". |
 | `Game:MaxListedWinners` | `50` | Most correct guessers named in the reveal |
 | `Game:Ink` | `Marbled` | `Marbled`, `Flat` or `Shaded` |
 | `Generator:Difficulty:MinWinnerShare` / `MaxWinnerShare` | `50.3` / `52.3` | How close rounds are, as the winner's % of the painted floor |
@@ -223,7 +223,7 @@ dotnet run --project src\TurfGuess.Bot -c Release -- --preview-messages
 This builds a sample round with the real generator and prints every message for it:
 1. the round post with its buttons,
 2. the private vote confirmation,
-3. the live vote count,
+3. the live list of who has voted,
 4. the "voting is closed" reply,
 5. the round post after it closes,
 6. the reveal.
@@ -235,7 +235,7 @@ Mentions and timestamps are shown as Discord would display them.
 | `--seed <n>` | Use a different sample round (default `42`) |
 | `--raw` | Show the exact markup sent to Discord (`<@id>` mentions, `<t:…>` timestamps) |
 
-It uses your `appsettings.json`, so changes to the game name, round time, time zone or vote count setting show up in the preview.
+It uses your `appsettings.json`, so changes to the game name, round time, time zone or voter list setting show up in the preview.
 
 ---
 

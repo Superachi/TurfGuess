@@ -83,6 +83,22 @@ public class RepositoryTests
     }
 
     [Fact]
+    public void Voters_are_listed_by_name_so_changing_a_vote_does_not_move_anyone()
+    {
+        using var env = new TestEnvironment();
+        long id = env.Repo.Insert(NewRound());
+        env.Repo.MarkOpen(id, 77, 150);
+
+        env.Repo.TryUpsertVote(id, 3, "carol", Side.Left, 11);
+        env.Repo.TryUpsertVote(id, 1, "Alice", Side.Left, 12);
+        env.Repo.TryUpsertVote(id, 2, "bob", Side.Right, 13);
+        Assert.Equal(new ulong[] { 1, 2, 3 }, env.Repo.GetVoterIds(id));
+
+        env.Repo.TryUpsertVote(id, 1, "Alice", Side.Right, 20); // change: newest voted_at
+        Assert.Equal(new ulong[] { 1, 2, 3 }, env.Repo.GetVoterIds(id));
+    }
+
+    [Fact]
     public void Large_discord_ids_survive_the_round_trip()
     {
         using var env = new TestEnvironment();

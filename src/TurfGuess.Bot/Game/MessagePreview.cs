@@ -42,7 +42,8 @@ public static partial class MessagePreview
 
         // Sample votes: 11 players, 7 of them right.
         var winner = round.WinnerSide;
-        var correct = Enumerable.Range(1, 7).Select(i => 100_000_000_000_000_000UL + (ulong)i).ToList();
+        var voters = Enumerable.Range(1, 11).Select(i => 100_000_000_000_000_000UL + (ulong)i).ToList();
+        var correct = voters.Take(7).ToList();
         var summary = winner == Side.Left
             ? new RevealSummary(LeftVotes: 7, RightVotes: 4, correct)
             : new RevealSummary(LeftVotes: 4, RightVotes: 7, correct);
@@ -59,7 +60,7 @@ public static partial class MessagePreview
 
         Section(sb, "1. Round message (posted at the round time)");
         Embed(sb, MessageText.RoundTitle(options.Game.Name, round.Id),
-            Show(MessageText.RoundDescription(round, options.Game.ShowVoteCount ? 0 : null, closed: false)),
+            Show(MessageText.RoundDescription(round, options.Game.ShowVoteCount ? [] : null, closed: false)),
             $"round_{round.Id}.png", MessageText.RoundFooter(round.Id));
         sb.AppendLine($"Buttons: {buttons(false)}");
         sb.AppendLine();
@@ -68,9 +69,9 @@ public static partial class MessagePreview
         sb.AppendLine(Show(MessageText.VoteAccepted(round, Side.Left)));
         sb.AppendLine();
 
-        Section(sb, "3. Round message, live vote count (edited at most every " +
+        Section(sb, "3. Round message, live voter list (edited at most every " +
                     $"{options.Discord.VoteCountInterval.TotalSeconds:0} s)");
-        sb.AppendLine(Show(MessageText.RoundDescription(round, 11, closed: false)));
+        sb.AppendLine(Show(MessageText.RoundDescription(round, voters, closed: false)));
         sb.AppendLine();
 
         Section(sb, "4. Clicking after voting closed (only the clicker sees this)");
@@ -79,7 +80,7 @@ public static partial class MessagePreview
 
         Section(sb, "5. Round message after the reveal");
         Embed(sb, MessageText.RoundTitle(options.Game.Name, round.Id),
-            Show(MessageText.RoundDescription(round, options.Game.ShowVoteCount ? 11 : null, closed: true)),
+            Show(MessageText.RoundDescription(round, options.Game.ShowVoteCount ? voters : null, closed: true)),
             $"round_{round.Id}.png", MessageText.RoundFooter(round.Id));
         sb.AppendLine($"Buttons: {buttons(true)}");
         sb.AppendLine();

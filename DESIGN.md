@@ -435,6 +435,7 @@ TurfGuess/
       Game/RoundScheduler.cs     #   BackgroundService: wakes at reveal times / on admin signal
       Game/RoundImages.cs        #   render + store PNGs, regenerate if missing
       Game/MessageText.cs        #   all player-facing text (Discord-free, unit-tested)
+      Game/MessagePreview.cs     #   --preview-messages: print all messages for a sample round
       Game/VoteService.cs        #   votes; closing enforced by the database
       Game/VoteCountService.cs   #   debounced "N players have voted" edits
       Game/IRoundChannel.cs      #   what the game needs from the chat platform

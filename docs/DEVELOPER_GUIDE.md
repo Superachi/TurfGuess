@@ -36,7 +36,7 @@ flowchart LR
 | `src/TurfGuess.Preview` | ✅ | Console app that writes sample rounds and contact sheets |
 | `src/TurfGuess.Bot` | 🟡 Built, not yet run live | Discord bot: scheduler, round lifecycle, voting buttons, SQLite, reveals, admin commands |
 | `tests/TurfGuess.Core.Tests` | ✅ | xUnit tests for Core (77 tests) |
-| `tests/TurfGuess.Bot.Tests` | ✅ | xUnit tests for the bot's game logic, data and text (37 tests) |
+| `tests/TurfGuess.Bot.Tests` | ✅ | xUnit tests for the bot's game logic, data and text (39 tests) |
 
 **The one rule to remember:** the **paint mask** is the single source of truth. The score is counted from it and the renderer only draws it. Nothing visual may ever change what's counted.
 
@@ -48,7 +48,7 @@ flowchart LR
 
 ```bash
 dotnet build                                   # whole solution
-dotnet test                                    # 114 tests (77 Core + 37 Bot), ~10 s
+dotnet test                                    # 116 tests (77 Core + 39 Bot), ~10 s
 dotnet run --project src/TurfGuess.Preview -c Release -- --count 12 --seed 42
 ```
 
@@ -252,6 +252,7 @@ flowchart LR
 ### Startup (`Program.cs`)
 
 1. Configuration: `appsettings.json` from the app folder, then user secrets, then `TURFGUESS_*` environment variables.
+   - With `--preview-messages [--seed N] [--raw]`, `MessagePreview.Render` prints every message for a sample round and the app exits. It needs no token and makes no Discord connection. It uses the same `MessageText` as the live bot, so the preview can't drift from what's actually posted.
 2. `BotOptionsValidator.Validate`. On any error, print every problem and exit with code 1.
 3. Create the schema (`Database.EnsureSchema`, WAL mode).
 4. Register the services and start three hosted services:
@@ -359,6 +360,7 @@ dotnet test
 | `RoundServiceTests` | First start creates and posts a round; nothing happens before the reveal time; reveal plus next round at the round time; correct guessers (including changed votes); votes rejected after reveal; multi-day downtime reveals once and posts one round; **a crash right after posting a round or a reveal never posts it twice**; missing images regenerated; `RevealNow` |
 | `RoundScheduleTests` | Today vs tomorrow; catch-up rounds are shorter; 25-hour and 23-hour rounds across daylight-saving changes; skipped times; the first-round minimum |
 | `RepositoryTests` | Round round-trip; only one unfinished round; status only moves forward; votes only while open and changeable; large snowflakes; repeatable schema creation |
+| `MessagePreviewTests` | The preview shows every message, resolves mentions and timestamps, and `--raw` keeps the markup |
 | `MessageAndOptionsTests` | Reveal text (winner, coverage, votes, mentions, cut-off, 2000-character limit, no votes); round description; button ids; config validation |
 
 Round tests run at `PixelsPerCell = 4` to stay fast. The math doesn't depend on resolution. Internals are visible to the test project via `InternalsVisibleTo`.

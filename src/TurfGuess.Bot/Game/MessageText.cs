@@ -35,7 +35,7 @@ public static class MessageText
         }
         else
         {
-            sb.Append("Which color covered more floor? Vote with the buttons below.\n");
+            sb.Append("Which team do you think painted more? Cast your vote!\n");
             sb.Append($"Results <t:{round.RevealAt}:R> (<t:{round.RevealAt}:f>).");
         }
 

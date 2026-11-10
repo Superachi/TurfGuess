@@ -23,6 +23,18 @@ builder.Configuration.AddUserSecrets(Assembly.GetExecutingAssembly(), optional: 
 builder.Configuration.AddEnvironmentVariables(prefix: "TURFGUESS_");
 
 var options = builder.Configuration.Get<BotOptions>() ?? new BotOptions();
+
+// --preview-messages [--seed N] [--raw]: print every message for a sample round and exit.
+// No token or Discord connection needed.
+if (args.Contains("--preview-messages"))
+{
+    int seedIndex = Array.IndexOf(args, "--seed");
+    ulong seed = seedIndex >= 0 && seedIndex + 1 < args.Length && ulong.TryParse(args[seedIndex + 1], out var s) ? s : 42;
+    Console.OutputEncoding = System.Text.Encoding.UTF8;
+    Console.WriteLine(MessagePreview.Render(options, seed, DateTimeOffset.UtcNow, raw: args.Contains("--raw")));
+    return 0;
+}
+
 var errors = BotOptionsValidator.Validate(options);
 if (errors.Count > 0)
 {

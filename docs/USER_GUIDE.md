@@ -61,7 +61,8 @@ Each round runs from one round time to the next, which is normally 24 hours.
 
 **Tips:**
 - The map is **symmetric** (rotated 180°), so neither team has a better side.
-- Players rush forward, so the floor near each team's own spawn is often left **unpainted**. Don't let a big grey patch on one side fool you.
+- Players rush forward, so the floor near each team's own spawn is often left **unpainted**, with stray splats and droplets around the edges. Don't let a big grey patch on one side fool you.
+- Sometimes a team **painted its spawn diligently**, so its side is almost fully painted and the grey patches end up on the other side. A tidy spawn doesn't mean that team won.
 - The middle is messy on purpose. Look at the overall area, not just the front line.
 
 ### The reveal
@@ -125,8 +126,8 @@ This generates 12 rounds and writes them to the `preview` folder:
 It also prints a table in the terminal:
 
 ```
-  seed try winner      target  actual  L cov  R cov    unp     ms
-    42   1 Pink       53.85 % 53.85 % 46.2 % 39.6 % 14.1 %    639
+  seed try winner      target  actual  L cov  R cov    unp dil     ms
+    42   1 Pink       53.85 % 53.85 % 46.2 % 39.6 % 14.1 %   -    639
 ```
 
 | Column | Meaning |
@@ -137,6 +138,7 @@ It also prints a table in the terminal:
 | `target` / `actual` | The intended winning share of the painted floor, and the share actually counted. They always match. |
 | `L cov` / `R cov` | Left and right team's share of the whole floor. |
 | `unp` | Unpainted share of the floor. |
+| `dil` | Which teams painted their own spawn diligently this round: `L`, `R`, `LR` or `-`. |
 | `ms` | Time it took to generate the round. |
 
 > **Tip:** to test your guessing, open `contact_sheet.png`, cover up the labels, guess each round, then check.

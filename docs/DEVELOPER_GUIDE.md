@@ -34,7 +34,7 @@ flowchart LR
 |---|---|---|
 | `src/TurfGuess.Core` | ✅ | Map generation, paint, scoring, rendering, color pairs |
 | `src/TurfGuess.Preview` | ✅ | Console app that writes sample rounds and contact sheets |
-| `tests/TurfGuess.Core.Tests` | ✅ | xUnit tests for Core (72 tests) |
+| `tests/TurfGuess.Core.Tests` | ✅ | xUnit tests for Core (77 tests) |
 | `src/TurfGuess.Bot` | 🚧 Planned (milestone 3) | Discord bot: scheduler, voting buttons, SQLite, reveals. See DESIGN.md §2, §6–8 |
 
 **The one rule to remember:** the **paint mask** is the single source of truth. The score is counted from it and the renderer only draws it. Nothing visual may ever change what's counted.
@@ -47,7 +47,7 @@ flowchart LR
 
 ```bash
 dotnet build                                   # whole solution
-dotnet test                                    # 72 tests, ~4 s
+dotnet test                                    # 77 tests, ~6 s
 dotnet run --project src/TurfGuess.Preview -c Release -- --count 12 --seed 42
 ```
 
@@ -99,7 +99,7 @@ byte[] png = MapRenderer.EncodePng(image);
 
 - **`Rng`** is SplitMix64. It's used instead of `System.Random` so that output never depends on the runtime's implementation. `Rng.Derive(seed, salt)` makes independent sub-seeds without consuming state.
 - **`GradientNoise`** is our own Perlin-style noise with fBm, seeded through `Rng`, instead of a third-party library.
-- **`GeneratorVersion`** (in `RoundGenerator`) must be **bumped whenever a change alters what a given seed produces**. The bot will store it with each round, so old rounds can be told apart. Current version: **3**.
+- **`GeneratorVersion`** (in `RoundGenerator`) must be **bumped whenever a change alters what a given seed produces**. The bot will store it with each round, so old rounds can be told apart. Current version: **4**.
 - Floating-point math (`Math.Log`, `Math.Exp`, …) is deterministic on a given platform. It may differ in the last bits across CPU architectures, which is why the bot stores each round's result and image instead of regenerating them.
 
 ### Stage 1: map generation (`MapGen/MapGenerator.cs`)
@@ -130,7 +130,7 @@ flowchart TD
     A[1. cost field<br/>noise per floor cell] --> B[2. Dijkstra from each spawn<br/>dL, dR per cell]
     B --> C[3. pixel mask from cells<br/>+ corner rounding]
     C --> D[upsample dL, dR to pixels]
-    D --> E[4. unpainted mask<br/>quantile of closeness to spawn + holes noise]
+    D --> E[4. unpainted mask<br/>closeness to spawn × diligence + noise<br/>+ sputter splats, quantile]
     E --> F[5. ownership score s<br/>ln dR − ln dL + jitter + grain]
     F --> G[5b. estimate front t₀<br/>add fight noise + splats]
     G --> H[6. quantile threshold<br/>exactly nLeft pixels go Left]
@@ -140,7 +140,13 @@ flowchart TD
 1. **Cost field.** For each walkable cell, `cost = exp(1.1 · fbm(x·0.09, y·0.09))`. Varying costs make paint flow faster through some areas, which gives finger-like borders.
 2. **Distance fields.** An 8-connected Dijkstra from every cell of each spawn pad, with no corner cutting past walls, gives `dL` and `dR`. They're computed once and don't depend on the margin.
 3. **Pixel mask and corner rounding.** Each pixel takes its cell's type, with floor as `Unpainted`. Then `CornerRounding.Apply` rounds the outline (see below), and `dL` and `dR` are bilinearly interpolated for every floor pixel, ignoring non-walkable neighbours.
-4. **Unpainted mask.** Key `u = 1·(1 − min(dL, dR)/max) + 0.7·holes`. The highest-`u` pixels become unpainted, so the floor **near spawns** gets neglected, broken into patches by the noise. Pixels within a cost-distance of 2.5 of a pad (the spawn trail) are never unpainted. The cut-off is a **quantile**, so the share lands exactly on target. This step doesn't depend on the margin.
+4. **Unpainted mask.** The highest-`u` pixels become unpainted, so the floor **near spawns** gets neglected, broken into patches by the noise. The cut-off is a **quantile**, so the share lands exactly on target. This step doesn't depend on the margin.
+   ```
+   u = max(nL·(1 − dL/max), nR·(1 − dR/max)) + 0.7·holes + 0.06·jitter + 0.02·grain
+   ```
+   - **Diligence:** `n` is 1.0 for a normal team and 0.25 for a team that painted its spawn diligently. Each team is diligent with probability `DiligentSpawnChance` (30%), drawn from `Rng.Derive(paintSeed, 7)` and exposed as `PaintResult.DiligentLeft/Right`. The unpainted share then shifts to the other spawn, or toward the middle when both teams were diligent.
+   - **Spawn trail:** pixels within a cost-distance of `2.5 · (1 + 0.8·jitter)` of a pad are never unpainted. The jitter makes the trail's edge ragged rather than a smooth ring.
+   - **Sputters (4b):** `jitter` and `grain` make the paint/unpainted edge ragged. A preliminary quantile gives the estimated border `u₀`. Then 14–25 small splats (radius 0.35–0.9 cells, 3–7 droplets each) are stamped at pixels near a spawn (closeness ≥ 0.4) with `u₀ ≤ u < u₀ + 0.15`, setting `u = −∞` (forced painted). Only after that does the final quantile run.
 5. **Ownership score.** For painted pixels, `s = ln(dR+1) − ln(dL+1) + 0.10·jitter + 0.035·grain`. Positive means closer to the left team.
    - **Fight zone (5b).** A preliminary threshold `t₀` for the target margin estimates where the front line will be. Then `0.9 · exp(−((s − t₀)/0.35)²) · fight-noise` is added, so both colors interleave in blotches across a band in the middle.
    - **Splats.** 28–45 stamps (wobbly circles with a radius of 0.6–1.5 cells, plus 2–5 droplets each), mostly placed where `|s − t₀| < 0.5`. Each one sets `s = t₀ ± 8`, so it shows its team's color wherever it lands.
@@ -224,7 +230,8 @@ All options are mutable classes, so the bot can bind them from `appsettings.json
 | Option | Default | Valid range | Meaning |
 |---|---|---|---|
 | `UnpaintedMin` / `UnpaintedMax` | 0.05 / 0.15 | 0 ≤ min ≤ max < 0.5 | Unpainted share of the floor, picked per round |
-| `Splatter` | true | | Splat stamps on or off |
+| `Splatter` | true | | Splats in the fight zone and sputters at the unpainted border near spawns |
+| `DiligentSpawnChance` | 0.3 | 0–1 | Per team, per round: chance it painted its own spawn area diligently |
 | `PixelsPerCell` | 16 | 2–64 | Mask and image resolution |
 | `CornerRadius` | 0.75 | 0–<1 | Outer corner radius, in cells |
 | `InnerCornerRadius` | 0.5 | 0–<1 | Inner corner radius, in cells |
@@ -256,6 +263,7 @@ dotnet test
 | `MapGeneratorTests` | Same seed gives the same map; different seeds differ; both symmetry modes exact; every walkable cell reachable from both spawns; floor fraction and spawn placement |
 | `RoundGeneratorTests` | Counted winner share = target (±1 pixel); unpainted share = target; identical masks per seed; both sides win across seeds; coverage adds up; walls, void and spawns don't count; invalid difficulty rejected; renderer outputs PNGs of the right size |
 | `CornerRoundingTests` | Distance transform vs brute force; square corners cut; L-shaped corners filled; radius 0 is a no-op; 2-cell corridor survives the max radius; spawns never cut; rounded rounds still hit the target |
+| `SpawnPaintTests` | Diligence chance 0/1 controls the flags; mix at the default; diligent teams leave less unpainted floor near spawn; targets unaffected; invalid chance rejected |
 | `ColorPairsTests` | Pairs valid and distinct; pick is deterministic; all pairs and both sides used; empty list rejected |
 | `MarbleDampingTests` | Yellow/green damped; other hues full; smooth fade |
 

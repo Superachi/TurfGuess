@@ -23,5 +23,11 @@ public sealed class PaintResult
     public required int PixelsPerCell { get; init; }
     public required PixelKind[] Mask { get; init; }
 
+    /// <summary>The left team painted its own spawn area diligently this round.</summary>
+    public bool DiligentLeft { get; init; }
+
+    /// <summary>The right team painted its own spawn area diligently this round.</summary>
+    public bool DiligentRight { get; init; }
+
     public PixelKind this[int x, int y] => Mask[y * Width + x];
 }

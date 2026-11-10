@@ -22,6 +22,18 @@ public static class PaintSimulator
     private const double HolesWeight = 0.7;
     private const double SpawnNeglect = 1.0;
     private const float SpawnTrail = 2.5f;       // cost-distance around a pad that is always painted
+    private const double SpawnTrailRoughness = 0.8; // how ragged the spawn trail's edge is
+    private const double DiligentNeglect = 0.25; // a diligent team neglects its spawn area this much (vs 1.0)
+
+    // Rough, sputtery edge where paint meets unpainted floor (same idea as the front-line jitter).
+    private const double BorderJitterFrequency = 1.1;  // per cell
+    private const double BorderJitterAmplitude = 0.06;
+    private const double BorderGrainFrequency = 4.0;   // per cell
+    private const double BorderGrainAmplitude = 0.02;
+
+    // Paint splats landing in the unpainted floor near spawns.
+    private const double SpawnSplatBand = 0.15;        // how far into the unpainted area (in units of the key)
+    private const double SpawnSplatMinCloseness = 0.4; // only near a spawn, not in far corners
 
     // Fight zone: around the front line both colors interleave in blotches.
     private const double FightFrequency = 0.35;  // per cell
@@ -101,27 +113,65 @@ public static class PaintSimulator
         if (nFloor == 0) return null;
 
         // 4. Unpainted mask, fixed before the margin is set.
+        //    Key u: closeness to a spawn (scaled per team by how much it neglected its spawn)
+        //    + holes noise + a rough border. The highest u become unpainted.
+        var diligence = new Rng(Rng.Derive(seed, 7));
+        bool diligentLeft = diligence.Chance(options.DiligentSpawnChance);
+        bool diligentRight = diligence.Chance(options.DiligentSpawnChance);
+        double neglectLeft = diligentLeft ? DiligentNeglect : SpawnNeglect;
+        double neglectRight = diligentRight ? DiligentNeglect : SpawnNeglect;
+
         var holes = new GradientNoise(Rng.Derive(seed, 2));
+        var borderJitter = new GradientNoise(Rng.Derive(seed, 8));
+        var borderGrain = new GradientNoise(Rng.Derive(seed, 9));
         float maxMin = 0;
         for (int i = 0; i < nFloor; i++) maxMin = Math.Max(maxMin, Math.Min(dl[i], dr[i]));
         if (maxMin <= 0) maxMin = 1;
+
+        var u = new float[nFloor];
+        var closeness = new float[nFloor];
+        for (int i = 0; i < nFloor; i++)
+        {
+            int pi = floorPixels[i];
+            double gx = (pi % pw + 0.5) / p, gy = (pi / pw + 0.5) / p;
+            double rough = borderJitter.Fbm(gx * BorderJitterFrequency, gy * BorderJitterFrequency, 3);
+
+            // The spawn trail's edge is roughened by the same noise, so it isn't a smooth ring.
+            if (Math.Min(dl[i], dr[i]) < SpawnTrail * (1 + SpawnTrailRoughness * rough))
+            {
+                u[i] = float.NegativeInfinity;
+                closeness[i] = 1;
+                continue;
+            }
+
+            double closeLeft = 1 - dl[i] / maxMin, closeRight = 1 - dr[i] / maxMin;
+            closeness[i] = (float)Math.Max(closeLeft, closeRight);
+            u[i] = (float)(Math.Max(neglectLeft * closeLeft, neglectRight * closeRight)
+                + HolesWeight * holes.Fbm(gx * HolesFrequency, gy * HolesFrequency, 2)
+                + BorderJitterAmplitude * rough
+                + BorderGrainAmplitude * borderGrain.Sample(gx * BorderGrainFrequency, gy * BorderGrainFrequency));
+        }
+
+        int nUnpainted = (int)Math.Round(unpaintedShare * nFloor);
+
+        // 4b. Sputters near spawns: estimate the unpainted border, then stamp paint splats just
+        //     inside the unpainted side of it. Stamped pixels are forced painted (u = −∞), and the
+        //     quantile below still lands exactly on the target share.
+        if (options.Splatter && nUnpainted > 0)
+        {
+            float border = KthLargest(u, nUnpainted);
+            ApplySpawnSplats(new Rng(Rng.Derive(seed, 10)), u, closeness, border, floorPixels, pixelToFloor, pw, ph, p);
+        }
 
         var unpaintedKey = new float[nFloor];
         var order = new int[nFloor];
         for (int i = 0; i < nFloor; i++)
         {
-            int pi = floorPixels[i];
-            double gx = (pi % pw + 0.5) / p, gy = (pi / pw + 0.5) / p;
-            float nearest = Math.Min(dl[i], dr[i]);
-            double u = nearest < SpawnTrail
-                ? double.NegativeInfinity
-                : SpawnNeglect * (1 - nearest / maxMin) + HolesWeight * holes.Fbm(gx * HolesFrequency, gy * HolesFrequency, 2);
-            unpaintedKey[i] = (float)-u; // ascending sort => largest u first
+            unpaintedKey[i] = -u[i]; // ascending sort => largest u first
             order[i] = i;
         }
         Array.Sort(unpaintedKey, order);
 
-        int nUnpainted = (int)Math.Round(unpaintedShare * nFloor);
         var isPainted = new bool[nFloor];
         for (int k = nUnpainted; k < nFloor; k++) isPainted[order[k]] = true;
 
@@ -177,7 +227,15 @@ public static class PaintSimulator
         for (int k = 0; k < nPainted; k++)
             mask[floorPixels[idx[k]]] = k < nLeft ? PixelKind.Left : PixelKind.Right;
 
-        var result = new PaintResult { Width = pw, Height = ph, PixelsPerCell = p, Mask = mask };
+        var result = new PaintResult
+        {
+            Width = pw,
+            Height = ph,
+            PixelsPerCell = p,
+            Mask = mask,
+            DiligentLeft = diligentLeft,
+            DiligentRight = diligentRight,
+        };
 
         // Sanity: the losing team must still hold ground next to its own spawn.
         var loser = winner.Opposite();
@@ -301,41 +359,82 @@ public static class PaintSimulator
             // Splat value relative to the front, so a stamp shows that team's color wherever it lands.
             double sign = rng.Chance(0.5) ? 1 : -1;
             float splatValue = (float)(front + sign * SplatStrength);
-            double cx = centre % pw, cy = centre / pw;
-            double r = rng.Range(0.6, 1.5) * p;
-            int lobes = rng.Next(3, 7);
-            double phase = rng.Range(0, 2 * Math.PI);
-
-            Stamp(cx, cy, r, lobes, phase, 0.18);
-
-            int droplets = rng.Next(2, 6);
-            for (int d = 0; d < droplets; d++)
+            StampSplat(rng, centre % pw, centre / pw, rng.Range(0.6, 1.5) * p, 2, 6, pw, ph, pixelToFloor, fi =>
             {
-                double ang = rng.Range(0, 2 * Math.PI);
-                double dist = r * rng.Range(1.3, 2.1);
-                Stamp(cx + Math.Cos(ang) * dist, cy + Math.Sin(ang) * dist, r * rng.Range(0.15, 0.32), 0, 0, 0);
-            }
+                if (isPainted[fi]) score[fi] = splatValue;
+            });
+        }
+    }
 
-            void Stamp(double sx, double sy, double radius, int lobeCount, double lobePhase, double wobble)
+    /// <summary>
+    /// Small paint splats and sputter droplets landing in the unpainted floor near spawns, just
+    /// past the estimated unpainted border. Stamped pixels are forced painted.
+    /// </summary>
+    private static void ApplySpawnSplats(Rng rng, float[] u, float[] closeness, float border, List<int> floorPixels, int[] pixelToFloor, int pw, int ph, int p)
+    {
+        int count = rng.Next(14, 26);
+        for (int n = 0; n < count; n++)
+        {
+            int centre = -1;
+            for (int t = 0; t < 80; t++)
             {
-                double maxR = radius * (1 + wobble);
-                int x0 = Math.Max(0, (int)(sx - maxR)), x1 = Math.Min(pw - 1, (int)(sx + maxR));
-                int y0 = Math.Max(0, (int)(sy - maxR)), y1 = Math.Min(ph - 1, (int)(sy + maxR));
-                for (int y = y0; y <= y1; y++)
+                int i = rng.Next(0, floorPixels.Count);
+                if (closeness[i] >= SpawnSplatMinCloseness && u[i] >= border && u[i] - border < SpawnSplatBand)
                 {
-                    for (int x = x0; x <= x1; x++)
-                    {
-                        double dx = x - sx, dy = y - sy;
-                        double dd = Math.Sqrt(dx * dx + dy * dy);
-                        double limit = radius * (1 + wobble * Math.Sin(lobeCount * Math.Atan2(dy, dx) + lobePhase));
-                        if (dd > limit) continue;
-                        int fi = pixelToFloor[y * pw + x];
-                        if (fi < 0 || !isPainted[fi]) continue;
-                        score[fi] = splatValue;
-                    }
+                    centre = floorPixels[i];
+                    break;
+                }
+            }
+            if (centre < 0) continue;
+
+            StampSplat(rng, centre % pw, centre / pw, rng.Range(0.35, 0.9) * p, 3, 8, pw, ph, pixelToFloor, fi =>
+            {
+                u[fi] = float.NegativeInfinity;
+            });
+        }
+    }
+
+    /// <summary>One splat: a lobed blob plus a few droplets around it. Calls <paramref name="apply"/> per floor pixel hit.</summary>
+    private static void StampSplat(Rng rng, double cx, double cy, double radius, int minDroplets, int maxDroplets,
+        int pw, int ph, int[] pixelToFloor, Action<int> apply)
+    {
+        int lobes = rng.Next(3, 7);
+        double phase = rng.Range(0, 2 * Math.PI);
+        Stamp(cx, cy, radius, lobes, phase, 0.18);
+
+        int droplets = rng.Next(minDroplets, maxDroplets);
+        for (int d = 0; d < droplets; d++)
+        {
+            double ang = rng.Range(0, 2 * Math.PI);
+            double dist = radius * rng.Range(1.3, 2.1);
+            Stamp(cx + Math.Cos(ang) * dist, cy + Math.Sin(ang) * dist, radius * rng.Range(0.15, 0.32), 0, 0, 0);
+        }
+
+        void Stamp(double sx, double sy, double r, int lobeCount, double lobePhase, double wobble)
+        {
+            double maxR = r * (1 + wobble);
+            int x0 = Math.Max(0, (int)(sx - maxR)), x1 = Math.Min(pw - 1, (int)(sx + maxR));
+            int y0 = Math.Max(0, (int)(sy - maxR)), y1 = Math.Min(ph - 1, (int)(sy + maxR));
+            for (int y = y0; y <= y1; y++)
+            {
+                for (int x = x0; x <= x1; x++)
+                {
+                    double dx = x - sx, dy = y - sy;
+                    double limit = r * (1 + wobble * Math.Sin(lobeCount * Math.Atan2(dy, dx) + lobePhase));
+                    if (dx * dx + dy * dy > limit * limit) continue;
+                    int fi = pixelToFloor[y * pw + x];
+                    if (fi >= 0) apply(fi);
                 }
             }
         }
+    }
+
+    /// <summary>The <paramref name="k"/>-th largest value (1-based).</summary>
+    private static float KthLargest(float[] values, int k)
+    {
+        var copy = (float[])values.Clone();
+        Array.Sort(copy);
+        return copy[Math.Clamp(copy.Length - k, 0, copy.Length - 1)];
     }
 
     private static bool TouchesSpawn(PaintResult r, RectI spawnCells, PixelKind kind)

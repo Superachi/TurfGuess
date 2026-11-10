@@ -49,7 +49,7 @@ if (args_.Flag("pairs"))
 
 Directory.CreateDirectory(outDir);
 Console.WriteLine($"Writing {count} rounds to {outDir}");
-Console.WriteLine($"{"seed",6} {"try",3} {"winner",-10} {"target",7} {"actual",7} {"L cov",6} {"R cov",6} {"unp",6} {"ms",6}");
+Console.WriteLine($"{"seed",6} {"try",3} {"winner",-10} {"target",7} {"actual",7} {"L cov",6} {"R cov",6} {"unp",6} {"dil",3} {"ms",6}");
 
 var thumbs = new List<(SKBitmap Image, string Label)>();
 for (int i = 0; i < count; i++)
@@ -73,7 +73,7 @@ for (int i = 0; i < count; i++)
     var s = round.Score;
     var winnerName = s.Winner == Side.Left ? style.Left.Name : style.Right.Name;
     Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
-        $"{seed,6} {round.Attempts,3} {winnerName,-10} {round.TargetWinnerShare,7:P2} {s.WinnerShare,7:P2} {s.CoverageLeft,6:P1} {s.CoverageRight,6:P1} {s.UnpaintedShare,6:P1} {genMs,6}"));
+        $"{seed,6} {round.Attempts,3} {winnerName,-10} {round.TargetWinnerShare,7:P2} {s.WinnerShare,7:P2} {s.CoverageLeft,6:P1} {s.CoverageRight,6:P1} {s.UnpaintedShare,6:P1} {Diligent(round),3} {genMs,6}"));
 
     thumbs.Add((MapRenderer.RenderRound(round, style), $"#{seed}  {style.Left.Name} vs {style.Right.Name}: {winnerName} {s.WinnerShare:P1}"));
 }
@@ -113,6 +113,13 @@ static void WriteContactSheet(List<(SKBitmap Image, string Label)> items, int co
     using var image = SKImage.FromBitmap(sheet);
     using var data = image.Encode(SKEncodedImageFormat.Png, 100);
     File.WriteAllBytes(path, data.ToArray());
+}
+
+// Which teams painted their own spawn diligently this round: L, R, LR or -.
+static string Diligent(GeneratedRound r)
+{
+    string s = (r.Paint.DiligentLeft ? "L" : "") + (r.Paint.DiligentRight ? "R" : "");
+    return s.Length > 0 ? s : "-";
 }
 
 static Args ParseArgs(string[] argv)

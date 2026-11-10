@@ -61,13 +61,25 @@ public static class MapRenderer
 
         var left = Rgb.Parse(style.Left.Color);
         var right = Rgb.Parse(style.Right.Color);
-        var leftInk = new Ink(left);
-        var rightInk = new Ink(right);
+        bool marbled = style.Ink == InkStyle.Marbled;
+        var leftInk = marbled ? Ink.Marble(left) : new Ink(left, ShadeHueShift, ShadeLightness);
+        var rightInk = marbled ? Ink.Marble(right) : new Ink(right, ShadeHueShift, ShadeLightness);
 
         int shadowDx = Math.Max(2, p / 4), shadowDy = Math.Max(2, p / 3);
         int bevel = Math.Max(1, p / 8);
 
-        var (tone, gloss) = InkLighting(mask, w, h, p, round.Seed);
+        var (tone, gloss) = style.Ink switch
+        {
+            InkStyle.Shaded => InkLighting(mask, w, h, p, round.Seed),
+            InkStyle.Marbled => InkMarble(mask, w, h, p, round.Seed),
+            _ => (new float[w * h], new float[w * h]),
+        };
+        double edgeShadow = style.Ink switch
+        {
+            InkStyle.Shaded => ShadeEdgeShadow,
+            InkStyle.Marbled => MarbleEdgeShadow,
+            _ => 0,
+        };
 
         var pixels = new int[w * h];
         for (int y = 0; y < h; y++)
@@ -94,7 +106,7 @@ public static class MapRenderer
                         var ink = kind == PixelKind.Left ? leftInk : rightInk;
                         double t = tone[i];
                         // Borders sit in cool shadow, which outlines each color.
-                        if (IsPaintEdge(mask, w, h, x, y, kind)) t = Math.Min(t, 0) - EdgeShadow;
+                        if (edgeShadow > 0 && IsPaintEdge(mask, w, h, x, y, kind)) t = Math.Min(t, 0) - edgeShadow;
                         c = ink.Shade(t, gloss[i]);
                         break;
                     }
@@ -153,16 +165,83 @@ public static class MapRenderer
     // Ink shading
     // ---------------------------------------------------------------------------------------
 
+    // Shaded style (InkStyle.Shaded).
     private const double BumpFrequency = 1 / 4.0;   // per cell
     private const double BumpStrength = 3.0;
-    // Minimalist look: all ink variance is off, so each team is one flat color.
-    // Previous tuned values, for going back: ShadeGain 1.6, SwellWeight 0.6, GlossGain 1.4, EdgeShadow 0.8.
-    private const double ShadeGain = 0;
+    private const double ShadeGain = 1.6;
     private const double SwellFrequency = 1 / 7.0;  // per cell: broad light/dark swells
-    private const double SwellWeight = 0;
+    private const double SwellWeight = 0.6;
     private const double GlossPower = 30;
-    private const double GlossGain = 0;
-    private const double EdgeShadow = 0;
+    private const double GlossGain = 1.4;
+    private const double ShadeEdgeShadow = 0.8;
+    private const double ShadeHueShift = 20;        // degrees at full light/shadow
+    private const double ShadeLightness = 0.075;
+
+    // Marbled style (InkStyle.Marbled): domain-warped noise folded into bands.
+    private const double MarbleFrequency = 1 / 16.0; // per cell
+    private const double MarbleWarp = 2.2;          // how far the coordinates get pushed around
+    private const double MarbleBands = 1.4;         // bands per unit of warped noise
+    private const double MarbleSharpness = 1.0;     // < 1 flattens band centres into distinct stripes
+    private const double MarbleStreakGain = 0;      // thin glossy streaks along band crests
+    private const double MarbleStreakPower = 40;
+    private const double MarbleEdgeShadow = 0;
+    private const double MarbleHueShift = 15;
+    private const double MarbleLightness = 0.015;
+
+    // Yellow and green base colors turn muddy (olive) when their hue shifts, so the marble's hue
+    // shift fades out for base hues in this OKLCh range: full damping inside the core, a smooth
+    // fade over the margin on either side. Yellow ≈ 105°, green ≈ 140°.
+    private const double DampCenterHue = 120;
+    private const double DampCoreHalfWidth = 30;   // 90°–150°: fully damped
+    private const double DampFadeWidth = 25;       // fades back to full shift by 65° and 175°
+    private const double DampAmount = 0.65;        // 1 = no hue shift at all inside the core
+
+    /// <summary>Multiplier for the marble hue shift, from the base color's OKLCh hue.</summary>
+    internal static double MarbleHueShiftScale(double baseHue)
+    {
+        double d = Math.Abs(((baseHue - DampCenterHue + 540) % 360) - 180);
+        double weight = d <= DampCoreHalfWidth ? 1
+            : d >= DampCoreHalfWidth + DampFadeWidth ? 0
+            : 0.5 + 0.5 * Math.Cos(Math.PI * (d - DampCoreHalfWidth) / DampFadeWidth);
+        return 1 - DampAmount * weight;
+    }
+
+    /// <summary>
+    /// Oil-slick marbling: noise sampled at coordinates warped by noise, warped by noise again
+    /// (Inigo Quilez' domain warping), then folded through a sine into flowing bands.
+    /// The tone swings between the warm and cool hue-shifted versions of the ink color.
+    /// </summary>
+    private static (float[] Tone, float[] Gloss) InkMarble(PixelKind[] mask, int w, int h, int p, ulong seed)
+    {
+        var n = new GradientNoise(Rng.Derive(seed, 79));
+        var tone = new float[w * h];
+        var gloss = new float[w * h];
+
+        for (int y = 0; y < h; y++)
+        {
+            for (int x = 0; x < w; x++)
+            {
+                int i = y * w + x;
+                if (mask[i] is not (PixelKind.Left or PixelKind.Right)) continue;
+
+                double x0 = x * MarbleFrequency / p, y0 = y * MarbleFrequency / p;
+                double qx = n.Fbm(x0, y0, 2);
+                double qy = n.Fbm(x0 + 5.2, y0 + 1.3, 2);
+                double rx = n.Fbm(x0 + MarbleWarp * qx + 1.7, y0 + MarbleWarp * qy + 9.2, 2);
+                double ry = n.Fbm(x0 + MarbleWarp * qx + 8.3, y0 + MarbleWarp * qy + 2.8, 2);
+                double v = n.Fbm(x0 + MarbleWarp * rx, y0 + MarbleWarp * ry, 3);
+
+                double phase = v * MarbleBands * 2 * Math.PI;
+                double s = Math.Sin(phase);
+                tone[i] = (float)(Math.Sign(s) * Math.Pow(Math.Abs(s), MarbleSharpness));
+
+                double crest = 0.5 + 0.5 * Math.Sin(phase * 2 + 1.3);
+                gloss[i] = (float)(Math.Pow(crest, MarbleStreakPower) * MarbleStreakGain);
+            }
+        }
+
+        return (tone, gloss);
+    }
 
     /// <summary>
     /// Treats the ink as a thick, slightly bumpy layer lit from the top-left.
@@ -232,16 +311,21 @@ public static class MapRenderer
     /// An ink color that shades with hue shifting in OKLCh: lights drift warm (toward yellow),
     /// shadows drift cool (toward blue) and get a little richer, instead of only changing value.
     /// </summary>
-    private sealed class Ink(Rgb baseColor)
+    private sealed class Ink(Rgb baseColor, double HueShift, double LightnessRange)
     {
         private const double WarmHue = 100;   // OKLCh hue of yellow
         private const double CoolHue = 265;   // OKLCh hue of blue
-        private const double HueShift = 20;   // degrees at full light/shadow
-        private const double LightnessRange = 0.075;
         private const double ChromaRange = 0.06;
         private static readonly Rgb GlossColor = new(255, 251, 238);
 
         private readonly Oklch _base = ColorMath.ToOklch(baseColor.R, baseColor.G, baseColor.B);
+
+        /// <summary>Marble ink: hue shift scaled down for yellow/green base colors.</summary>
+        public static Ink Marble(Rgb baseColor)
+        {
+            var hue = ColorMath.ToOklch(baseColor.R, baseColor.G, baseColor.B).H;
+            return new Ink(baseColor, MarbleHueShift * MarbleHueShiftScale(hue), MarbleLightness);
+        }
 
         public Rgb Shade(double tone, double gloss)
         {

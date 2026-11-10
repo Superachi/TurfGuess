@@ -5,7 +5,7 @@ using TurfGuess.Core;
 using TurfGuess.Core.Grid;
 using TurfGuess.Core.Render;
 
-// Usage: dotnet run --project src/TurfGuess.Preview -- [--count 12] [--seed 42] [--out preview]
+// Usage: dotnet run --project src/TurfGuess.Preview -- [--count 12] [--seed 42] [--out preview] [--ink Flat|Shaded|Marbled]
 //        [--ppc 16] [--symmetry Rotate|Mirror] [--no-reveal] [--columns 4]
 //        dotnet run --project src/TurfGuess.Preview -- --pairs [--seed 42]
 //          [--pairs-file pairs.json] [--pairs-out name.png]
@@ -20,6 +20,7 @@ bool reveal = !args_.Flag("no-reveal");
 
 var options = new GeneratorOptions();
 options.Paint.PixelsPerCell = args_.Int("ppc", options.Paint.PixelsPerCell);
+var inkStyle = Enum.Parse<InkStyle>(args_.Str("ink", "Flat"), ignoreCase: true);
 if (args_.Has("symmetry")) options.Map.Symmetry = Enum.Parse<SymmetryMode>(args_.Str("symmetry", "Rotate"), ignoreCase: true);
 
 if (args_.Flag("pairs"))
@@ -33,7 +34,7 @@ if (args_.Flag("pairs"))
     for (int i = 0; i < pairs.Count; i++)
     {
         var pair = pairs[i];
-        var pairStyle = new RenderStyle { Left = pair.A, Right = pair.B };
+        var pairStyle = new RenderStyle { Left = pair.A, Right = pair.B, Ink = inkStyle };
         pairThumbs.Add((MapRenderer.RenderRound(pairRound, pairStyle),
             $"{i + 1}. {pair.A.Name} {pair.A.Color}  vs  {pair.B.Name} {pair.B.Color}"));
     }
@@ -55,6 +56,7 @@ for (int i = 0; i < count; i++)
     var sw = Stopwatch.StartNew();
     var round = RoundGenerator.Generate(seed, options);
     var style = ColorPairs.Pick(seed);
+    style.Ink = inkStyle;
     long genMs = sw.ElapsedMilliseconds;
 
     using var image = MapRenderer.RenderRound(round, style, $"{style.GameName} · Seed {seed}");

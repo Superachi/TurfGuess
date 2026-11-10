@@ -73,7 +73,7 @@ public class RoundGeneratorTests
     }
 
     [Theory]
-    [InlineData(50.0, 58.0)]
+    [InlineData(50.0, 54.0)]
     [InlineData(57.0, 52.0)]
     public void Invalid_difficulty_is_rejected(double min, double max)
     {

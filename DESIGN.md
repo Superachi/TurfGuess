@@ -242,7 +242,7 @@ Paint should *flow* from each spawn and wrap around obstacles, not just split th
 
   | Pair | Colors |
   |---|---|
-  | Pink vs Green | `#C83D79` / `#409D3B` |
+  | Pink vs Green | `#E0559A` / `#2E7D32` (adjusted: pink brighter, green darker than the wiki's `#C83D79` / `#409D3B`) |
   | Orange vs Blue | `#DE6624` / `#343BC4` |
   | Yellow vs Blue | `#D0BE08` / `#3A0CCD` |
 
@@ -266,7 +266,7 @@ rounds (
   posted_at     TEXT,      -- ISO timestamp (UTC)
   reveal_at     TEXT,      -- ISO timestamp (UTC), computed from RoundTime in TimeZone
   left_name     TEXT,      -- color pair picked for this round, e.g. 'Pink'
-  left_color    TEXT,      -- '#C83D79'
+  left_color    TEXT,      -- '#E0559A'
   left_emoji    TEXT,
   right_name    TEXT,
   right_color   TEXT,
@@ -317,8 +317,8 @@ Streaks, accuracy and the leaderboard can be computed from `votes` joined with `
   // Optional. Leave out to use the built-in pairs (section 5, Colors).
   // Each round picks one pair from its seed; emoji are shown on the vote buttons.
   "ColorPairs": [
-    { "A": { "Name": "Pink",   "Color": "#C83D79", "Emoji": "🩷" },
-      "B": { "Name": "Green",  "Color": "#409D3B", "Emoji": "💚" } },
+    { "A": { "Name": "Pink",   "Color": "#E0559A", "Emoji": "🩷" },
+      "B": { "Name": "Green",  "Color": "#2E7D32", "Emoji": "💚" } },
     { "A": { "Name": "Orange", "Color": "#DE6624", "Emoji": "🧡" },
       "B": { "Name": "Blue",   "Color": "#343BC4", "Emoji": "💙" } }
   ],
@@ -326,7 +326,7 @@ Streaks, accuracy and the leaderboard can be computed from `votes` joined with `
     // Fixed range. Each round picks a winner share uniformly in [min, max].
     // Measured as a share of PAINTED floor: max(L, R) / (L + R). Must be > 50.
     "MinWinnerShare": 50.5,   // %
-    "MaxWinnerShare": 58.0
+    "MaxWinnerShare": 54.0
   },
   "Map": {
     "GridWidth": 96,

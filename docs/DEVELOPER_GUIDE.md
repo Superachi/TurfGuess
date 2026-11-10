@@ -333,7 +333,7 @@ All options are mutable classes, so the bot can bind them from `appsettings.json
 
 | Option | Default | Valid range | Meaning |
 |---|---|---|---|
-| `UnpaintedMin` / `UnpaintedMax` | 0.05 / 0.15 | 0 ≤ min ≤ max < 0.5 | Unpainted share of the floor, picked per round |
+| `UnpaintedMin` / `UnpaintedMax` | 0.03 / 0.10 | 0 ≤ min ≤ max < 0.5 | Unpainted share of the floor, picked per round |
 | `Splatter` | true | | Splats in the fight zone and sputters at the unpainted border near spawns |
 | `DiligentSpawnChance` | 0.3 | 0–1 | Per team, per round: chance it painted its own spawn area diligently |
 | `PixelsPerCell` | 16 | 2–64 | Mask and image resolution |

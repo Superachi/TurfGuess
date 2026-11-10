@@ -361,8 +361,8 @@ Streaks, accuracy and the leaderboard can be computed from `votes` joined with `
       "MaxFloor": 0.70
     },
     "Paint": {
-      "UnpaintedMin": 0.05,     // fraction of total floor, picked per round in [min, max]
-      "UnpaintedMax": 0.15,
+      "UnpaintedMin": 0.03,     // fraction of total floor, picked per round in [min, max]
+      "UnpaintedMax": 0.10,
       "Splatter": true,         // splats in the fight zone + sputters at the unpainted border near spawns
       "DiligentSpawnChance": 0.3, // per team, per round: chance it painted its own spawn area diligently
       "PixelsPerCell": 16,      // mask and render resolution

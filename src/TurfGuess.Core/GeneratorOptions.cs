@@ -57,8 +57,8 @@ public sealed class MapOptions
 public sealed class PaintOptions
 {
     /// <summary>Fraction of total floor left unpainted, picked per round in [min, max].</summary>
-    public double UnpaintedMin { get; set; } = 0.05;
-    public double UnpaintedMax { get; set; } = 0.15;
+    public double UnpaintedMin { get; set; } = 0.03;
+    public double UnpaintedMax { get; set; } = 0.10;
 
     /// <summary>Seeded splat stamps: in the fight zone, and paint sputters at the unpainted border near spawns.</summary>
     public bool Splatter { get; set; } = true;

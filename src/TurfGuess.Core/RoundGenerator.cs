@@ -22,7 +22,7 @@ public sealed record GeneratedRound(
 public static class RoundGenerator
 {
     /// <summary>Bump whenever a change alters what a given seed produces.</summary>
-    public const int GeneratorVersion = 1;
+    public const int GeneratorVersion = 2;
 
     public static GeneratedRound Generate(ulong seed, GeneratorOptions options)
     {

@@ -137,20 +137,25 @@ The symmetry is meant to be **obvious**. It signals that the map is fair, and th
 ### 3.3 Pipeline
 Work on a **cell grid** (e.g. 96×54 cells), then upscale for rendering. **The grid is the look.** Shapes stay rectilinear and built from blocks, like real arena geometry (platforms, corridors, ledges), with **no smoothing** into organic blobs. Paint is the only organic element on the map, and the contrast between hard-edged architecture and flowing ink is part of the style.
 
-1. **Generate the left half**
-   - Build the floor by placing **axis-aligned rectangles** (platforms, corridors, plazas) of varied sizes, snapped to the grid, overlapping freely.
-   - Optionally cut **rectangular voids** (pits, out-of-bounds gaps) into it to make chokepoints.
-   - Carve guaranteed floor: a spawn pad near the left edge, plus a few straight or L-shaped **lanes** (2–4 cells wide) from spawn toward the center line, so the map is never a maze.
-2. **Place obstacles** (walls and pillars, which are impassable and can't be painted)
-   - Scatter grid-aligned blocks: single pillars, wall segments, L-shapes and T-shapes, at a configurable density.
+**Keep it simple.** Real arena maps are **one solid body** with a clean, stepped outline, a few gaps, and a handful of chunky obstacles. They're mostly open floor, not a maze of rooms and corridors. All layout shapes snap to a **2-cell step**, which keeps outlines clean.
+
+1. **Generate the left half** from a few large rectangles:
+   - **Spine:** one wide band (30–48% of the map height) from the left edge to the center line, shifted a little off the middle row. Its overlap with its own rotated copy is the main way across the center.
+   - **Wings:** 2–4 big rectangles hanging off the top or bottom of the spine. Each overlaps the spine, so the body is always connected.
+   - **Center plaza** (70% of maps): a rectangle at the center line, symmetric around the middle row, so it always crosses the center in both symmetry modes.
+   - **Spawn pad** and a small platform around it, inside the spine near the left edge.
+   - **Holes:** 0–2 sizeable rectangular gaps (4–8 cells), forming pits or notches in the outline.
+2. **Place obstacles** (blocks and walls, which are impassable and can't be painted)
+   - **At most 4 per half** by default (`MaxObstaclesPerHalf`), up to the configured density: chunky blocks (2–4 × 2–4 cells) and the odd straight wall (4–8 long, 1–2 thick).
+   - Each obstacle needs a ring of floor around it, so it never leaves a thin sliver against the outline, and a 3-cell gap to other obstacles.
    - Keep a buffer zone around the spawn pad clear.
 3. **Apply symmetry** to produce the full map.
 4. **Validate connectivity**
-   - Flood fill from the left spawn and remove any floor cells it doesn't reach (islands).
+   - Flood fill from the left spawn and remove any floor cells it doesn't reach (islands), plus any obstacles left floating in void. The inner cells of a big block count as part of that block.
    - Reject and regenerate the map (next sub-seed) if:
      - the right spawn isn't reachable,
      - the floor area is outside the `[min_floor, max_floor]` fraction,
-     - the center line has too few crossing points (too few chokepoints makes boring maps; too many makes them blobby).
+     - the center line has too few crossing points (at least 4 crossing rows, at most 5 separate crossings).
 5. **Output** a grid with cell types `VOID`, `FLOOR`, `WALL` and `SPAWN_L` / `SPAWN_R`.
 
 ### 3.4 Possible later variants
@@ -301,7 +306,8 @@ Streaks, accuracy and the leaderboard can be computed from `votes` joined with `
     "GridWidth": 96,
     "GridHeight": 54,
     "Symmetry": "Rotate",     // "Rotate" | "Mirror"
-    "ObstacleDensity": 0.06,
+    "ObstacleDensity": 0.03,
+    "MaxObstaclesPerHalf": 4,
     "MinFloor": 0.45,
     "MaxFloor": 0.70
   },
@@ -354,7 +360,7 @@ TurfGuess/
   src/
     TurfGuess.Core/              # class library: pure, deterministic, NO Discord or DB references
       Grid/                      #   Grid<T>, CellType, symmetry helpers
-      MapGen/MapGenerator.cs     #   rectangles, lanes, obstacles, symmetry, validation
+      MapGen/MapGenerator.cs     #   spine + wings + plaza, holes, obstacles, symmetry, validation
       Paint/PaintSimulator.cs    #   distance fields, unpainted mask, ownership score, quantile threshold
       Render/MapRenderer.cs      #   SkiaSharp: round image + reveal image
       Scoring/Score.cs           #   coverage computed from the final paint mask

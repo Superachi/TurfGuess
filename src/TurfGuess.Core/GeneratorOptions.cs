@@ -19,6 +19,7 @@ public sealed class GeneratorOptions
         if (Map.ObstacleDensity is < 0 or > 0.3) errors.Add("Map.ObstacleDensity must be in [0, 0.3].");
         if (Map.MinFloor <= 0 || Map.MaxFloor >= 1 || Map.MinFloor >= Map.MaxFloor) errors.Add("Map.MinFloor/MaxFloor must satisfy 0 < min < max < 1.");
         if (Map.MaxAttempts < 1) errors.Add("Map.MaxAttempts must be >= 1.");
+        if (Map.MaxObstaclesPerHalf is < 0 or > 20) errors.Add("Map.MaxObstaclesPerHalf must be in [0, 20].");
 
         if (Paint.UnpaintedMin < 0 || Paint.UnpaintedMax >= 0.5 || Paint.UnpaintedMin > Paint.UnpaintedMax) errors.Add("Paint.UnpaintedMin/Max must satisfy 0 <= min <= max < 0.5.");
         if (Paint.PixelsPerCell is < 2 or > 64) errors.Add("Paint.PixelsPerCell must be in [2, 64].");
@@ -36,8 +37,11 @@ public sealed class MapOptions
     public int GridHeight { get; set; } = 54;
     public SymmetryMode Symmetry { get; set; } = SymmetryMode.Rotate;
 
-    /// <summary>Target fraction of floor cells covered by walls/pillars.</summary>
-    public double ObstacleDensity { get; set; } = 0.06;
+    /// <summary>Target fraction of floor cells covered by obstacles (capped by <see cref="MaxObstaclesPerHalf"/>).</summary>
+    public double ObstacleDensity { get; set; } = 0.03;
+
+    /// <summary>Hard cap on obstacles per half of the map.</summary>
+    public int MaxObstaclesPerHalf { get; set; } = 4;
 
     /// <summary>Walkable cells as a fraction of the whole grid.</summary>
     public double MinFloor { get; set; } = 0.45;

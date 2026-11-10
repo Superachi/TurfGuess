@@ -6,13 +6,15 @@ namespace TurfGuess.Core.MapGen;
 public sealed class MapGenerationException(string message) : Exception(message);
 
 /// <summary>
-/// Builds a blocky, symmetric arena on a cell grid (DESIGN.md §3):
-/// rectangles + corridors for the left half, pits, grid-aligned obstacles,
-/// then symmetry and validation.
+/// Builds a simple, blocky, symmetric arena on a cell grid (DESIGN.md §3):
+/// one solid body made of a few large overlapping rectangles (spine + wings + center plaza),
+/// a couple of holes, and a handful of chunky obstacles. Then symmetry and validation.
 /// </summary>
 public static class MapGenerator
 {
-    private const int MaxRooms = 40;
+    /// <summary>Layout shapes snap to multiples of this many cells, which keeps outlines clean.</summary>
+    private const int Snap = 2;
+
     private const int MinCrossingRows = 4;
     private const int MaxCrossingRuns = 5;
 
@@ -37,61 +39,61 @@ public static class MapGenerator
 
         // The left half, keeping a one-cell void border around the outside of the map.
         var bounds = new RectI(1, 1, half - 1, h - 2);
-        var rooms = new List<RectI>();
 
-        // --- Spawn pad + platform -------------------------------------------------------
+        // --- Spine: one wide band from the left edge to the center line. ----------------
+        //     Offsetting it from the middle row makes the rotated halves interlock instead of
+        //     forming one straight bar; the overlap with its rotated twin is the main crossing.
+        int spineH = SnapUp(rng.Next(h * 30 / 100, h * 48 / 100));
+        int offset = SnapDown(rng.Next(-h / 9, h / 9 + 1));
+        int spineY = h / 2 - spineH / 2 + offset;
+        var spine = Clip(new RectI(1, spineY, half - 1, spineH), bounds);
+        Carve(g, spine);
+
+        // --- Wings: 2–4 big rectangles hanging off the top or bottom of the spine. --------
+        int wings = rng.Next(2, 5);
+        for (int i = 0; i < wings; i++)
+        {
+            int ww = SnapUp(rng.Next(half * 20 / 100, half * 45 / 100));
+            int wh = SnapUp(rng.Next(h * 15 / 100, h * 35 / 100));
+            int wx = SnapDown(rng.Next(1, Math.Max(2, half - ww)));
+            int overlap = SnapUp(rng.Next(4, Math.Max(5, wh / 2)));
+            bool top = i % 2 == 0 ? rng.Chance(0.6) : rng.Chance(0.4);
+            int wy = top ? spine.Y - wh + overlap : spine.Bottom - overlap;
+            Carve(g, Clip(new RectI(wx, wy, ww, wh), bounds));
+        }
+
+        // --- Center plaza (most maps): symmetric around the middle row, so it always crosses
+        //     the center line in both symmetry modes.
+        if (rng.Chance(0.7))
+        {
+            int a = SnapUp(rng.Next(h * 12 / 100, h * 22 / 100));
+            int plazaW = SnapUp(rng.Next(6, 17));
+            Carve(g, Clip(new RectI(half - plazaW, h / 2 - a, plazaW, 2 * a + h % 2), bounds));
+        }
+
+        // --- Spawn pad + platform, inside the spine.
         const int padW = 3, padH = 5;
-        int padY = rng.Next(h / 2 - padH - 4, h / 2 + 4);
+        int padY = Math.Clamp(spine.CenterY - padH / 2 + rng.Next(-2, 3), spine.Y + 1, spine.Bottom - padH - 1);
         var pad = new RectI(2, padY, padW, padH);
         var platform = Clip(new RectI(1, padY - 3, 9, padH + 6), bounds);
         Carve(g, platform);
-        rooms.Add(platform);
 
-        // --- Center plaza: symmetric around the middle row, so it always crosses the center line
-        //     in both symmetry modes.
-        int a = rng.Next(3, 9);
-        int plazaW = rng.Next(6, 15);
-        var plaza = new RectI(half - plazaW, h / 2 - a, plazaW, 2 * a + h % 2);
-        AddRoom(g, rng, rooms, plaza, bounds);
-
-        // --- Paired seam lanes: lanes that end on the center line at row y AND at the mirrored row,
-        //     so in rotate mode they connect to their rotated counterpart.
-        int pairs = rng.Next(0, 3);
-        for (int i = 0; i < pairs; i++)
+        // --- Holes: 0–2 sizeable rectangular gaps (pits or notches in the outline).
+        int holes = rng.Next(0, 3);
+        for (int i = 0; i < holes; i++)
         {
-            int lw = rng.Next(2, 4);
-            int maxY = plaza.Y - lw - 1;
-            if (maxY <= 3) break;
-            int y = rng.Next(3, maxY);
-            int len = rng.Next(4, 11);
-            AddRoom(g, rng, rooms, new RectI(half - len, y, len, lw), bounds);
-            AddRoom(g, rng, rooms, new RectI(half - len, h - y - lw, len, lw), bounds);
+            var hole = new RectI(
+                SnapDown(rng.Next(bounds.X + 8, bounds.Right - 4)),
+                SnapDown(rng.Next(bounds.Y, bounds.Bottom - 4)),
+                SnapUp(rng.Next(4, 9)),
+                SnapUp(rng.Next(4, 9)));
+            hole = Clip(hole, bounds);
+            if (hole.Intersects(platform.Inflate(2))) continue;
+            g.Fill(hole, CellType.Void);
         }
 
-        // --- Random rooms until the half is full enough. Walls and pits will take some floor
-        //     away later, so aim above the final target.
-        double target = rng.Range(o.MinFloor + 0.03, Math.Max(o.MinFloor + 0.04, o.MaxFloor - 0.08)) + o.ObstacleDensity * 0.6;
-        while (rooms.Count < MaxRooms && WalkableFraction(g, half) < target)
-        {
-            int rw = rng.Next(4, 15);
-            int rh = rng.Next(4, 13);
-            int rx = rng.Next(1, half - rw + 1);
-            int ry = rng.Next(1, h - rh);
-            AddRoom(g, rng, rooms, new RectI(rx, ry, rw, rh), bounds);
-        }
-
-        // --- Pits: rectangular holes that create chokepoints.
-        int pits = rng.Next(0, 4);
-        for (int i = 0; i < pits; i++)
-        {
-            var pit = new RectI(rng.Next(bounds.X, bounds.Right - 2), rng.Next(bounds.Y, bounds.Bottom - 2), rng.Next(2, 6), rng.Next(2, 6));
-            pit = Clip(pit, bounds);
-            if (pit.Intersects(platform.Inflate(2))) continue;
-            g.Fill(pit, CellType.Void);
-        }
-
-        // --- Obstacles: grid-aligned pillars, segments, L- and T-shapes.
-        PlaceObstacles(g, rng, o.ObstacleDensity, half, platform.Inflate(1));
+        // --- Obstacles: a handful of chunky blocks and the odd straight wall.
+        PlaceObstacles(g, rng, o.ObstacleDensity, o.MaxObstaclesPerHalf, half, platform.Inflate(1));
 
         // --- Spawn pad on top.
         g.Fill(pad, CellType.SpawnLeft);
@@ -139,36 +141,8 @@ public static class MapGenerator
         };
     }
 
-    private static void AddRoom(Grid<CellType> g, Rng rng, List<RectI> rooms, RectI room, RectI bounds)
-    {
-        room = Clip(room, bounds);
-        if (room.W <= 0 || room.H <= 0) return;
-        Carve(g, room);
-        if (rooms.Count > 0)
-            Connect(g, rng, rooms[rng.Next(0, rooms.Count)], room, bounds);
-        rooms.Add(room);
-    }
-
-    /// <summary>Carves an L-shaped corridor between the centers of two rooms.</summary>
-    private static void Connect(Grid<CellType> g, Rng rng, RectI from, RectI to, RectI bounds)
-    {
-        int cw = rng.Next(2, 4);
-        int ax = from.CenterX, ay = from.CenterY, bx = to.CenterX, by = to.CenterY;
-        bool horizontalFirst = rng.Chance(0.5);
-        int cornerX = horizontalFirst ? bx : ax;
-        int cornerY = horizontalFirst ? ay : by;
-
-        // Segment 1: (ax, ay) -> corner; segment 2: corner -> (bx, by).
-        CarveSegment(g, ax, ay, cornerX, cornerY, cw, bounds);
-        CarveSegment(g, cornerX, cornerY, bx, by, cw, bounds);
-    }
-
-    private static void CarveSegment(Grid<CellType> g, int x0, int y0, int x1, int y1, int width, RectI bounds)
-    {
-        int minX = Math.Min(x0, x1) - width / 2, maxX = Math.Max(x0, x1) - width / 2 + width;
-        int minY = Math.Min(y0, y1) - width / 2, maxY = Math.Max(y0, y1) - width / 2 + width;
-        Carve(g, Clip(new RectI(minX, minY, maxX - minX, maxY - minY), bounds));
-    }
+    private static int SnapDown(int v) => (int)Math.Floor(v / (double)Snap) * Snap;
+    private static int SnapUp(int v) => (int)Math.Ceiling(v / (double)Snap) * Snap;
 
     private static void Carve(Grid<CellType> g, RectI r)
     {
@@ -184,85 +158,64 @@ public static class MapGenerator
         return new RectI(x0, y0, Math.Max(0, x1 - x0), Math.Max(0, y1 - y0));
     }
 
-    private static double WalkableFraction(Grid<CellType> g, int half)
-    {
-        int n = 0;
-        for (int y = 0; y < g.Height; y++)
-            for (int x = 0; x < half; x++)
-                if (g[x, y].IsWalkable()) n++;
-        return n / (double)(half * g.Height);
-    }
-
     // ---------------------------------------------------------------------------------------
     // Obstacles
     // ---------------------------------------------------------------------------------------
 
-    private static void PlaceObstacles(Grid<CellType> g, Rng rng, double density, int half, RectI keepClear)
+    /// <summary>
+    /// Places a few solid rectangles fully inside open floor: each needs a one-cell ring of floor
+    /// around it (no slivers against the outline) and a clear gap to other obstacles.
+    /// </summary>
+    private static void PlaceObstacles(Grid<CellType> g, Rng rng, double density, int maxObstacles, int half, RectI keepClear)
     {
         int floor = 0;
         for (int y = 0; y < g.Height; y++)
             for (int x = 0; x < half; x++)
                 if (g[x, y] == CellType.Floor) floor++;
 
-        int target = (int)(density * floor);
-        int placed = 0;
-        for (int tries = 0; placed < target && tries < 2000; tries++)
+        int targetCells = (int)(density * floor);
+        int placedCells = 0, placed = 0;
+        for (int tries = 0; placedCells < targetCells && placed < maxObstacles && tries < 500; tries++)
         {
-            var shape = RandomShape(rng);
-            int ox = rng.Next(1, half);
-            int oy = rng.Next(1, g.Height - 1);
-
-            bool ok = true;
-            foreach (var (dx, dy) in shape)
+            RectI block;
+            if (rng.Chance(0.25))
             {
-                int x = ox + dx, y = oy + dy;
-                if (x < 1 || x >= half || y < 1 || y >= g.Height - 1 || g[x, y] != CellType.Floor || keepClear.Contains(x, y))
-                {
-                    ok = false;
-                    break;
-                }
+                // Straight wall, 1–2 thick.
+                int len = rng.Next(4, 9), thick = rng.Next(1, 3);
+                block = rng.Chance(0.5) ? new RectI(0, 0, len, thick) : new RectI(0, 0, thick, len);
             }
-            if (!ok) continue;
+            else
+            {
+                // Chunky block.
+                block = new RectI(0, 0, rng.Next(2, 5), rng.Next(2, 5));
+            }
+            block = block with { X = rng.Next(2, half - block.W), Y = rng.Next(2, g.Height - 2 - block.H) };
 
-            foreach (var (dx, dy) in shape) g[ox + dx, oy + dy] = CellType.Wall;
-            placed += shape.Count;
+            if (block.Intersects(keepClear)) continue;
+            if (!AllFloor(g, block.Inflate(1), half)) continue;          // interior only
+            if (AnyWall(g, block.Inflate(3))) continue;                   // spacing between obstacles
+
+            g.Fill(block, CellType.Wall);
+            placedCells += block.W * block.H;
+            placed++;
         }
     }
 
-    private static List<(int Dx, int Dy)> RandomShape(Rng rng)
+    private static bool AllFloor(Grid<CellType> g, RectI r, int half)
     {
-        var cells = new List<(int, int)>();
-        switch (rng.Next(0, 5))
-        {
-            case 0: // pillar
-                cells.Add((0, 0));
-                break;
-            case 1: // 2x2 block
-                cells.AddRange([(0, 0), (1, 0), (0, 1), (1, 1)]);
-                break;
-            case 2: // straight segment
-                for (int i = 0, n = rng.Next(3, 7); i < n; i++) cells.Add((i, 0));
-                break;
-            case 3: // L-shape
-                for (int i = 0, n = rng.Next(3, 6); i < n; i++) cells.Add((i, 0));
-                for (int i = 1, n = rng.Next(3, 6); i < n; i++) cells.Add((0, i));
-                break;
-            default: // T-shape
-                int bar = rng.Chance(0.5) ? 3 : 5;
-                for (int i = 0; i < bar; i++) cells.Add((i - bar / 2, 0));
-                for (int i = 1, n = rng.Next(2, 4); i <= n; i++) cells.Add((0, i));
-                break;
-        }
+        if (r.X < 0 || r.Y < 0 || r.Right > half || r.Bottom > g.Height) return false;
+        for (int y = r.Y; y < r.Bottom; y++)
+            for (int x = r.X; x < r.Right; x++)
+                if (g[x, y] != CellType.Floor) return false;
+        return true;
+    }
 
-        // Random rotation by k * 90°.
-        int k = rng.Next(0, 4);
-        for (int i = 0; i < cells.Count; i++)
-        {
-            var (x, y) = cells[i];
-            for (int r = 0; r < k; r++) (x, y) = (-y, x);
-            cells[i] = (x, y);
-        }
-        return cells;
+    private static bool AnyWall(Grid<CellType> g, RectI r)
+    {
+        for (int y = Math.Max(0, r.Y); y < Math.Min(g.Height, r.Bottom); y++)
+            for (int x = Math.Max(0, r.X); x < Math.Min(g.Width, r.Right); x++)
+                if (g[x, y] == CellType.Wall) return true;
+        return false;
     }
 
     // ---------------------------------------------------------------------------------------
@@ -317,13 +270,18 @@ public static class MapGenerator
         }
     }
 
-    /// <summary>Turns unreachable floor into void, and drops walls that no longer border reachable floor.</summary>
+    /// <summary>
+    /// Turns unreachable floor into void, and drops obstacles that no longer touch reachable floor.
+    /// A wall is kept when it is connected (through other walls) to a wall bordering reachable floor,
+    /// so the inner cells of a big block survive.
+    /// </summary>
     private static void RemoveUnreached(Grid<CellType> g, bool[] reached)
     {
         for (int i = 0; i < g.Cells.Length; i++)
             if (g.Cells[i].IsWalkable() && !reached[i]) g.Cells[i] = CellType.Void;
 
-        var toVoid = new List<int>();
+        var keep = new bool[g.Cells.Length];
+        var queue = new Queue<int>();
         for (int y = 0; y < g.Height; y++)
         {
             for (int x = 0; x < g.Width; x++)
@@ -333,10 +291,29 @@ public static class MapGenerator
                 for (int dy = -1; dy <= 1 && !touchesFloor; dy++)
                     for (int dx = -1; dx <= 1 && !touchesFloor; dx++)
                         if (g.InBounds(x + dx, y + dy) && g[x + dx, y + dy].IsWalkable()) touchesFloor = true;
-                if (!touchesFloor) toVoid.Add(g.Index(x, y));
+                if (!touchesFloor) continue;
+                int i = g.Index(x, y);
+                keep[i] = true;
+                queue.Enqueue(i);
             }
         }
-        foreach (int i in toVoid) g.Cells[i] = CellType.Void;
+
+        while (queue.Count > 0)
+        {
+            int i = queue.Dequeue();
+            int x = i % g.Width, y = i / g.Width;
+            foreach (var (nx, ny) in new[] { (x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1) })
+            {
+                if (!g.InBounds(nx, ny)) continue;
+                int j = g.Index(nx, ny);
+                if (keep[j] || g.Cells[j] != CellType.Wall) continue;
+                keep[j] = true;
+                queue.Enqueue(j);
+            }
+        }
+
+        for (int i = 0; i < g.Cells.Length; i++)
+            if (g.Cells[i] == CellType.Wall && !keep[i]) g.Cells[i] = CellType.Void;
     }
 
     private static (int Rows, int Runs) CenterCrossings(Grid<CellType> g)

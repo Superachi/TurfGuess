@@ -225,7 +225,7 @@ Paint should *flow* from each spawn and wrap around obstacles, not just split th
 
 - Upscale the grid (e.g. 16 px/cell → 1536×864) and render with SkiaSharp.
 - Layers, bottom to top:
-  1. Background (void): flat dark grey (`#2A2C30`), no texture.
+  1. Background (void): flat dark grey (`#282A30`), no texture.
   2. Floor: flat neutral gray. **No grid lines**: the cell grid shapes the map but isn't drawn.
   3. Paint: drawn in one of three **ink styles** (`RenderStyle.Ink`):
      - **Flat**: one solid color per team, for a minimalist look.

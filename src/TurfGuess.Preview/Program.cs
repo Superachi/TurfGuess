@@ -7,6 +7,9 @@ using TurfGuess.Core.Render;
 
 // Usage: dotnet run --project src/TurfGuess.Preview -- [--count 12] [--seed 42] [--out preview]
 //        [--ppc 16] [--symmetry Rotate|Mirror] [--no-reveal] [--columns 4]
+//        dotnet run --project src/TurfGuess.Preview -- --pairs [--seed 42]
+//          [--pairs-file pairs.json] [--pairs-out name.png]
+//          renders one map in every color pair -> preview/color_pairs.png
 
 var args_ = ParseArgs(args);
 int count = args_.Int("count", 12);
@@ -18,11 +21,32 @@ bool reveal = !args_.Flag("no-reveal");
 var options = new GeneratorOptions();
 options.Paint.PixelsPerCell = args_.Int("ppc", options.Paint.PixelsPerCell);
 if (args_.Has("symmetry")) options.Map.Symmetry = Enum.Parse<SymmetryMode>(args_.Str("symmetry", "Rotate"), ignoreCase: true);
-var style = new RenderStyle();
+
+if (args_.Flag("pairs"))
+{
+    Directory.CreateDirectory(outDir);
+    var pairRound = RoundGenerator.Generate(baseSeed, options);
+    var pairs = args_.Has("pairs-file")
+        ? System.Text.Json.JsonSerializer.Deserialize<List<ColorPair>>(File.ReadAllText(args_.Str("pairs-file", "")))!
+        : ColorPairs.Default.ToList();
+    var pairThumbs = new List<(SKBitmap Image, string Label)>();
+    for (int i = 0; i < pairs.Count; i++)
+    {
+        var pair = pairs[i];
+        var pairStyle = new RenderStyle { Left = pair.A, Right = pair.B };
+        pairThumbs.Add((MapRenderer.RenderRound(pairRound, pairStyle),
+            $"{i + 1}. {pair.A.Name} {pair.A.Color}  vs  {pair.B.Name} {pair.B.Color}"));
+    }
+    string pairsPath = Path.Combine(outDir, args_.Str("pairs-out", "color_pairs.png"));
+    WriteContactSheet(pairThumbs, args_.Int("columns", 3), pairsPath);
+    foreach (var t in pairThumbs) t.Image.Dispose();
+    Console.WriteLine($"Color pairs sheet ({pairs.Count} pairs, seed {baseSeed}): {pairsPath}");
+    return;
+}
 
 Directory.CreateDirectory(outDir);
 Console.WriteLine($"Writing {count} rounds to {outDir}");
-Console.WriteLine($"{"seed",6} {"try",3} {"winner",-7} {"target",7} {"actual",7} {"L cov",6} {"R cov",6} {"unp",6} {"ms",6}");
+Console.WriteLine($"{"seed",6} {"try",3} {"winner",-10} {"target",7} {"actual",7} {"L cov",6} {"R cov",6} {"unp",6} {"ms",6}");
 
 var thumbs = new List<(SKBitmap Image, string Label)>();
 for (int i = 0; i < count; i++)
@@ -30,6 +54,7 @@ for (int i = 0; i < count; i++)
     ulong seed = baseSeed + (ulong)i;
     var sw = Stopwatch.StartNew();
     var round = RoundGenerator.Generate(seed, options);
+    var style = ColorPairs.Pick(seed);
     long genMs = sw.ElapsedMilliseconds;
 
     using var image = MapRenderer.RenderRound(round, style, $"{style.GameName} · Seed {seed}");
@@ -44,9 +69,9 @@ for (int i = 0; i < count; i++)
     var s = round.Score;
     var winnerName = s.Winner == Side.Left ? style.Left.Name : style.Right.Name;
     Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
-        $"{seed,6} {round.Attempts,3} {winnerName,-7} {round.TargetWinnerShare,7:P2} {s.WinnerShare,7:P2} {s.CoverageLeft,6:P1} {s.CoverageRight,6:P1} {s.UnpaintedShare,6:P1} {genMs,6}"));
+        $"{seed,6} {round.Attempts,3} {winnerName,-10} {round.TargetWinnerShare,7:P2} {s.WinnerShare,7:P2} {s.CoverageLeft,6:P1} {s.CoverageRight,6:P1} {s.UnpaintedShare,6:P1} {genMs,6}"));
 
-    thumbs.Add((MapRenderer.RenderRound(round, style), $"#{seed}  {winnerName} {s.WinnerShare:P1}"));
+    thumbs.Add((MapRenderer.RenderRound(round, style), $"#{seed}  {style.Left.Name} vs {style.Right.Name}: {winnerName} {s.WinnerShare:P1}"));
 }
 
 WriteContactSheet(thumbs, columns, Path.Combine(outDir, "contact_sheet.png"));

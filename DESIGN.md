@@ -41,7 +41,7 @@ Day 3 09:00   Reveal R2 → Post R3
 
 ### Voting rules
 - **Pure binary guess:** which team covered more floor? There are no margin brackets or bonus guesses.
-- **Voting uses message buttons.** The round message has two buttons, one per team, each labeled with the team's emoji and name and colored to match where Discord's button styles allow (e.g. `🟧 Orange` / `🟦 Blue`). One click is a vote, with no commands or extra steps.
+- **Voting uses message buttons.** The round message has two buttons, one per team, each labeled with that round's color emoji and name (e.g. `🩷 Pink` / `💚 Green`, see [Colors](#colors)). One click is a vote, with no commands or extra steps.
 - **Votes are hidden.** A click gets an **ephemeral** reply that only the voter sees ("You voted 🟧 Orange. You can change it until the reveal."). Nobody can see the running split, so players can't just follow the crowd.
 - **One vote per player.** Clicking the other button changes the vote, and the newest click wins.
 - **Live vote counter (optional):** the round message can show "N players have voted" and be updated as votes come in. It shows only the total, never the split. Edits are debounced (e.g. at most once every 30 s) to stay within rate limits.
@@ -236,8 +236,19 @@ Paint should *flow* from each spawn and wrap around obstacles, not just split th
 - The same map with a result banner showing both percentages, and the winner highlighted.
 - Later: an animated GIF of a counting bar filling up, for the suspense.
 
-### Accessibility
-- Colors are configurable. Include a colorblind-friendly default pair (e.g. orange/blue), and **validate in config** that the two team colors differ enough in lightness and hue.
+### Colors
+- **Every round picks a color pair** from a list, deterministically from its seed. Which color goes to the left team is also picked from the seed. Each team's name is its color name ("Pink vs Green"), and each color has an emoji for its vote button (🩷 💚 💙 🩵 🧡 💜 💛 ❤️).
+- **Built-in pairs:** three hand-picked regular-battle ink pairs from the Inkipedia ink gallery. The other 15 regular-battle pairs looked too garish and were dropped:
+
+  | Pair | Colors |
+  |---|---|
+  | Pink vs Green | `#C83D79` / `#409D3B` |
+  | Orange vs Blue | `#DE6624` / `#343BC4` |
+  | Yellow vs Blue | `#D0BE08` / `#3A0CCD` |
+
+  More pairs are being chosen from established palettes. The candidates are reviewed with `--pairs --pairs-file` in the Preview app.
+- The list can be replaced in config (`ColorPairs`). Config validation checks that the two colors in each pair differ enough in lightness and hue, and that their names and emoji differ.
+- The pair picked for a round is **stored with the round** (section 6), so a config change never changes the colors of a round that's already posted.
 
 ---
 
@@ -254,6 +265,12 @@ rounds (
   image_path    TEXT,
   posted_at     TEXT,      -- ISO timestamp (UTC)
   reveal_at     TEXT,      -- ISO timestamp (UTC), computed from RoundTime in TimeZone
+  left_name     TEXT,      -- color pair picked for this round, e.g. 'Pink'
+  left_color    TEXT,      -- '#C83D79'
+  left_emoji    TEXT,
+  right_name    TEXT,
+  right_color   TEXT,
+  right_emoji   TEXT,
   winner        TEXT,      -- 'left' | 'right'
   winner_share  REAL,      -- % of painted floor (difficulty)
   share_left    REAL,      -- coverage, % of total floor
@@ -297,10 +314,14 @@ Streaks, accuracy and the leaderboard can be computed from `votes` joined with `
     "MaxListedWinners": 50,           // extra names are cut off with "…and N more"
     "MinRoundLength": "06:00:00"      // first-start rounds shorter than this skip to the following RoundTime
   },
-  "Teams": {
-    "Left":  { "Name": "Orange", "Color": "#F28C28", "Emoji": "🟧" },  // emoji shown on the vote button
-    "Right": { "Name": "Blue",   "Color": "#2F6FDE", "Emoji": "🟦" }
-  },
+  // Optional. Leave out to use the built-in pairs (section 5, Colors).
+  // Each round picks one pair from its seed; emoji are shown on the vote buttons.
+  "ColorPairs": [
+    { "A": { "Name": "Pink",   "Color": "#C83D79", "Emoji": "🩷" },
+      "B": { "Name": "Green",  "Color": "#409D3B", "Emoji": "💚" } },
+    { "A": { "Name": "Orange", "Color": "#DE6624", "Emoji": "🧡" },
+      "B": { "Name": "Blue",   "Color": "#343BC4", "Emoji": "💙" } }
+  ],
   "Difficulty": {
     // Fixed range. Each round picks a winner share uniformly in [min, max].
     // Measured as a share of PAINTED floor: max(L, R) / (L + R). Must be > 50.
@@ -368,6 +389,7 @@ TurfGuess/
       MapGen/MapGenerator.cs     #   spine + wings + plaza, holes, obstacles, symmetry, validation
       Paint/PaintSimulator.cs    #   distance fields, unpainted mask, ownership score, quantile threshold
       Render/MapRenderer.cs      #   SkiaSharp: round image + reveal image
+      Render/ColorPairs.cs       #   built-in color pairs + per-seed pick
       Scoring/Score.cs           #   coverage computed from the final paint mask
       Noise/GradientNoise.cs     #   seeded Perlin-style noise + fBm
       Util/Rng.cs                #   SplitMix64 PRNG
@@ -411,6 +433,7 @@ TurfGuess/
 | Question | Decision |
 |---|---|
 | Single server or multiple guilds? | **Single server.** One channel, set in config. |
+| Fixed team colors or varying? | **A different color pair each round**, picked from the seed. Team names are the color names. |
 | Name the correct guessers at reveal? | **Yes**, listed by name with **no pings** (`AllowedMentions.None`). |
 | Language? | **C# / .NET 10**, because it's the language the author knows best. Python offered nothing this project needs. |
 | Fixed or adaptive margin range? | **Fixed**, taken from config. |

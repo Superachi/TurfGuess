@@ -38,7 +38,7 @@ if (args.Contains("--preview-messages"))
 var errors = BotOptionsValidator.Validate(options);
 if (errors.Count > 0)
 {
-    Console.Error.WriteLine("Turf Guess can't start, the configuration has problems:");
+    Console.Error.WriteLine($"{options.Game.Name} can't start, the configuration has problems:");
     foreach (var e in errors) Console.Error.WriteLine($"  - {e}");
     return 1;
 }

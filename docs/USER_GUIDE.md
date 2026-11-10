@@ -137,7 +137,7 @@ The other settings are in [`src/TurfGuess.Bot/appsettings.json`](../src/TurfGues
 |---|---|---|
 | `Game:RoundTime` | `09:00` | Time of day when the round is revealed and the next one posted |
 | `Game:TimeZone` | `Europe/Amsterdam` | Time zone for the round time (daylight saving is handled) |
-| `Game:Name` | `Turf Guess` | Shown in titles and captions |
+| `Game:Name` | `Judd's Judgment` | The game's name, shown in message titles, image captions and the reveal. Change it to anything you like. |
 | `Game:ShowVoteCount` | `true` | Show "N players have voted" on the round message. Only the total, never the split. |
 | `Game:MaxListedWinners` | `50` | Most correct guessers named in the reveal |
 | `Game:Ink` | `Marbled` | `Marbled`, `Flat` or `Shaded` |

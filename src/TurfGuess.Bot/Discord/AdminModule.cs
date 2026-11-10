@@ -9,7 +9,7 @@ namespace TurfGuess.Bot.Discord;
 /// Admin slash commands under <c>/turf-admin</c>. A separate top-level command, so it can be limited
 /// to administrators while future player commands (<c>/turf stats</c>, <c>/turf leaderboard</c>) stay public.
 /// </summary>
-[Group("turf-admin", "Turf Guess admin commands")]
+[Group("turf-admin", "Admin commands for the daily guessing game")]
 [DefaultMemberPermissions(GuildPermission.Administrator)]
 public sealed class AdminModule(
     RoundService rounds,

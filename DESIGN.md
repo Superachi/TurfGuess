@@ -327,7 +327,7 @@ Streaks, accuracy and the leaderboard can be computed from `votes` joined with `
 ```jsonc
 {
   "Game": {
-    "Name": "Turf Guess",
+    "Name": "Judd's Judgment",     // shown in message titles, image captions and the reveal
     "RoundTime": "09:00",
     "TimeZone": "Europe/Amsterdam",   // IANA id; .NET resolves it on Windows and Linux
     "ShowVoteCount": true,            // "N players have voted" on the round message

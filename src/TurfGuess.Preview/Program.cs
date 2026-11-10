@@ -22,7 +22,7 @@ var options = new GeneratorOptions();
 options.Paint.PixelsPerCell = args_.Int("ppc", options.Paint.PixelsPerCell);
 options.Paint.CornerRadius = args_.Double("radius", options.Paint.CornerRadius);
 options.Paint.InnerCornerRadius = args_.Double("inner-radius", options.Paint.InnerCornerRadius);
-var inkStyle = Enum.Parse<InkStyle>(args_.Str("ink", "Flat"), ignoreCase: true);
+var inkStyle = Enum.Parse<InkStyle>(args_.Str("ink", new RenderStyle().Ink.ToString()), ignoreCase: true);
 if (args_.Has("symmetry")) options.Map.Symmetry = Enum.Parse<SymmetryMode>(args_.Str("symmetry", "Rotate"), ignoreCase: true);
 
 if (args_.Flag("pairs"))

@@ -12,13 +12,13 @@ public sealed class TeamStyle
 /// <summary>How the ink surface is drawn.</summary>
 public enum InkStyle
 {
-    /// <summary>One solid color per team (default).</summary>
+    /// <summary>One solid color per team.</summary>
     Flat,
 
     /// <summary>Thick ink with smooth swells, bump lighting, gloss and hue-shifted shading.</summary>
     Shaded,
 
-    /// <summary>Experimental: swirled, oil-slick bands of hue-shifted tones (domain-warped noise).</summary>
+    /// <summary>Swirled, oil-slick bands of hue-shifted tones (domain-warped noise). Default.</summary>
     Marbled,
 }
 
@@ -26,7 +26,7 @@ public enum InkStyle
 public sealed class RenderStyle
 {
     public string GameName { get; set; } = "Turf Guess";
-    public InkStyle Ink { get; set; } = InkStyle.Flat;
+    public InkStyle Ink { get; set; } = InkStyle.Marbled;
     public TeamStyle Left { get; set; } = new() { Name = "Orange", Color = "#CF581B", Emoji = "🧡" };
     public TeamStyle Right { get; set; } = new() { Name = "Blue", Color = "#141494", Emoji = "💙" };
 }

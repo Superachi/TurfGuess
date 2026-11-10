@@ -227,8 +227,9 @@ Paint should *flow* from each spawn and wrap around obstacles, not just split th
 - Layers, bottom to top:
   1. Background (void): flat dark grey (`#2A2C30`), no texture.
   2. Floor: flat neutral gray. **No grid lines**: the cell grid shapes the map but isn't drawn.
-  3. Paint: drawn in one of three **ink styles** (`RenderStyle.Ink`). The default is **Flat**: one solid color per team, for a minimalist look. The others are optional:
-     - **Marbled** (experimental): an oil-slick look. Domain-warped noise (noise sampled at coordinates pushed around by more noise, twice) is folded through a sine into flowing, swirled bands. The bands swing between the warm and cool hue-shifted tones of the team color (up to 15° of hue) at nearly constant lightness. For yellow and green base colors (OKLCh hue 90°–150°, fading out by 65° and 175°), the hue shift is reduced to 35%, because those colors turn muddy olive when shifted. Glossy streaks along the band crests are supported but switched off.
+  3. Paint: drawn in one of three **ink styles** (`RenderStyle.Ink`):
+     - **Flat**: one solid color per team, for a minimalist look.
+     - **Marbled** (default): an oil-slick look. Domain-warped noise (noise sampled at coordinates pushed around by more noise, twice) is folded through a sine into flowing, swirled bands. The bands swing between the warm and cool hue-shifted tones of the team color (up to 15° of hue) at nearly constant lightness. For yellow and green base colors (OKLCh hue 90°–150°, fading out by 65° and 175°), the hue shift is reduced to 35%, because those colors turn muddy olive when shifted. Glossy streaks along the band crests are supported but switched off.
      - **Shaded**: a thick ink layer with hue shifting:
      - Each pixel gets a *tone* from broad, smooth noise swells plus a faint bump map lit from the top-left.
      - Tone is applied in **OKLCh** (a perceptual color space). Lights get slightly lighter and drift **warm, toward yellow**; shadows get slightly darker, a little richer and drift **cool, toward blue**, by up to 20° of hue. Pink goes rose in the lights and magenta-purple in the shadows; green goes from yellow-green to bluish green.

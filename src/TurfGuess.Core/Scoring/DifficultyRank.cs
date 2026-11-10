@@ -14,16 +14,16 @@ public static class Difficulty
 {
     /// <summary>
     /// Upper bounds of the winner's share of the painted floor (exclusive) for X, S, A and B.
-    /// Anything at or above the last bound is C. Equal 0.7-point bands over the default
-    /// 50.5–54% range, so with the default settings each rank comes up about one round in five.
+    /// Anything at or above the last bound is C. Equal 0.4-point bands over the default
+    /// 50.3–52.3% range, so with the default settings each rank comes up about one round in five.
     /// Fixed rather than derived from the configured range, so a rank always means the same split.
     /// </summary>
     private static readonly (double MaxShare, DifficultyRank Rank)[] Bands =
     [
-        (0.512, DifficultyRank.X),
-        (0.519, DifficultyRank.S),
-        (0.526, DifficultyRank.A),
-        (0.533, DifficultyRank.B),
+        (0.507, DifficultyRank.X),
+        (0.511, DifficultyRank.S),
+        (0.515, DifficultyRank.A),
+        (0.519, DifficultyRank.B),
     ];
 
     /// <summary>The rank for a winner share of the painted floor, as a fraction (0.5–1).</summary>

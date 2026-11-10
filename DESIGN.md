@@ -348,8 +348,8 @@ Streaks, accuracy and the leaderboard can be computed from `votes` joined with `
     "Difficulty": {
       // Fixed range. Each round picks a winner share uniformly in [min, max].
       // Measured as a share of PAINTED floor: max(L, R) / (L + R). Must be > 50.
-      "MinWinnerShare": 50.5,   // %
-      "MaxWinnerShare": 54.0
+      "MinWinnerShare": 50.3,   // %
+      "MaxWinnerShare": 52.3
     },
     "Map": {
       "GridWidth": 96,

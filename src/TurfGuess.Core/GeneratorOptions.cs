@@ -88,6 +88,6 @@ public sealed class PaintOptions
 public sealed class DifficultyOptions
 {
     /// <summary>Winner share of the PAINTED floor, in percent. Must be &gt; 50.</summary>
-    public double MinWinnerShare { get; set; } = 50.5;
-    public double MaxWinnerShare { get; set; } = 54.0;
+    public double MinWinnerShare { get; set; } = 50.3;
+    public double MaxWinnerShare { get; set; } = 52.3;
 }

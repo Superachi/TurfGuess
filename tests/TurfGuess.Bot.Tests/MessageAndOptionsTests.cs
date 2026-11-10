@@ -66,10 +66,10 @@ public class MessageTextTests
 
     [Theory]
     [InlineData(0.5050, "X-rank difficulty 🔥🔥🔥🔥🔥")]
-    [InlineData(0.5150, "S-rank difficulty 🔥🔥🔥🔥")]
-    [InlineData(0.5200, "A-rank difficulty 🔥🔥🔥")]
-    [InlineData(0.5300, "B-rank difficulty 🔥🔥")]
-    [InlineData(0.5390, "C-rank difficulty 🔥")]
+    [InlineData(0.5090, "S-rank difficulty 🔥🔥🔥🔥")]
+    [InlineData(0.5130, "A-rank difficulty 🔥🔥🔥")]
+    [InlineData(0.5170, "B-rank difficulty 🔥🔥")]
+    [InlineData(0.5210, "C-rank difficulty 🔥")]
     public void Round_description_shows_the_difficulty_rank_open_and_closed(double winnerShare, string expected)
     {
         var round = Round();

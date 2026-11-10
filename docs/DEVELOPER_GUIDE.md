@@ -177,7 +177,7 @@ Radii are in cells and must be **below 1**. An opening with radius *r* removes f
 | `UnpaintedShare` | `U / floor` | Shown at the reveal |
 | `Winner` | `L > R ? Left : Right` | Ties are impossible because `MinWinnerShare > 50` |
 
-`Difficulty.RankFor(winnerShare)` (`Scoring/DifficultyRank.cs`) turns `WinnerShare` into a rank shown in the round message: X under 51.2%, S under 51.9%, A under 52.6%, B under 53.3%, otherwise C. The bands are fixed 0.7-point steps over the default 50.5–54% range, not derived from the configured range, so a rank always means the same split.
+`Difficulty.RankFor(winnerShare)` (`Scoring/DifficultyRank.cs`) turns `WinnerShare` into a rank shown in the round message: X under 50.7%, S under 51.1%, A under 51.5%, B under 51.9%, otherwise C. The bands are fixed 0.4-point steps over the default 50.3–52.3% range, not derived from the configured range, so a rank always means the same split.
 
 ### Stage 4: rendering (`Render/MapRenderer.cs`)
 
@@ -344,7 +344,7 @@ All options are mutable classes, so the bot can bind them from `appsettings.json
 
 | Option | Default | Valid range | Meaning |
 |---|---|---|---|
-| `MinWinnerShare` / `MaxWinnerShare` | 50.5 / 54.0 | 50 < min ≤ max < 100 | Winner's share of the painted floor, in % |
+| `MinWinnerShare` / `MaxWinnerShare` | 50.3 / 52.3 | 50 < min ≤ max < 100 | Winner's share of the painted floor, in % |
 
 **`RenderStyle`** (not validated, set per round)
 

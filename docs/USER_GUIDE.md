@@ -11,7 +11,7 @@ This guide covers what Turf Guess does, how to play, and how to use the tools th
 Every day the bot posts a picture of an arena. Two teams of paint have flowed in from opposite sides, one from the left and one from the right, and fought over the middle. One color covers slightly more floor than the other. **Your job is to guess which color won.** You vote with a single button click. At the same time the next day, the bot reveals the exact percentages, lists who guessed right, and posts the next arena.
 
 What makes it fun:
-- **It's close.** The winning color covers only 50.5–54% of the painted floor, so you really have to look.
+- **It's close.** The winning color covers only 50.3–52.3% of the painted floor, so you really have to look.
 - **No two rounds are alike.** Every arena, paint pattern and color pair is generated from scratch.
 - **It's quick.** One look, one click, once a day.
 
@@ -69,13 +69,13 @@ The round message shows how hard the round is, e.g. *S-rank difficulty 🔥🔥�
 
 | Rank | Shown as | Winner's share of the painted floor |
 |---|---|---|
-| **C** (easiest) | C-rank difficulty 🔥 | 53.3% or more |
-| **B** | B-rank difficulty 🔥🔥 | 52.6% – 53.3% |
-| **A** | A-rank difficulty 🔥🔥🔥 | 51.9% – 52.6% |
-| **S** | S-rank difficulty 🔥🔥🔥🔥 | 51.2% – 51.9% |
-| **X** (hardest) | X-rank difficulty 🔥🔥🔥🔥🔥 | under 51.2% |
+| **C** (easiest) | C-rank difficulty 🔥 | 51.9% or more |
+| **B** | B-rank difficulty 🔥🔥 | 51.5% – 51.9% |
+| **A** | A-rank difficulty 🔥🔥🔥 | 51.1% – 51.5% |
+| **S** | S-rank difficulty 🔥🔥🔥🔥 | 50.7% – 51.1% |
+| **X** (hardest) | X-rank difficulty 🔥🔥🔥🔥🔥 | under 50.7% |
 
-With the default settings (50.5–54%), each rank comes up about one day in five. The bands are fixed, so if you change `Generator:Difficulty`, some ranks come up more often or not at all.
+With the default settings (50.3–52.3%), each rank comes up about one day in five. The bands are fixed, so if you change `Generator:Difficulty`, some ranks come up more often or not at all.
 
 ### The reveal
 
@@ -160,7 +160,7 @@ The other settings are in [`src/TurfGuess.Bot/appsettings.json`](../src/TurfGues
 | `Game:ShowVoteCount` | `true` | Show "N players have voted" on the round message. Only the total, never the split. |
 | `Game:MaxListedWinners` | `50` | Most correct guessers named in the reveal |
 | `Game:Ink` | `Marbled` | `Marbled`, `Flat` or `Shaded` |
-| `Generator:Difficulty:MinWinnerShare` / `MaxWinnerShare` | `50.5` / `54.0` | How close rounds are, as the winner's % of the painted floor |
+| `Generator:Difficulty:MinWinnerShare` / `MaxWinnerShare` | `50.3` / `52.3` | How close rounds are, as the winner's % of the painted floor |
 | `Database:Path` | `turfguess.db` | Where rounds and votes are stored |
 | `Images:Directory` | `images` | Where round and reveal images are stored |
 

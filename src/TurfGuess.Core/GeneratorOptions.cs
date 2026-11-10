@@ -23,6 +23,8 @@ public sealed class GeneratorOptions
 
         if (Paint.UnpaintedMin < 0 || Paint.UnpaintedMax >= 0.5 || Paint.UnpaintedMin > Paint.UnpaintedMax) errors.Add("Paint.UnpaintedMin/Max must satisfy 0 <= min <= max < 0.5.");
         if (Paint.PixelsPerCell is < 2 or > 64) errors.Add("Paint.PixelsPerCell must be in [2, 64].");
+        if (Paint.CornerRadius is < 0 or >= 1) errors.Add("Paint.CornerRadius must be in [0, 1).");
+        if (Paint.InnerCornerRadius is < 0 or >= 1) errors.Add("Paint.InnerCornerRadius must be in [0, 1).");
 
         if (Difficulty.MinWinnerShare <= 50 || Difficulty.MaxWinnerShare >= 100 || Difficulty.MinWinnerShare > Difficulty.MaxWinnerShare)
             errors.Add("Difficulty.MinWinnerShare/MaxWinnerShare must satisfy 50 < min <= max < 100.");
@@ -62,6 +64,18 @@ public sealed class PaintOptions
 
     /// <summary>Mask and render resolution.</summary>
     public int PixelsPerCell { get; set; } = 16;
+
+    /// <summary>
+    /// Radius of the rounded OUTER (convex) corners of the map outline, in cells, like CSS
+    /// border-radius. 0 = sharp. Must stay below 1, or 2-cell-wide parts of the map would vanish.
+    /// </summary>
+    public double CornerRadius { get; set; } = 0.75;
+
+    /// <summary>
+    /// Radius of the curve filling INNER (concave) corners of the outline, in cells. 0 = sharp.
+    /// Must stay below 1, or 2-cell-wide gaps would fill in.
+    /// </summary>
+    public double InnerCornerRadius { get; set; } = 0.5;
 }
 
 public sealed class DifficultyOptions

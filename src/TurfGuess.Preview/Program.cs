@@ -6,7 +6,7 @@ using TurfGuess.Core.Grid;
 using TurfGuess.Core.Render;
 
 // Usage: dotnet run --project src/TurfGuess.Preview -- [--count 12] [--seed 42] [--out preview] [--ink Flat|Shaded|Marbled]
-//        [--ppc 16] [--symmetry Rotate|Mirror] [--no-reveal] [--columns 4]
+//        [--ppc 16] [--symmetry Rotate|Mirror] [--no-reveal] [--columns 4] [--radius 0.75] [--inner-radius 0.5]
 //        dotnet run --project src/TurfGuess.Preview -- --pairs [--seed 42]
 //          [--pairs-file pairs.json] [--pairs-out name.png]
 //          renders one map in every color pair -> preview/color_pairs.png
@@ -20,6 +20,8 @@ bool reveal = !args_.Flag("no-reveal");
 
 var options = new GeneratorOptions();
 options.Paint.PixelsPerCell = args_.Int("ppc", options.Paint.PixelsPerCell);
+options.Paint.CornerRadius = args_.Double("radius", options.Paint.CornerRadius);
+options.Paint.InnerCornerRadius = args_.Double("inner-radius", options.Paint.InnerCornerRadius);
 var inkStyle = Enum.Parse<InkStyle>(args_.Str("ink", "Flat"), ignoreCase: true);
 if (args_.Has("symmetry")) options.Map.Symmetry = Enum.Parse<SymmetryMode>(args_.Str("symmetry", "Rotate"), ignoreCase: true);
 
@@ -133,4 +135,5 @@ internal sealed record Args(Dictionary<string, string?> Values)
     public string Str(string key, string fallback) => Values.TryGetValue(key, out var v) && v is not null ? v : fallback;
     public int Int(string key, int fallback) => Values.TryGetValue(key, out var v) && int.TryParse(v, out var n) ? n : fallback;
     public long Long(string key, long fallback) => Values.TryGetValue(key, out var v) && long.TryParse(v, out var n) ? n : fallback;
+    public double Double(string key, double fallback) => Values.TryGetValue(key, out var v) && double.TryParse(v, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var n) ? n : fallback;
 }

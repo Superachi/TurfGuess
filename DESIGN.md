@@ -185,7 +185,11 @@ Paint should *flow* from each spawn and wrap around obstacles, not just split th
 
 1. **Cost field.** Build a noise-based cost per floor cell, so paint moves faster through some areas than others. This produces the organic, finger-like borders.
 2. **Distance fields.** Run a Dijkstra from each spawn over the floor grid to get `dL` and `dR`, the raw cost-weighted distances. Paint can't cross `WALL` or `VOID`, so the distances wrap around obstacles. They're computed **once per round** and don't depend on the target margin.
-3. **Upsample to mask resolution.** Bilinearly interpolate `dL` and `dR` to the final mask resolution (the render resolution, e.g. 16 px/cell). Pixels outside floor cells are excluded.
+3. **Upsample to mask resolution, with rounded corners.** Build the pixel mask from the cell types (the render resolution, e.g. 16 px/cell), then round the outline like CSS `border-radius`:
+   - a morphological **opening** with a disk of radius `CornerRadius` rounds the **outer** (convex) corners;
+   - a morphological **closing** with a disk of radius `InnerCornerRadius` fills the **inner** (concave) corners with a curve.
+
+   Both use an exact Euclidean distance transform, so the radius doesn't affect speed. Only the floor/void outline changes: walls and spawn pads are never cut. Radii are in cells and must stay below 1, or 2-cell-wide parts of the map would vanish (outer) or 2-cell gaps would fill in (inner). This happens **before** scoring, so rounded-off corners never count. Then bilinearly interpolate `dL` and `dR` for every floor pixel.
 4. **Unpainted mask** (fixed before the margin is set):
    - **The spawn areas get neglected, not the middle.** Real players rush forward, so the floor near their own spawn is what stays unpainted. Each pixel gets the key `u = closeness to the nearest spawn + holes noise`, and the pixels with the highest `u` become unpainted. The noise breaks this up into patches instead of a solid ring.
    - A short **spawn trail** right around each pad (cost-distance < 2.5) is always painted.
@@ -343,7 +347,9 @@ Streaks, accuracy and the leaderboard can be computed from `votes` joined with `
     "UnpaintedMin": 0.05,     // fraction of total floor, picked per round in [min, max]
     "UnpaintedMax": 0.15,
     "Splatter": true,         // seeded splat stamps in the ownership score
-    "PixelsPerCell": 16       // mask and render resolution
+    "PixelsPerCell": 16,      // mask and render resolution
+    "CornerRadius": 0.75,     // outer corners of the outline, in cells, like CSS border-radius (0 = sharp, < 1)
+    "InnerCornerRadius": 0.5  // curve filling inner corners, in cells (0 = sharp, < 1)
   },
   "Discord": {
     "ChannelId": 0

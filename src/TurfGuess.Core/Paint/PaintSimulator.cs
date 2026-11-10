@@ -61,36 +61,40 @@ public static class PaintSimulator
         var distL = Dijkstra(cells, cost, map.SpawnLeft);
         var distR = Dijkstra(cells, cost, map.SpawnRight);
 
-        // 3. Base mask from cell types + upsampled distances for floor pixels.
+        // 3. Base mask from cell types, rounded corners on the outline, then upsampled distances
+        //    for every floor pixel.
         var mask = new PixelKind[pw * ph];
-        var pixelToFloor = new int[pw * ph];
-        var floorPixels = new List<int>(pw * ph / 2);
-        var dl = new List<float>(pw * ph / 2);
-        var dr = new List<float>(pw * ph / 2);
-
         for (int py = 0; py < ph; py++)
         {
             for (int px = 0; px < pw; px++)
             {
-                int pi = py * pw + px;
-                pixelToFloor[pi] = -1;
-                var cell = cells[px / p, py / p];
-                switch (cell)
+                mask[py * pw + px] = cells[px / p, py / p] switch
                 {
-                    case CellType.Void: mask[pi] = PixelKind.Void; break;
-                    case CellType.Wall: mask[pi] = PixelKind.Wall; break;
-                    case CellType.SpawnLeft: mask[pi] = PixelKind.SpawnLeft; break;
-                    case CellType.SpawnRight: mask[pi] = PixelKind.SpawnRight; break;
-                    default:
-                        double gx = (px + 0.5) / p - 0.5, gy = (py + 0.5) / p - 0.5;
-                        pixelToFloor[pi] = floorPixels.Count;
-                        floorPixels.Add(pi);
-                        dl.Add(Interpolate(distL, cells, gx, gy));
-                        dr.Add(Interpolate(distR, cells, gx, gy));
-                        mask[pi] = PixelKind.Unpainted;
-                        break;
-                }
+                    CellType.Void => PixelKind.Void,
+                    CellType.Wall => PixelKind.Wall,
+                    CellType.SpawnLeft => PixelKind.SpawnLeft,
+                    CellType.SpawnRight => PixelKind.SpawnRight,
+                    _ => PixelKind.Unpainted,
+                };
             }
+        }
+
+        CornerRounding.Apply(mask, pw, ph, options.CornerRadius * p, options.InnerCornerRadius * p);
+
+        var pixelToFloor = new int[pw * ph];
+        var floorPixels = new List<int>(pw * ph / 2);
+        var dl = new List<float>(pw * ph / 2);
+        var dr = new List<float>(pw * ph / 2);
+        for (int pi = 0; pi < mask.Length; pi++)
+        {
+            pixelToFloor[pi] = -1;
+            if (mask[pi] != PixelKind.Unpainted) continue;
+            int px = pi % pw, py = pi / pw;
+            double gx = (px + 0.5) / p - 0.5, gy = (py + 0.5) / p - 0.5;
+            pixelToFloor[pi] = floorPixels.Count;
+            floorPixels.Add(pi);
+            dl.Add(Interpolate(distL, cells, gx, gy));
+            dr.Add(Interpolate(distR, cells, gx, gy));
         }
 
         int nFloor = floorPixels.Count;
@@ -243,9 +247,15 @@ public static class PaintSimulator
 
         if (weight <= 0)
         {
-            // Pixel sits at the far edge of its cell with only walls around: use its own cell.
+            // No walkable cell among the four nearest centres (an edge pixel next to walls, or a
+            // pixel filled in by corner rounding): use the nearest finite distance around it.
             int cx = Math.Clamp((int)Math.Round(gx), 0, g.Width - 1), cy = Math.Clamp((int)Math.Round(gy), 0, g.Height - 1);
-            return dist[g.Index(cx, cy)];
+            float best = float.PositiveInfinity;
+            for (int dy = -1; dy <= 1; dy++)
+                for (int dx = -1; dx <= 1; dx++)
+                    if (g.InBounds(cx + dx, cy + dy))
+                        best = Math.Min(best, dist[g.Index(cx + dx, cy + dy)]);
+            return float.IsInfinity(best) ? 0 : best;
         }
         return (float)(sum / weight);
 

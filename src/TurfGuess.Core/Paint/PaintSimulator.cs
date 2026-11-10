@@ -21,7 +21,7 @@ public static class PaintSimulator
     private const double HolesFrequency = 0.22;  // per cell
     private const double HolesWeight = 0.7;
     private const double SpawnNeglect = 1.0;
-    private const float SpawnTrail = 2.5f;       // cost-distance around a pad that is always painted
+    private const float SpawnTrail = 3.5f;       // cost-distance around a pad that is always painted
     private const double SpawnTrailRoughness = 0.8; // how ragged the spawn trail's edge is
     private const double DiligentNeglect = 0.25; // a diligent team neglects its spawn area this much (vs 1.0)
 
@@ -32,7 +32,7 @@ public static class PaintSimulator
     private const double BorderGrainAmplitude = 0.02;
 
     // Paint splats landing in the unpainted floor near spawns.
-    private const double SpawnSplatBand = 0.15;        // how far into the unpainted area (in units of the key)
+    private const double SpawnSplatBand = 0.25;        // how far into the unpainted area (in units of the key)
     private const double SpawnSplatMinCloseness = 0.4; // only near a spawn, not in far corners
 
     // Fight zone: around the front line both colors interleave in blotches.

@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using TurfGuess.Bot.Data;
 using TurfGuess.Core.Grid;
+using TurfGuess.Core.Scoring;
 
 namespace TurfGuess.Bot.Game;
 
@@ -37,17 +38,30 @@ public static class MessageText
         var sb = new StringBuilder();
         if (closed)
         {
-            sb.Append("**Voting is closed.** The results are below.");
+            sb.Append("**Voting is closed.** The results are below.\n");
+            sb.Append(DifficultyLine(round));
         }
         else
         {
             sb.Append("Which team do you think painted more? Cast your vote!\n");
+            sb.Append(DifficultyLine(round)).Append('\n');
             sb.Append($"Results <t:{round.RevealAt}:R> (<t:{round.RevealAt}:f>).");
         }
 
         if (voters is { } n)
             sb.Append($"\n\n{VoterCount(n)}");
         return sb.ToString();
+    }
+
+    /// <summary>
+    /// How close the round is, as a rank from C (easiest) to X (hardest). It says nothing about
+    /// who won, so it's shown while voting is open.
+    /// </summary>
+    public static string DifficultyLine(RoundRecord round)
+    {
+        var rank = Difficulty.RankFor(round.WinnerShare);
+        int flames = (int)rank + 1; // C = 1 … X = 5
+        return $"{rank}-rank difficulty {string.Concat(Enumerable.Repeat("🔥", flames))}";
     }
 
     public static string VoterCount(int n) => n switch

@@ -63,6 +63,20 @@ Each round runs from one round time to the next, which is normally 24 hours.
 - Sometimes a team **painted its spawn diligently**, so its side is almost fully painted and the grey patches end up on the other side. A tidy spawn doesn't mean that team won.
 - The middle is messy on purpose. Look at the overall area, not just the front line.
 
+### Difficulty rank
+
+The round message shows how hard the round is, e.g. *S-rank difficulty 🔥🔥🔥🔥*. The rank only says how close the two colors are, never which one is ahead.
+
+| Rank | Shown as | Winner's share of the painted floor |
+|---|---|---|
+| **C** (easiest) | C-rank difficulty 🔥 | 53.3% or more |
+| **B** | B-rank difficulty 🔥🔥 | 52.6% – 53.3% |
+| **A** | A-rank difficulty 🔥🔥🔥 | 51.9% – 52.6% |
+| **S** | S-rank difficulty 🔥🔥🔥🔥 | 51.2% – 51.9% |
+| **X** (hardest) | X-rank difficulty 🔥🔥🔥🔥🔥 | under 51.2% |
+
+With the default settings (50.5–54%), each rank comes up about one day in five. The bands are fixed, so if you change `Generator:Difficulty`, some ranks come up more often or not at all.
+
 ### The reveal
 
 ![A reveal image](images/reveal_example.png)
@@ -261,8 +275,8 @@ This generates 12 rounds and writes them to the `preview` folder:
 It also prints a table in the terminal:
 
 ```
-  seed try winner      target  actual  L cov  R cov    unp dil     ms
-    42   1 Pink       53.85 % 53.85 % 46.2 % 39.6 % 14.1 %   -    639
+  seed try winner      target  actual  L cov  R cov    unp dil rank     ms
+    42   1 Pink       53.85 % 53.85 % 46.2 % 39.6 % 14.1 %   -    C    639
 ```
 
 | Column | Meaning |
@@ -274,6 +288,7 @@ It also prints a table in the terminal:
 | `L cov` / `R cov` | Left and right team's share of the whole floor. |
 | `unp` | Unpainted share of the floor. |
 | `dil` | Which teams painted their own spawn diligently this round: `L`, `R`, `LR` or `-`. |
+| `rank` | The [difficulty rank](#difficulty-rank), from `C` (easiest) to `X` (hardest). |
 | `ms` | Time it took to generate the round. |
 
 > **Tip:** to test your guessing, open `contact_sheet.png`, cover up the labels, guess each round, then check.

@@ -68,7 +68,7 @@ TurfGuess/
       Grid/                      # Grid<T>, CellType, Side, RectI, Symmetry
       MapGen/                    # MapGenerator, GameMap
       Paint/                     # PaintSimulator, CornerRounding, PaintResult
-      Scoring/                   # Score, ScoreResult
+      Scoring/                   # Score, ScoreResult, DifficultyRank
       Render/                    # MapRenderer, RenderStyle, ColorPairs, ColorMath
       Noise/GradientNoise.cs     # seeded Perlin-style noise + fBm
       Util/Rng.cs                # SplitMix64 PRNG
@@ -176,6 +176,8 @@ Radii are in cells and must be **below 1**. An opening with radius *r* removes f
 | `CoverageLeft`, `CoverageRight` | `L / floor`, `R / floor` | The percentages shown at the reveal |
 | `UnpaintedShare` | `U / floor` | Shown at the reveal |
 | `Winner` | `L > R ? Left : Right` | Ties are impossible because `MinWinnerShare > 50` |
+
+`Difficulty.RankFor(winnerShare)` (`Scoring/DifficultyRank.cs`) turns `WinnerShare` into a rank shown in the round message: X under 51.2%, S under 51.9%, A under 52.6%, B under 53.3%, otherwise C. The bands are fixed 0.7-point steps over the default 50.5–54% range, not derived from the configured range, so a rank always means the same split.
 
 ### Stage 4: rendering (`Render/MapRenderer.cs`)
 
@@ -368,6 +370,7 @@ dotnet test
 | `SpawnPaintTests` | Diligence chance 0/1 controls the flags; mix at the default; diligent teams leave less unpainted floor near spawn; targets unaffected; invalid chance rejected |
 | `ColorPairsTests` | Pairs valid and distinct; pick is deterministic; all pairs and both sides used; empty list rejected |
 | `MarbleDampingTests` | Yellow/green damped; other hues full; smooth fade |
+| `DifficultyRankTests` | Rank boundaries, X to C |
 
 **Bot tests** (`tests/TurfGuess.Bot.Tests`). Each one runs against a fresh SQLite file and image folder in a temp directory (`TestEnvironment`), with `FakeChannel` standing in for Discord:
 

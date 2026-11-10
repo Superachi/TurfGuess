@@ -64,6 +64,21 @@ public class MessageTextTests
         Assert.Contains("closed", MessageText.RoundDescription(Round(), 3, closed: true));
     }
 
+    [Theory]
+    [InlineData(0.5050, "X-rank difficulty 🔥🔥🔥🔥🔥")]
+    [InlineData(0.5150, "S-rank difficulty 🔥🔥🔥🔥")]
+    [InlineData(0.5200, "A-rank difficulty 🔥🔥🔥")]
+    [InlineData(0.5300, "B-rank difficulty 🔥🔥")]
+    [InlineData(0.5390, "C-rank difficulty 🔥")]
+    public void Round_description_shows_the_difficulty_rank_open_and_closed(double winnerShare, string expected)
+    {
+        var round = Round();
+        round.WinnerShare = winnerShare;
+        string line = expected + "\n";
+        Assert.Contains(line, MessageText.RoundDescription(round, 3, closed: false));
+        Assert.Contains(line, MessageText.RoundDescription(round, 3, closed: true) + "\n");
+    }
+
     [Fact]
     public void Embeds_refer_to_their_own_attachment() =>
         Assert.Equal("attachment://round_2.png", MessageText.AttachmentUrl("round_2.png"));

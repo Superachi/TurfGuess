@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/TurfGuess.Core/TurfGuess.Core.csproj" />
+    <Project Path="src/TurfGuess.Preview/TurfGuess.Preview.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/TurfGuess.Core.Tests/TurfGuess.Core.Tests.csproj" />
+  </Folder>
+</Solution>

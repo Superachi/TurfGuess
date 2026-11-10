@@ -1,0 +1,6 @@
+bin/
+obj/
+preview/
+*.user
+.vs/
+*.db

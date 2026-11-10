@@ -1,0 +1,413 @@
+# Turf Guess — Design Document
+
+> Working title. The game name, team names and colors are all configurable (see [Configuration](#7-configuration)).
+
+## 1. Concept
+
+A Discord bot for a **single server** runs one round of a guessing game per day. Each round it posts an image of a procedurally generated, symmetric arena. Two colors of paint have flowed into it, one from the left spawn and one from the right. One color covers slightly more floor than the other. Players vote on which color they think won by clicking one of two buttons on the message. At the next daily round time (normally 24 hours later) the bot reveals the exact percentages and posts the next round.
+
+The fun comes from:
+- **Close calls.** Margins are small and tunable, so it really takes eyeballing.
+- **Organic paint on hard-edged maps.** The map is blocky and obviously symmetric, while the paint flows organically around walls and obstacles, so you can't just compare the two halves.
+- **The daily ritual.** One guess per day, plus streaks and a leaderboard.
+
+Cheating (pixel counting) is explicitly **out of scope**. It's a casual game.
+
+---
+
+## 2. Daily cycle
+
+There is always exactly one active round. At the configured **round time** (e.g. 09:00 local) every day:
+
+1. **Reveal round N−1**
+   - Close voting: set the round's status to `Revealed` in the database. **That is what closes voting** (see [Voting rules](#voting-rules)). Then edit the round message to disable both buttons and mark it **Closed**.
+   - Post the reveal: the winning color, the exact percentages, how many people voted each way, and a list of the correct guessers (see [Reveal message](#reveal-message)).
+2. **Post round N**
+   - Generate a new map and paint it, then post the image with vote buttons.
+
+```
+Day 1 09:00   Post R1
+Day 2 09:00   Reveal R1 → Post R2
+Day 3 09:00   Reveal R2 → Post R3
+...
+```
+
+### Schedule rules
+- **The round time is wall-clock time in the configured `TimeZone`**, not a fixed 24-hour gap. A round's `reveal_at` is the **next time RoundTime comes around in TimeZone after the round is posted**. When the clocks change for daylight saving time, that round lasts 23 or 25 hours, and the posts stay at 09:00 local.
+- **Catch-up rounds are shorter, never later.** If the bot was down and catches up at 15:00, it reveals the overdue round and posts a new one right away. That new round still reveals at the next 09:00, so the schedule never drifts.
+- **If several days were missed,** only the overdue open round is revealed, then one new round is posted. Missed days are skipped, not posted after the fact.
+- **First start (no rounds in the database):** post a round right away. It reveals at the next RoundTime. Starting at 08:55 would give a 5-minute round, so if less than `MinRoundLength` (default 6 hours) is left, the reveal moves to the RoundTime after that.
+- The scheduler wakes for the earliest `reveal_at` of all open rounds, not on a fixed daily timer. Catch-up and normal operation then follow the same code path.
+
+### Voting rules
+- **Pure binary guess:** which team covered more floor? There are no margin brackets or bonus guesses.
+- **Voting uses message buttons.** The round message has two buttons, one per team, each labeled with the team's emoji and name and colored to match where Discord's button styles allow (e.g. `🟧 Orange` / `🟦 Blue`). One click is a vote, with no commands or extra steps.
+- **Votes are hidden.** A click gets an **ephemeral** reply that only the voter sees ("You voted 🟧 Orange. You can change it until the reveal."). Nobody can see the running split, so players can't just follow the crowd.
+- **One vote per player.** Clicking the other button changes the vote, and the newest click wins.
+- **Live vote counter (optional):** the round message can show "N players have voted" and be updated as votes come in. It shows only the total, never the split. Edits are debounced (e.g. at most once every 30 s) to stay within rate limits.
+
+**Source of truth:** each click is written to the `votes` table straight away (an upsert on `(round_id, user_id)`).
+
+**Closing is enforced by the database, not by the buttons.** Disabling the buttons is only a visual cue: a click can be in flight while the edit happens, and the edit itself can fail. So the vote upsert is **conditional on the round being open**, in a single statement:
+
+```sql
+INSERT INTO votes (round_id, user_id, choice, voted_at)
+SELECT @RoundId, @UserId, @Choice, @Now
+WHERE EXISTS (SELECT 1 FROM rounds WHERE id = @RoundId AND status = 'Open')
+ON CONFLICT (round_id, user_id) DO UPDATE SET choice = excluded.choice, voted_at = excluded.voted_at;
+```
+
+- If 1 row is affected, the vote is recorded and the voter gets the ephemeral confirmation.
+- If 0 rows are affected, the voter gets an ephemeral "Voting for this round is closed." The same happens for clicks on any old round message.
+- SQLite runs writes one at a time, so a vote and the `Open → Revealed` update can never overlap. A vote either lands before the reveal counts votes, or it's rejected. Each button has a fixed custom id that includes the round id (`vote:{roundId}:{side}`). Clicks are routed by that id, so the buttons keep working after a restart (see [Tech stack](#8-tech-stack--structure)).
+
+> While the bot is offline, Discord shows clicks as "This interaction failed", and they aren't recorded. That's accepted: the player can just click again once the bot is back.
+
+### Reveal message
+- Winning team, both coverage percentages (share of total floor) and the unpainted share. See [Definitions](#41-definitions).
+- Vote counts per team.
+- **The correct guessers by name**, sent as mentions with `AllowedMentions.None`. They render as clickable names but **don't ping anyone**.
+- If the list would go over Discord's 2000-character message limit, it's cut off with "…and N more".
+- The reveal image (the same map with a result banner) is attached.
+
+### Round lifecycle
+
+```
+Pending ──(message posted, message_id saved)──▶ Open ──(voting closed)──▶ Revealed ──(reveal posted)──▶ Done
+```
+
+| Status | Meaning |
+|---|---|
+| `Pending` | The row is written: seed, results, `reveal_at` and image path. The message may or may not have been posted yet. |
+| `Open` | The round message is posted and `message_id` is saved. Votes are accepted. |
+| `Revealed` | Voting is closed and the votes are final. The reveal message may or may not have been posted yet. |
+| `Done` | The reveal message is posted and `reveal_message_id` is saved. |
+
+**Invariant:** at most one round is ever not `Done`. The next round is created only after the previous one reaches `Done`.
+
+**Order of operations.** The database row is always written *before* the matching Discord call, and the Discord ID is saved *after* it:
+
+- **Posting:**
+  1. Generate the round and write it as `Pending`.
+  2. Send the message.
+  3. Save `message_id` and set the status to `Open`.
+- **Revealing:**
+  1. Set the status to `Revealed`. This closes voting.
+  2. Disable the buttons.
+  3. Send the reveal.
+  4. Save `reveal_message_id` and set the status to `Done`.
+
+**Crash recovery on startup.** The scheduler finishes any round that's left halfway:
+
+| Found | Action |
+|---|---|
+| `Pending` | Check the bot's recent messages in the channel (the last 50) for one whose button id contains this round's id (`vote:{roundId}:…`). If found, adopt its `message_id` and move to `Open`. Otherwise post the message now. This **never posts a duplicate**. |
+| `Open`, past `reveal_at` | Reveal it as normal. |
+| `Revealed` | Check the recent messages for the reveal of this round (its embed footer carries `Round #{id}`). If found, adopt it and move to `Done`. Otherwise disable the buttons (harmless if already done) and post the reveal. |
+| Everything `Done` | Create the next round. |
+
+Every step can safely run twice, so recovery and normal operation use the same code path: "advance the current round one step until it's `Open` and waiting, or `Done`."
+
+### Reliability
+- All round state is kept in SQLite, so the bot survives restarts.
+- On startup the bot checks for a round that is past its reveal time. If it finds one, it reveals it and posts a new round immediately (catch-up, see [Schedule rules](#schedule-rules)). The buttons on the open round keep working without any re-registration.
+- The answer is stored only server-side. Each round stores its **seed**, so any image can be regenerated exactly for debugging.
+
+---
+
+## 3. Map generation
+
+### 3.1 Requirements
+- **Symmetric**, so neither team has a structural advantage.
+- **Interesting shapes:** an irregular outline, obstacles, chokepoints and open areas.
+- **Fully connected:** every floor cell can be reached from both spawns.
+- **Spawns** on the far left and far right.
+- **Deterministic** from a seed.
+
+### 3.2 Symmetry mode
+The default is **180° rotational (point) symmetry**: the right half is the left half rotated 180° around the map center. This is deliberate and follows how competitive arena maps are built. With a mirror, a corner that one team peeks around on its right would be a left-side peek for the other team. Rotation gives both teams identical sightlines, which removes the **right-peek advantage**.
+
+The symmetry is meant to be **obvious**. It signals that the map is fair, and the guessing challenge comes from the paint, not from the layout.
+
+| Mode | Description |
+|---|---|
+| `rotate` (default) | Rotate the left half 180° around the center. No peek-side advantage. |
+| `mirror` | Reflect across the vertical center line. Available as an option, but it reintroduces the peek-side asymmetry. |
+
+### 3.3 Pipeline
+Work on a **cell grid** (e.g. 96×54 cells), then upscale for rendering. **The grid is the look.** Shapes stay rectilinear and built from blocks, like real arena geometry (platforms, corridors, ledges), with **no smoothing** into organic blobs. Paint is the only organic element on the map, and the contrast between hard-edged architecture and flowing ink is part of the style.
+
+1. **Generate the left half**
+   - Build the floor by placing **axis-aligned rectangles** (platforms, corridors, plazas) of varied sizes, snapped to the grid, overlapping freely.
+   - Optionally cut **rectangular voids** (pits, out-of-bounds gaps) into it to make chokepoints.
+   - Carve guaranteed floor: a spawn pad near the left edge, plus a few straight or L-shaped **lanes** (2–4 cells wide) from spawn toward the center line, so the map is never a maze.
+2. **Place obstacles** (walls and pillars, which are impassable and can't be painted)
+   - Scatter grid-aligned blocks: single pillars, wall segments, L-shapes and T-shapes, at a configurable density.
+   - Keep a buffer zone around the spawn pad clear.
+3. **Apply symmetry** to produce the full map.
+4. **Validate connectivity**
+   - Flood fill from the left spawn and remove any floor cells it doesn't reach (islands).
+   - Reject and regenerate the map (next sub-seed) if:
+     - the right spawn isn't reachable,
+     - the floor area is outside the `[min_floor, max_floor]` fraction,
+     - the center line has too few crossing points (too few chokepoints makes boring maps; too many makes them blobby).
+5. **Output** a grid with cell types `VOID`, `FLOOR`, `WALL` and `SPAWN_L` / `SPAWN_R`.
+
+### 3.4 Possible later variants
+- **Map "styles"** with different presets (open field, corridors, islands joined by bridges).
+- **Height/levels:** purely cosmetic, drawn with drop shadows.
+- **Named maps:** generate a fun random name for each map ("Rusty Pier", "Neon Quarry").
+
+---
+
+## 4. Paint simulation
+
+### 4.1 Definitions
+| Term | Meaning |
+|---|---|
+| **Floor pixels** | Pixels of the final mask whose cell is `FLOOR`. Walls, void and spawn pads never count. |
+| **Painted floor** | Floor pixels painted by either team: `L + R`. |
+| **Unpainted share** | `U / (L + R + U)`, the fraction of floor nobody painted. |
+| **Winner share** (difficulty) | `max(L, R) / (L + R)`, a share of the **painted** floor. This is what `MinWinnerShare` / `MaxWinnerShare` control. |
+| **Coverage** (shown at reveal) | `L / floor` and `R / floor`, a share of **total** floor, as in the real thing, shown next to the unpainted share. |
+
+Example: winner share 52%, unpainted 10% → the reveal shows **46.8% vs 43.2%, 10.0% unpainted**.
+
+Using painted floor for difficulty means the unpainted share can vary from round to round without changing how hard the guess is.
+
+### 4.2 Approach: two distance fields and one threshold
+Paint should *flow* from each spawn and wrap around obstacles, not just split the screen in half.
+
+1. **Cost field.** Build a noise-based cost per floor cell, so paint moves faster through some areas than others. This produces the organic, finger-like borders.
+2. **Distance fields.** Run a Dijkstra from each spawn over the floor grid to get `dL` and `dR`, the raw cost-weighted distances. Paint can't cross `WALL` or `VOID`, so the distances wrap around obstacles. They're computed **once per round** and don't depend on the target margin.
+3. **Upsample to mask resolution.** Bilinearly interpolate `dL` and `dR` to the final mask resolution (the render resolution, e.g. 16 px/cell). Pixels outside floor cells are excluded.
+4. **Unpainted mask** (fixed before the margin is set):
+   - A pixel is unpainted if `min(dL, dR) > C` (far from both spawns), or if a separate "holes" noise goes above a threshold.
+   - `C` is chosen as a **quantile**, so the unpainted share lands on a value picked at random in `[UnpaintedMin, UnpaintedMax]`.
+   - Because this step doesn't involve the speed bias, changing the margin never changes the unpainted area.
+5. **Ownership score per painted pixel:**
+   ```
+   s(p) = ln dR(p) − ln dL(p) + jitter(p) + splat(p)
+   ```
+   - `s > t` means left owns the pixel. Positive values mean "closer to left".
+   - `jitter` is fine, high-frequency noise. It roughens the borders at pixel level, which gives the painted look.
+   - `splat` comes from seeded splat stamps (circles plus droplets) at random positions, each assigned a random team. Inside a stamp it adds a large ±value, so the stamp takes that team's color wherever it lands. A splat deep in enemy territory reads as a stray shot.
+   - Jitter and splats are part of the score field **from the start**, not cosmetic extras added later.
+6. **Threshold for the exact margin.** The threshold `t` is the speed bias. It's equivalent to scaling the distances by `dL·b` vs `dR/b` with `t = 2 ln b`. Since everything else is fixed, `t` is simply a **quantile of `s` over the painted pixels**:
+   - Pick the winning side (50/50) and the target winner share `w` within the difficulty range.
+   - Left wins → `t` = the `(1 − w)` quantile of `s`. Right wins → `t` = the `w` quantile.
+   - This hits the target **to the pixel**, with no iterative search and no tolerance band. At 1536×864 one pixel is under 0.0001% of the floor.
+7. **Final mask.** The result is a per-pixel `byte[]` with `None / Left / Right / Unpainted` (plus wall/void). **This mask is the single source of truth** for both the score and the renderer.
+
+### 4.3 Guarantees
+- **Exact margin:** the stored share is the share counted from the final mask, and it equals the target up to one pixel.
+- **No ties:** `MinWinnerShare > 50`, and the threshold is placed between distinct values of `s`. Ties in `s` are broken by pixel index, so the result is deterministic.
+- **Sanity checks.** The seed is rejected (and the next sub-seed tried) if:
+  - painted floor is under 50% of the image's floor,
+  - the losing team ends up with no connected region touching its own spawn (it would look like a wipeout rather than a close match).
+
+> Rule: **the score is always counted from the final paint mask**, never from an intermediate step. The renderer only *draws* that mask. Anti-aliasing, shading and shadows affect how it looks, never the count.
+
+---
+
+## 5. Rendering
+
+- Upscale the grid (e.g. 16 px/cell → 1536×864) and render with SkiaSharp.
+- Layers, bottom to top:
+  1. Background (void), dark and slightly textured.
+  2. Floor tiles: neutral gray, faint grid lines.
+  3. Paint: team colors, with slight lightness variation from noise so it doesn't look flat.
+  4. Walls and obstacles: raised look (a lighter top face plus a drop shadow).
+  5. Spawn pads in team colors.
+  6. Optional: round number and game name in a corner.
+- The renderer receives the final paint mask from the paint step (section 4.2, step 7) at the same resolution and draws it. It never counts anything itself.
+
+### Reveal image
+- The same map with a result banner showing both percentages, and the winner highlighted.
+- Later: an animated GIF of a counting bar filling up, for the suspense.
+
+### Accessibility
+- Colors are configurable. Include a colorblind-friendly default pair (e.g. orange/blue), and **validate in config** that the two team colors differ enough in lightness and hue.
+
+---
+
+## 6. Data model (SQLite)
+
+```sql
+rounds (
+  id            INTEGER PRIMARY KEY,
+  channel_id    INTEGER,   -- single server, so no guild_id needed
+  status        TEXT NOT NULL,  -- 'Pending' | 'Open' | 'Revealed' | 'Done'
+  message_id    INTEGER,        -- NULL until posted
+  reveal_message_id INTEGER,    -- NULL until the reveal is posted
+  seed          INTEGER,
+  image_path    TEXT,
+  posted_at     TEXT,      -- ISO timestamp (UTC)
+  reveal_at     TEXT,      -- ISO timestamp (UTC), computed from RoundTime in TimeZone
+  winner        TEXT,      -- 'left' | 'right'
+  winner_share  REAL,      -- % of painted floor (difficulty)
+  share_left    REAL,      -- coverage, % of total floor
+  share_right   REAL,
+  unpainted     REAL       -- % of total floor
+)
+
+votes (
+  round_id      INTEGER,
+  user_id       INTEGER,
+  choice        TEXT,      -- 'left' | 'right'
+  voted_at      TEXT,      -- time of the latest change
+  PRIMARY KEY (round_id, user_id)
+)
+```
+
+`votes` is upserted on every button click, only while the round is `Open` (see [Voting rules](#voting-rules)). The row as it stands when the round moves to `Revealed` is the final vote.
+
+A partial unique index enforces the "one unfinished round" invariant:
+
+```sql
+-- Every row in this partial index has the same key value (1), so at most one row can exist.
+CREATE UNIQUE INDEX one_active_round ON rounds (status <> 'Done') WHERE status <> 'Done';
+```
+
+Streaks, accuracy and the leaderboard can be computed from `votes` joined with `rounds`. Add a cached `user_stats` table later only if it's needed.
+
+---
+
+## 7. Configuration
+
+`appsettings.json`, loaded with `Microsoft.Extensions.Configuration` and bound to strongly typed options classes (`GameOptions`, `TeamOptions`, `MapOptions`, …) through the Options pattern. The options are validated at startup (`ValidateOnStart`): share ranges, floor ranges, and enough color contrast between the two teams.
+
+```jsonc
+{
+  "Game": {
+    "Name": "Turf Guess",
+    "RoundTime": "09:00",
+    "TimeZone": "Europe/Amsterdam",   // IANA id; .NET resolves it on Windows and Linux
+    "ShowVoteCount": true,            // "N players have voted" on the round message
+    "MaxListedWinners": 50,           // extra names are cut off with "…and N more"
+    "MinRoundLength": "06:00:00"      // first-start rounds shorter than this skip to the following RoundTime
+  },
+  "Teams": {
+    "Left":  { "Name": "Orange", "Color": "#F28C28", "Emoji": "🟧" },  // emoji shown on the vote button
+    "Right": { "Name": "Blue",   "Color": "#2F6FDE", "Emoji": "🟦" }
+  },
+  "Difficulty": {
+    // Fixed range. Each round picks a winner share uniformly in [min, max].
+    // Measured as a share of PAINTED floor: max(L, R) / (L + R). Must be > 50.
+    "MinWinnerShare": 50.5,   // %
+    "MaxWinnerShare": 58.0
+  },
+  "Map": {
+    "GridWidth": 96,
+    "GridHeight": 54,
+    "Symmetry": "Rotate",     // "Rotate" | "Mirror"
+    "ObstacleDensity": 0.06,
+    "MinFloor": 0.45,
+    "MaxFloor": 0.70
+  },
+  "Paint": {
+    "UnpaintedMin": 0.05,     // fraction of total floor, picked per round in [min, max]
+    "UnpaintedMax": 0.15,
+    "Splatter": true,         // seeded splat stamps in the ownership score
+    "PixelsPerCell": 16       // mask and render resolution
+  },
+  "Discord": {
+    "ChannelId": 0
+    // The token is never stored in this file. It comes from the environment variable
+    // TURFGUESS_Discord__Token, or from `dotnet user-secrets` during development.
+  },
+  "Database": {
+    "Path": "turfguess.db"
+  }
+}
+```
+
+---
+
+## 8. Tech stack & structure
+
+**C# on .NET 10 (LTS)**, with nullable reference types enabled.
+
+| Concern | Library | Notes |
+|---|---|---|
+| Discord | **Discord.Net** (`Discord.Net.WebSocket` + `Discord.Net.Interactions`) | Buttons, ephemeral replies, slash commands. NetCord is a possible alternative if Discord.Net turns out to be poorly maintained. |
+| Hosting / DI / config / logging | `Microsoft.Extensions.Hosting` | Generic Host. The bot and the scheduler run as `BackgroundService`s. |
+| Rendering | **SkiaSharp** (+ `SkiaSharp.NativeAssets.Linux` for Pi/VPS) | MIT license. Anti-aliased shapes, blur for drop shadows, PNG encoding. |
+| Noise | Own `GradientNoise` (Perlin-style + fBm, ~100 lines) | Written in-house instead of vendoring FastNoiseLite: no dependency, and the output is fully under our control for determinism. Used for the paint cost field and textures. |
+| Randomness | Own `Rng` (SplitMix64) | Seeded generation never depends on `System.Random`'s implementation. |
+| Pathfinding | Built-in `PriorityQueue<TElement, TPriority>` | The two-source Dijkstra. Grids are flat arrays (`float[]`, `byte[]`, indexed `y * w + x`). |
+| Database | **Microsoft.Data.Sqlite** + **Dapper** | Small hand-written SQL, no EF Core. The schema is created on startup. |
+| Tests | xUnit | Determinism (same seed gives the same map), symmetry, connectivity, the winner share counted from the mask matching the target, the unpainted share staying within range. |
+
+**Discord specifics:**
+- Gateway intents: `GatewayIntents.Guilds` only. No privileged intents are needed.
+- Channel permissions: *Send Messages*, *Attach Files*, *Read Message History*.
+- Vote buttons have `customId = "vote:{roundId}:{left|right}"` and are handled by an `InteractionService` handler, `[ComponentInteraction("vote:*:*")]`. Discord.Net routes clicks by custom id, not by an in-memory view, so **the buttons keep working after a restart** with no re-registration needed.
+- The vote confirmation is sent with `RespondAsync(..., ephemeral: true)`.
+- The reveal message is sent with `allowedMentions: AllowedMentions.None`, so names render without pinging anyone.
+
+**Solution layout:**
+
+```
+TurfGuess/
+  TurfGuess.slnx                 # .NET 10's XML solution format
+  src/
+    TurfGuess.Core/              # class library: pure, deterministic, NO Discord or DB references
+      Grid/                      #   Grid<T>, CellType, symmetry helpers
+      MapGen/MapGenerator.cs     #   rectangles, lanes, obstacles, symmetry, validation
+      Paint/PaintSimulator.cs    #   distance fields, unpainted mask, ownership score, quantile threshold
+      Render/MapRenderer.cs      #   SkiaSharp: round image + reveal image
+      Scoring/Score.cs           #   coverage computed from the final paint mask
+      Noise/GradientNoise.cs     #   seeded Perlin-style noise + fBm
+      Util/Rng.cs                #   SplitMix64 PRNG
+      RoundGenerator.cs          #   seed + options -> GeneratedRound (map, mask, score)
+    TurfGuess.Bot/               # worker app (Generic Host)
+      Program.cs
+      appsettings.json
+      Options/                   #   strongly typed config + validation
+      Data/RoundRepository.cs    #   SQLite + Dapper
+      Game/RoundService.cs       #   round lifecycle: idempotent "advance one step" + recovery
+      Game/RoundScheduler.cs     #   BackgroundService: waits for RoundTime in TimeZone
+      Discord/DiscordHost.cs     #   client login, InteractionService setup
+      Discord/VoteModule.cs      #   button handler
+      Discord/AdminModule.cs     #   slash commands
+    TurfGuess.Preview/           # console app: writes N sample PNGs + a contact sheet, no Discord
+  tests/
+    TurfGuess.Core.Tests/
+```
+
+`TurfGuess.Core` must stay **pure and Discord-free**: seed + options in, map/paint/image out. That way it can be iterated on quickly with `dotnet run --project src/TurfGuess.Preview -- --count 12 --seed 42`.
+
+### Slash commands (later)
+- `/turf stats`: your accuracy and streak
+- `/turf leaderboard`
+- `/turf admin reveal-now` and `/turf admin new-round` for testing
+
+---
+
+## 9. Milestones
+
+1. **Generator prototype:** `TurfGuess.Core` (map generation, paint, rendering) plus the `TurfGuess.Preview` console app, producing a contact sheet of 12 seeds. *This is where we find out whether it's fun.*
+2. **Tune:** map styles, margin ranges, visual polish, a colorblind check.
+3. **Bot MVP:** daily post, button voting, the reveal at the next RoundTime with the list of correct guessers, SQLite, restart catch-up.
+4. **Engagement:** streaks, leaderboard, reveal GIF, map names.
+5. **Hosting:** a small VPS or Raspberry Pi. Publish it as a self-contained app (`dotnet publish -r linux-arm64 --self-contained`) and run it as a systemd service through `Microsoft.Extensions.Hosting.Systemd`. On Windows it can run as a service instead (`Microsoft.Extensions.Hosting.WindowsServices`).
+
+---
+
+## 10. Decisions
+
+| Question | Decision |
+|---|---|
+| Single server or multiple guilds? | **Single server.** One channel, set in config. |
+| Name the correct guessers at reveal? | **Yes**, listed by name with **no pings** (`AllowedMentions.None`). |
+| Language? | **C# / .NET 10**, because it's the language the author knows best. Python offered nothing this project needs. |
+| Fixed or adaptive margin range? | **Fixed**, taken from config. |
+| What does "winner share" measure? | **Share of painted floor** (`max(L,R)/(L+R)`) for difficulty. The reveal shows **share of total floor** per team plus the unpainted share. |
+| How long is a round? | Until the **next RoundTime in TimeZone**. Catch-up and daylight-saving rounds are shorter or longer, so the schedule never drifts. |
+| Binary guess or margin brackets? | **Pure binary.** Players vote by clicking one of two buttons on the round message. |
+| Reactions or buttons? | **Buttons.** Votes stay hidden (with an ephemeral confirmation), are easy to change, and need no *Manage Messages* permission. |
+
+## 11. Open questions
+
+- None at the moment.

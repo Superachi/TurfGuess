@@ -221,9 +221,12 @@ Paint should *flow* from each spawn and wrap around obstacles, not just split th
 
 - Upscale the grid (e.g. 16 px/cell → 1536×864) and render with SkiaSharp.
 - Layers, bottom to top:
-  1. Background (void), dark and slightly textured.
-  2. Floor tiles: neutral gray, faint grid lines.
-  3. Paint: team colors, with slight lightness variation from noise so it doesn't look flat.
+  1. Background (void): flat dark grey (`#2A2C30`), no texture.
+  2. Floor: flat neutral gray. **No grid lines**: the cell grid shapes the map but isn't drawn.
+  3. Paint: **currently flat** team colors, for a minimalist look: every ink shading strength is set to 0. The shading model below is still in the code and can be turned back on with its constants:
+     - Each pixel gets a *tone* from broad, smooth noise swells plus a faint bump map lit from the top-left.
+     - Tone is applied in **OKLCh** (a perceptual color space). Lights get slightly lighter and drift **warm, toward yellow**; shadows get slightly darker, a little richer and drift **cool, toward blue**, by up to 20° of hue. Pink goes rose in the lights and magenta-purple in the shadows; green goes from yellow-green to bluish green.
+     - Borders between colors sit in cool shadow, which outlines each region, plus soft gloss highlights on the bumps that face the light, which make the ink look wet.
   4. Walls and obstacles: raised look (a lighter top face plus a drop shadow).
   5. Spawn pads in team colors.
   6. Optional: round number and game name in a corner.

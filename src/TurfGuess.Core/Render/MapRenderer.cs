@@ -13,14 +13,14 @@ namespace TurfGuess.Core.Render;
 /// </summary>
 public static class MapRenderer
 {
-    private static readonly Rgb VoidColor = new(22, 24, 32);
+    private static readonly Rgb VoidColor = new(40, 42, 48);
     private static readonly Rgb FloorColor = new(148, 151, 160);
     private static readonly Rgb WallTop = new(196, 200, 210);
     private static readonly Rgb WallLight = new(232, 235, 242);
     private static readonly Rgb WallSide = new(220, 224, 232);
     private static readonly Rgb WallDark = new(140, 144, 156);
     private static readonly Rgb WallDarkSide = new(160, 164, 175);
-    private static readonly SKColor BannerColor = new(18, 20, 28);
+    private static readonly SKColor BannerColor = new(28, 29, 34);
 
     /// <summary>The image posted with a new round.</summary>
     public static SKBitmap RenderRound(GeneratedRound round, RenderStyle style, string? caption = null)
@@ -61,10 +61,13 @@ public static class MapRenderer
 
         var left = Rgb.Parse(style.Left.Color);
         var right = Rgb.Parse(style.Right.Color);
-        var texture = new GradientNoise(Rng.Derive(round.Seed, 77));
+        var leftInk = new Ink(left);
+        var rightInk = new Ink(right);
 
         int shadowDx = Math.Max(2, p / 4), shadowDy = Math.Max(2, p / 3);
         int bevel = Math.Max(1, p / 8);
+
+        var (tone, gloss) = InkLighting(mask, w, h, p, round.Seed);
 
         var pixels = new int[w * h];
         for (int y = 0; y < h; y++)
@@ -73,26 +76,26 @@ public static class MapRenderer
             {
                 int i = y * w + x;
                 var kind = mask[i];
-                bool gridLine = x % p == 0 || y % p == 0;
                 Rgb c;
 
                 switch (kind)
                 {
                     case PixelKind.Void:
-                        c = VoidColor.Add(5 * texture.Sample(x * 0.05, y * 0.05));
+                        c = VoidColor;
                         break;
 
                     case PixelKind.Unpainted:
-                        c = gridLine ? FloorColor.Add(-14) : FloorColor;
+                        c = FloorColor;
                         break;
 
                     case PixelKind.Left:
                     case PixelKind.Right:
                     {
-                        var team = kind == PixelKind.Left ? left : right;
-                        c = team.Scale(1 + 0.07 * texture.Fbm(x / (p * 3.0), y / (p * 3.0), 2));
-                        if (IsPaintEdge(mask, w, h, x, y, kind)) c = c.Scale(0.80);
-                        else if (gridLine) c = c.Scale(0.95);
+                        var ink = kind == PixelKind.Left ? leftInk : rightInk;
+                        double t = tone[i];
+                        // Borders sit in cool shadow, which outlines each color.
+                        if (IsPaintEdge(mask, w, h, x, y, kind)) t = Math.Min(t, 0) - EdgeShadow;
+                        c = ink.Shade(t, gloss[i]);
                         break;
                     }
 
@@ -145,6 +148,116 @@ public static class MapRenderer
     }
 
     private static bool IsWall(Grid<CellType> cells, int x, int y) => cells.InBounds(x, y) && cells[x, y] == CellType.Wall;
+
+    // ---------------------------------------------------------------------------------------
+    // Ink shading
+    // ---------------------------------------------------------------------------------------
+
+    private const double BumpFrequency = 1 / 4.0;   // per cell
+    private const double BumpStrength = 3.0;
+    // Minimalist look: all ink variance is off, so each team is one flat color.
+    // Previous tuned values, for going back: ShadeGain 1.6, SwellWeight 0.6, GlossGain 1.4, EdgeShadow 0.8.
+    private const double ShadeGain = 0;
+    private const double SwellFrequency = 1 / 7.0;  // per cell: broad light/dark swells
+    private const double SwellWeight = 0;
+    private const double GlossPower = 30;
+    private const double GlossGain = 0;
+    private const double EdgeShadow = 0;
+
+    /// <summary>
+    /// Treats the ink as a thick, slightly bumpy layer lit from the top-left.
+    /// Returns per pixel a tone in roughly [-1, 1] (shadow to light) and a gloss amount in [0, 1].
+    /// Only paint pixels get values.
+    /// </summary>
+    private static (float[] Tone, float[] Gloss) InkLighting(PixelKind[] mask, int w, int h, int p, ulong seed)
+    {
+        var bumps = new GradientNoise(Rng.Derive(seed, 77));
+        var swells = new GradientNoise(Rng.Derive(seed, 78));
+
+        var height = new float[w * h];
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                int i = y * w + x;
+                if (mask[i] is PixelKind.Left or PixelKind.Right)
+                    height[i] = (float)bumps.Fbm(x * BumpFrequency / p, y * BumpFrequency / p, 2);
+            }
+
+        // Light from the top-left, viewer straight above.
+        var (lx, ly, lz) = Normalize(-0.55, -0.75, 0.6);
+        var (hx, hy, hz) = Normalize(lx, ly, lz + 1);
+        double glossBase = Math.Pow(hz, GlossPower);
+
+        var tone = new float[w * h];
+        var gloss = new float[w * h];
+        for (int y = 0; y < h; y++)
+        {
+            for (int x = 0; x < w; x++)
+            {
+                int i = y * w + x;
+                if (mask[i] is not (PixelKind.Left or PixelKind.Right)) continue;
+
+                double dx = H(x + 1, y, i) - H(x - 1, y, i);
+                double dy = H(x, y + 1, i) - H(x, y - 1, i);
+                var (nx, ny, nz) = Normalize(-dx * BumpStrength, -dy * BumpStrength, 1);
+
+                double lambert = nx * lx + ny * ly + nz * lz;
+                double shade = (lambert - lz) * ShadeGain;
+                double swell = swells.Fbm(x * SwellFrequency / p, y * SwellFrequency / p, 2);
+                tone[i] = (float)Math.Clamp((1 - SwellWeight) * shade + SwellWeight * swell, -1.5, 1.5);
+
+                double spec = Math.Pow(Math.Max(0, nx * hx + ny * hy + nz * hz), GlossPower) - glossBase;
+                gloss[i] = (float)Math.Clamp(spec * GlossGain, 0, 1);
+            }
+        }
+
+        return (tone, gloss);
+
+        // Height of a neighbour; non-paint neighbours count as level with this pixel.
+        double H(int nx, int ny, int self)
+        {
+            if (nx < 0 || ny < 0 || nx >= w || ny >= h) return height[self];
+            int j = ny * w + nx;
+            return mask[j] is PixelKind.Left or PixelKind.Right ? height[j] : height[self];
+        }
+    }
+
+    private static (double X, double Y, double Z) Normalize(double x, double y, double z)
+    {
+        double len = Math.Sqrt(x * x + y * y + z * z);
+        return (x / len, y / len, z / len);
+    }
+
+    /// <summary>
+    /// An ink color that shades with hue shifting in OKLCh: lights drift warm (toward yellow),
+    /// shadows drift cool (toward blue) and get a little richer, instead of only changing value.
+    /// </summary>
+    private sealed class Ink(Rgb baseColor)
+    {
+        private const double WarmHue = 100;   // OKLCh hue of yellow
+        private const double CoolHue = 265;   // OKLCh hue of blue
+        private const double HueShift = 20;   // degrees at full light/shadow
+        private const double LightnessRange = 0.075;
+        private const double ChromaRange = 0.06;
+        private static readonly Rgb GlossColor = new(255, 251, 238);
+
+        private readonly Oklch _base = ColorMath.ToOklch(baseColor.R, baseColor.G, baseColor.B);
+
+        public Rgb Shade(double tone, double gloss)
+        {
+            double hue = tone >= 0
+                ? ColorMath.HueToward(_base.H, WarmHue, HueShift * tone)
+                : ColorMath.HueToward(_base.H, CoolHue, HueShift * -tone);
+            var shaded = new Oklch(
+                _base.L + LightnessRange * tone,
+                Math.Max(0, _base.C * (1 - ChromaRange * tone)),
+                hue);
+
+            var (r, g, b) = ColorMath.ToSrgb(shaded);
+            var c = new Rgb(r, g, b);
+            return gloss > 0 ? c.Mix(GlossColor, gloss) : c;
+        }
+    }
 
     /// <summary>True when a 4-neighbour is floor of a different kind (other team or unpainted).</summary>
     private static bool IsPaintEdge(PixelKind[] mask, int w, int h, int x, int y, PixelKind kind)
@@ -225,6 +338,7 @@ public static class MapRenderer
 
         public Rgb Scale(double f) => new(R * f, G * f, B * f);
         public Rgb Add(double d) => new(R + d, G + d, B + d);
+        public Rgb Mix(Rgb other, double t) => new(R + (other.R - R) * t, G + (other.G - G) * t, B + (other.B - B) * t);
 
         public int ToRgba()
         {

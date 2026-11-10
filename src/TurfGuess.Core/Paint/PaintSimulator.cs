@@ -16,9 +16,17 @@ public static class PaintSimulator
     private const double CostFrequency = 0.09;   // per cell
     private const double CostContrast = 1.1;
 
-    // Unpainted mask: distance-from-both-spawns plus a "holes" noise.
+    // Unpainted mask: players rush forward, so floor near the spawns is what gets neglected.
+    // Key = closeness to the nearest spawn + a "holes" noise that breaks it into patches.
     private const double HolesFrequency = 0.22;  // per cell
-    private const double HolesWeight = 0.45;
+    private const double HolesWeight = 0.7;
+    private const double SpawnNeglect = 1.0;
+    private const float SpawnTrail = 2.5f;       // cost-distance around a pad that is always painted
+
+    // Fight zone: around the front line both colors interleave in blotches.
+    private const double FightFrequency = 0.35;  // per cell
+    private const double FightAmplitude = 0.9;
+    private const double FightWidth = 0.35;      // in units of the ownership score
 
     // Border roughness in the ownership score.
     private const double JitterFrequency = 1.1;  // per cell
@@ -28,7 +36,7 @@ public static class PaintSimulator
 
     // Splat stamps.
     private const double SplatStrength = 8.0;
-    private const double SplatCandidateBand = 0.3;
+    private const double SplatCandidateBand = 0.5;
 
     public static PaintResult? Paint(GameMap map, PaintOptions options, Side winner, double winnerShare, double unpaintedShare, ulong seed)
     {
@@ -100,7 +108,10 @@ public static class PaintSimulator
         {
             int pi = floorPixels[i];
             double gx = (pi % pw + 0.5) / p, gy = (pi / pw + 0.5) / p;
-            double u = Math.Min(dl[i], dr[i]) / maxMin + HolesWeight * holes.Fbm(gx * HolesFrequency, gy * HolesFrequency, 2);
+            float nearest = Math.Min(dl[i], dr[i]);
+            double u = nearest < SpawnTrail
+                ? double.NegativeInfinity
+                : SpawnNeglect * (1 - nearest / maxMin) + HolesWeight * holes.Fbm(gx * HolesFrequency, gy * HolesFrequency, 2);
             unpaintedKey[i] = (float)-u; // ascending sort => largest u first
             order[i] = i;
         }
@@ -125,28 +136,38 @@ public static class PaintSimulator
             score[i] = (float)s;
         }
 
-        if (options.Splatter)
-            ApplySplats(new Rng(Rng.Derive(seed, 5)), score, isPainted, floorPixels, pixelToFloor, pw, ph, p);
+        int nPainted = nFloor - nUnpainted;
+        if (nPainted <= 0) return null;
+        double leftShare = winner == Side.Left ? winnerShare : 1 - winnerShare;
+        int nLeft = (int)Math.Round(leftShare * nPainted);
 
-        // 6. Quantile threshold: exactly nLeft painted pixels go to the left team.
-        var paintedKeys = new List<float>(nFloor);
-        var paintedIdx = new List<int>(nFloor);
+        // 5b. Fight zone. Find where the front line will roughly be for this margin, then add
+        //     blotchy noise that fades out away from it, so both colors interleave there.
+        float front = Threshold(score, isPainted, nLeft);
+        var fight = new GradientNoise(Rng.Derive(seed, 6));
         for (int i = 0; i < nFloor; i++)
         {
             if (!isPainted[i]) continue;
-            paintedKeys.Add(-score[i]); // ascending sort => most "left" first
-            paintedIdx.Add(i);
+            double z = (score[i] - front) / FightWidth;
+            if (z is > 4 or < -4) continue;
+            int pi = floorPixels[i];
+            double gx = (pi % pw + 0.5) / p, gy = (pi / pw + 0.5) / p;
+            score[i] += (float)(FightAmplitude * Math.Exp(-z * z) * fight.Fbm(gx * FightFrequency, gy * FightFrequency, 3));
         }
 
-        int nPainted = paintedIdx.Count;
-        if (nPainted == 0) return null;
+        if (options.Splatter)
+            ApplySplats(new Rng(Rng.Derive(seed, 5)), score, isPainted, floorPixels, pixelToFloor, pw, ph, p, front);
 
-        var keys = paintedKeys.ToArray();
-        var idx = paintedIdx.ToArray();
+        // 6. Quantile threshold: exactly nLeft painted pixels go to the left team.
+        var keys = new float[nPainted];
+        var idx = new int[nPainted];
+        for (int i = 0, k = 0; i < nFloor; i++)
+        {
+            if (!isPainted[i]) continue;
+            keys[k] = -score[i]; // ascending sort => most "left" first
+            idx[k++] = i;
+        }
         Array.Sort(keys, idx);
-
-        double leftShare = winner == Side.Left ? winnerShare : 1 - winnerShare;
-        int nLeft = (int)Math.Round(leftShare * nPainted);
 
         // 7. Final mask.
         for (int k = 0; k < nPainted; k++)
@@ -238,17 +259,28 @@ public static class PaintSimulator
         }
     }
 
-    private static void ApplySplats(Rng rng, float[] score, bool[] isPainted, List<int> floorPixels, int[] pixelToFloor, int pw, int ph, int p)
+    /// <summary>The score of the <paramref name="nLeft"/>-th most "left" painted pixel.</summary>
+    private static float Threshold(float[] score, bool[] isPainted, int nLeft)
     {
-        int count = rng.Next(18, 33);
+        var values = new List<float>(score.Length);
+        for (int i = 0; i < score.Length; i++)
+            if (isPainted[i]) values.Add(-score[i]);
+        if (values.Count == 0) return 0;
+        values.Sort();
+        return -values[Math.Clamp(nLeft, 0, values.Count - 1)];
+    }
+
+    private static void ApplySplats(Rng rng, float[] score, bool[] isPainted, List<int> floorPixels, int[] pixelToFloor, int pw, int ph, int p, float front)
+    {
+        int count = rng.Next(28, 46);
         for (int n = 0; n < count; n++)
         {
-            // Prefer spots near the border, where a stray splat is visible.
+            // Prefer spots near the front line, where the fight happened.
             int centre = -1;
             for (int t = 0; t < 60; t++)
             {
                 int i = rng.Next(0, floorPixels.Count);
-                if (isPainted[i] && Math.Abs(score[i]) < SplatCandidateBand)
+                if (isPainted[i] && Math.Abs(score[i] - front) < SplatCandidateBand)
                 {
                     centre = floorPixels[i];
                     break;
@@ -256,7 +288,9 @@ public static class PaintSimulator
             }
             if (centre < 0) continue;
 
+            // Splat value relative to the front, so a stamp shows that team's color wherever it lands.
             double sign = rng.Chance(0.5) ? 1 : -1;
+            float splatValue = (float)(front + sign * SplatStrength);
             double cx = centre % pw, cy = centre / pw;
             double r = rng.Range(0.6, 1.5) * p;
             int lobes = rng.Next(3, 7);
@@ -287,7 +321,7 @@ public static class PaintSimulator
                         if (dd > limit) continue;
                         int fi = pixelToFloor[y * pw + x];
                         if (fi < 0 || !isPainted[fi]) continue;
-                        score[fi] = (float)(sign * SplatStrength);
+                        score[fi] = splatValue;
                     }
                 }
             }

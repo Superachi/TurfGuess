@@ -187,17 +187,19 @@ Paint should *flow* from each spawn and wrap around obstacles, not just split th
 2. **Distance fields.** Run a Dijkstra from each spawn over the floor grid to get `dL` and `dR`, the raw cost-weighted distances. Paint can't cross `WALL` or `VOID`, so the distances wrap around obstacles. They're computed **once per round** and don't depend on the target margin.
 3. **Upsample to mask resolution.** Bilinearly interpolate `dL` and `dR` to the final mask resolution (the render resolution, e.g. 16 px/cell). Pixels outside floor cells are excluded.
 4. **Unpainted mask** (fixed before the margin is set):
-   - A pixel is unpainted if `min(dL, dR) > C` (far from both spawns), or if a separate "holes" noise goes above a threshold.
-   - `C` is chosen as a **quantile**, so the unpainted share lands on a value picked at random in `[UnpaintedMin, UnpaintedMax]`.
+   - **The spawn areas get neglected, not the middle.** Real players rush forward, so the floor near their own spawn is what stays unpainted. Each pixel gets the key `u = closeness to the nearest spawn + holes noise`, and the pixels with the highest `u` become unpainted. The noise breaks this up into patches instead of a solid ring.
+   - A short **spawn trail** right around each pad (cost-distance < 2.5) is always painted.
+   - The cut-off is chosen as a **quantile**, so the unpainted share lands on a value picked at random in `[UnpaintedMin, UnpaintedMax]`.
    - Because this step doesn't involve the speed bias, changing the margin never changes the unpainted area.
 5. **Ownership score per painted pixel:**
    ```
-   s(p) = ln dR(p) − ln dL(p) + jitter(p) + splat(p)
+   s(p) = ln dR(p) − ln dL(p) + jitter(p) + fight(p) + splat(p)
    ```
    - `s > t` means left owns the pixel. Positive values mean "closer to left".
    - `jitter` is fine, high-frequency noise. It roughens the borders at pixel level, which gives the painted look.
-   - `splat` comes from seeded splat stamps (circles plus droplets) at random positions, each assigned a random team. Inside a stamp it adds a large ±value, so the stamp takes that team's color wherever it lands. A splat deep in enemy territory reads as a stray shot.
-   - Jitter and splats are part of the score field **from the start**, not cosmetic extras added later.
+   - **`fight`: the front line is where the battle happened.** A preliminary threshold `t₀` for the target margin estimates where the front will be. Blotchy noise (about 3-cell blobs) is added with a weight that falls off with distance from that front (`exp(−((s − t₀)/0.35)²)`). Both colors then interleave in islands across a wide band in the middle, rather than meeting along one clean line.
+   - `splat` comes from 28–45 seeded splat stamps (circles plus droplets), each assigned a random team. They're placed mostly **near the front line**, where the fight was. Inside a stamp the score is set to `t₀ ± large`, so the stamp takes that team's color wherever it lands.
+   - Jitter, fight noise and splats are part of the score field **from the start**, not cosmetic extras added later.
 6. **Threshold for the exact margin.** The threshold `t` is the speed bias. It's equivalent to scaling the distances by `dL·b` vs `dR/b` with `t = 2 ln b`. Since everything else is fixed, `t` is simply a **quantile of `s` over the painted pixels**:
    - Pick the winning side (50/50) and the target winner share `w` within the difficulty range.
    - Left wins → `t` = the `(1 − w)` quantile of `s`. Right wins → `t` = the `w` quantile.

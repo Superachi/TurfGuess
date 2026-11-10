@@ -114,6 +114,11 @@ To find the **channel ID**:
 1. In Discord, open **User Settings → Advanced** and turn on **Developer Mode**.
 2. Right-click the game channel and choose **Copy Channel ID**.
 
+**Playing in a thread.** The game can also run in a thread, including a forum post. Right-click the thread, copy its ID the same way, and use that as the channel ID. Some things to set up:
+- **Archiving.** Discord archives a thread after a period without new messages. The bot can't update the vote count or close the round in an archived thread. In the thread's settings, set **Hide After Inactivity** to **1 Week**, so the daily posts keep it open.
+- **Permissions.** Posting in a thread needs **Send Messages in Threads**. The invite link doesn't ask for it, but most servers allow it for everyone. If the bot can't post, check this permission for the bot in the parent channel.
+- **Private threads.** Add the bot to the thread, e.g. by mentioning it there.
+
 ### 3. Configure
 
 The token never goes in `appsettings.json`. Store it as a user secret, which is kept outside the repository:

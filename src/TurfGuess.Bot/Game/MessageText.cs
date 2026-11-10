@@ -22,6 +22,12 @@ public static class MessageText
     /// <summary>Footer on the reveal; recovery finds an already posted reveal by this exact text.</summary>
     public static string RevealFooter(long roundId) => $"Round #{roundId} · Results";
 
+    /// <summary>
+    /// How an embed refers to an image attached to the same message. Every embed, including the
+    /// ones built for edits, must use this, or Discord shows the attachment separately as well.
+    /// </summary>
+    public static string AttachmentUrl(string fileName) => $"attachment://{fileName}";
+
     public static string ButtonId(long roundId, Side side) => $"vote:{roundId}:{SideCodec.Format(side)}";
 
     public static string ButtonIdPrefix(long roundId) => $"vote:{roundId}:";

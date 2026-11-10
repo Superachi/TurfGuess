@@ -29,12 +29,7 @@ public sealed class DiscordRoundChannel(DiscordSocketClient client, BotOptions o
         string fileName = Path.GetFileName(imagePath);
         int? voters = options.Game.ShowVoteCount ? 0 : null;
 
-        var embed = new EmbedBuilder()
-            .WithTitle(MessageText.RoundTitle(options.Game.Name, round.Id))
-            .WithDescription(MessageText.RoundDescription(round, voters, closed: false))
-            .WithImageUrl($"attachment://{fileName}")
-            .WithFooter(MessageText.RoundFooter(round.Id))
-            .Build();
+        var embed = RoundEmbed(round, MessageText.RoundDescription(round, voters, closed: false), fileName);
 
         using var file = new FileAttachment(imagePath, fileName);
         var message = await channel.SendFileAsync(file, embed: embed, components: Buttons(round, disabled: false),
@@ -49,7 +44,7 @@ public sealed class DiscordRoundChannel(DiscordSocketClient client, BotOptions o
         await message.ModifyAsync(p =>
         {
             p.Components = Buttons(round, disabled: true);
-            p.Embed = RebuildEmbed(message, MessageText.RoundDescription(round, voters, closed: true));
+            p.Embed = RoundEmbed(round, MessageText.RoundDescription(round, voters, closed: true), AttachedFileName(message, round));
         }, Request(ct));
     }
 
@@ -57,7 +52,8 @@ public sealed class DiscordRoundChannel(DiscordSocketClient client, BotOptions o
     {
         var message = await RoundMessageAsync(round, ct);
         if (message is null) return;
-        await message.ModifyAsync(p => p.Embed = RebuildEmbed(message, MessageText.RoundDescription(round, voters, closed: false)),
+        await message.ModifyAsync(
+            p => p.Embed = RoundEmbed(round, MessageText.RoundDescription(round, voters, closed: false), AttachedFileName(message, round)),
             Request(ct));
     }
 
@@ -79,7 +75,7 @@ public sealed class DiscordRoundChannel(DiscordSocketClient client, BotOptions o
         var embed = new EmbedBuilder()
             .WithDescription(MessageText.Reveal(round, summary, options.Game.MaxListedWinners))
             .WithColor(new Color(winnerColor.Red, winnerColor.Green, winnerColor.Blue))
-            .WithImageUrl($"attachment://{fileName}")
+            .WithImageUrl(MessageText.AttachmentUrl(fileName))
             .WithFooter(MessageText.RevealFooter(round.Id))
             .Build();
 
@@ -113,11 +109,22 @@ public sealed class DiscordRoundChannel(DiscordSocketClient client, BotOptions o
     }
 
     /// <summary>Keeps the original embed (and its image) and swaps the description.</summary>
-    private static Embed RebuildEmbed(IUserMessage message, string description)
-    {
-        var builder = message.Embeds.FirstOrDefault()?.ToEmbedBuilder() ?? new EmbedBuilder();
-        return builder.WithDescription(description).Build();
-    }
+    /// <summary>
+    /// The round embed, built the same way for the first post and for every edit. The image must
+    /// always point at the message's own attachment (<c>attachment://file.png</c>): an edit that
+    /// copies the existing embed gets the image back as a CDN link, and Discord then shows the
+    /// now-unreferenced attachment a second time above the embed.
+    /// </summary>
+    private Embed RoundEmbed(RoundRecord round, string description, string fileName) => new EmbedBuilder()
+        .WithTitle(MessageText.RoundTitle(options.Game.Name, round.Id))
+        .WithDescription(description)
+        .WithImageUrl(MessageText.AttachmentUrl(fileName))
+        .WithFooter(MessageText.RoundFooter(round.Id))
+        .Build();
+
+    /// <summary>The file name of the image attached to the round message (kept on edits).</summary>
+    private static string AttachedFileName(IUserMessage message, RoundRecord round) =>
+        message.Attachments.FirstOrDefault()?.Filename ?? Path.GetFileName(round.ImagePath);
 
     private static MessageComponent Buttons(RoundRecord round, bool disabled) => new ComponentBuilder()
         .WithButton(round.LeftName, MessageText.ButtonId(round.Id, Side.Left), ButtonStyle.Secondary,

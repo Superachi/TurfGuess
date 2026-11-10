@@ -65,6 +65,10 @@ public class MessageTextTests
     }
 
     [Fact]
+    public void Embeds_refer_to_their_own_attachment() =>
+        Assert.Equal("attachment://round_2.png", MessageText.AttachmentUrl("round_2.png"));
+
+    [Fact]
     public void Button_ids_round_trip()
     {
         string id = MessageText.ButtonId(12, Side.Right);

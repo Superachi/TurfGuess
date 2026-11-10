@@ -22,15 +22,13 @@ What makes it fun:
 | Arena and paint generator | ✅ Done |
 | Round and reveal images | ✅ Done |
 | **Preview tool** for generating sample images on your own computer | ✅ Done |
-| The Discord bot itself (daily posts, voting, reveals) | 🚧 Not built yet |
+| The Discord bot (daily posts, voting, reveals, admin commands) | 🟡 Built and unit-tested, not yet tried on a live server |
 
-The [How to play](#how-to-play) section describes the game as it's designed. The [Preview tool](#the-preview-tool) section is what you can use right now.
+[How to play](#how-to-play) is for players. [Running the bot](#running-the-bot) is for the server admin setting it up. [The Preview tool](#the-preview-tool) is for trying out rounds on your own computer.
 
 ---
 
 ## How to play
-
-> **Note:** this describes the planned Discord bot. It isn't available yet.
 
 1. **Every day at the round time** (for example 09:00), the bot posts a new arena in the game channel, with two buttons, one per team color, e.g. `🩷 Pink` and `💚 Green`.
 2. **Click the color you think covers more floor.** Only you see your vote: the bot confirms it with a message nobody else can see. Nobody can see how others voted, so you can't just follow the crowd.
@@ -87,6 +85,94 @@ Each round uses one of three color pairs, picked at random:
 | 💛 Yellow vs 💙 Blue | `#D0BE08` / `#3A0CCD` |
 
 Which color starts on the left is random too.
+
+---
+
+## Running the bot
+
+This section is for the server admin. You need the **.NET 10 SDK** and this repository on the computer that will run the bot. That computer has to stay on for the game to run.
+
+### 1. Create the Discord bot
+
+1. Go to the [Discord Developer Portal](https://discord.com/developers/applications) and click **New Application**. Give it a name, for example "Turf Guess".
+2. Open **Bot** in the left menu:
+   - Click **Reset Token** and copy the token. **Treat it like a password:** anyone with it can control the bot. You'll paste it in step 3. Never put it in a file you share or commit.
+   - No privileged intents are needed. Leave all three switches off.
+3. Open **General Information** and copy the **Application ID**.
+
+### 2. Invite it to your server
+
+Open this link in a browser, with your Application ID filled in:
+
+```
+https://discord.com/oauth2/authorize?client_id=YOUR_APPLICATION_ID&scope=bot+applications.commands&permissions=117760
+```
+
+Pick your server and confirm. The permissions it asks for are View Channel, Send Messages, Embed Links, Attach Files and Read Message History. If the game channel is private, also add the bot to that channel.
+
+To find the **channel ID**:
+1. In Discord, open **User Settings → Advanced** and turn on **Developer Mode**.
+2. Right-click the game channel and choose **Copy Channel ID**.
+
+### 3. Configure
+
+The token never goes in `appsettings.json`. Store it as a user secret, which is kept outside the repository:
+
+```powershell
+cd D:\Documents\HobbyProjects\TurfGuess
+dotnet user-secrets set "Discord:Token" "YOUR_BOT_TOKEN" --project src\TurfGuess.Bot
+dotnet user-secrets set "Discord:ChannelId" "YOUR_CHANNEL_ID" --project src\TurfGuess.Bot
+```
+
+Alternatively, use environment variables, which is handy on a server:
+
+```powershell
+$env:TURFGUESS_Discord__Token = "YOUR_BOT_TOKEN"
+$env:TURFGUESS_Discord__ChannelId = "YOUR_CHANNEL_ID"
+```
+
+The other settings are in [`src/TurfGuess.Bot/appsettings.json`](../src/TurfGuess.Bot/appsettings.json):
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `Game:RoundTime` | `09:00` | Time of day when the round is revealed and the next one posted |
+| `Game:TimeZone` | `Europe/Amsterdam` | Time zone for the round time (daylight saving is handled) |
+| `Game:Name` | `Turf Guess` | Shown in titles and captions |
+| `Game:ShowVoteCount` | `true` | Show "N players have voted" on the round message. Only the total, never the split. |
+| `Game:MaxListedWinners` | `50` | Most correct guessers named in the reveal |
+| `Game:Ink` | `Marbled` | `Marbled`, `Flat` or `Shaded` |
+| `Generator:Difficulty:MinWinnerShare` / `MaxWinnerShare` | `50.5` / `54.0` | How close rounds are, as the winner's % of the painted floor |
+| `Database:Path` | `turfguess.db` | Where rounds and votes are stored |
+| `Images:Directory` | `images` | Where round and reveal images are stored |
+
+`Database:Path` and `Images:Directory` are relative to the folder you start the bot from.
+
+### 4. Start it
+
+```powershell
+cd D:\Documents\HobbyProjects\TurfGuess\src\TurfGuess.Bot
+dotnet run -c Release
+```
+
+On first start the bot:
+1. connects and registers its admin commands in your server,
+2. creates the database,
+3. posts the first round straight away.
+
+The first round is revealed at the next round time. If that's less than 6 hours away, it's revealed at the round time after that. Stop the bot with **Ctrl+C**.
+
+If something's wrong with the settings, the bot won't start and lists every problem, for example a missing token or an unknown time zone.
+
+**Downtime is fine.** If the bot was off when a round should have been revealed, it reveals that round as soon as it's back and posts a new one. That new round still ends at the normal round time, so the schedule never drifts. Clicks while the bot is offline fail with "This interaction failed". Players can simply click again once it's back. The bot never posts a round or reveal twice, even after a crash.
+
+### Admin commands
+
+These slash commands are only visible to server administrators. Replies are only visible to you.
+
+| Command | What it does |
+|---|---|
+| `/turf-admin status` | Shows the current round: its number, status, colors, reveal time and how many have voted |
+| `/turf-admin reveal-now` | Reveals the current round right away and posts the next one. Useful for testing without waiting a day. |
 
 ---
 
@@ -221,6 +307,12 @@ They're shares of the whole floor, and some floor is unpainted. The reveal shows
 
 **Can there be a tie?**
 No. The winner always has more than 50% of the painted floor.
+
+**My click said "This interaction failed". What now?**
+The bot was probably offline for a moment. Click again once it's back. Your vote only counts once the bot confirms it.
+
+**Can other people see what I voted?**
+No. Only you see the confirmation. The round message only shows how many people voted, never the split.
 
 **Is it possible to cheat by counting pixels?**
 Yes. It's a casual game, and cheating is out of scope.

@@ -263,35 +263,40 @@ Paint should *flow* from each spawn and wrap around obstacles, not just split th
 
 ## 6. Data model (SQLite)
 
+The schema is created on startup (`Data/Database.cs`, safe to run every time) and the database runs in WAL mode. Times are **Unix seconds (UTC)**. Discord ids are stored as `INTEGER`: snowflakes fit in a signed 64-bit integer, and the code casts to and from `ulong` at the edges.
+
 ```sql
 rounds (
-  id            INTEGER PRIMARY KEY,
-  channel_id    INTEGER,   -- single server, so no guild_id needed
-  status        TEXT NOT NULL,  -- 'Pending' | 'Open' | 'Revealed' | 'Done'
-  message_id    INTEGER,        -- NULL until posted
-  reveal_message_id INTEGER,    -- NULL until the reveal is posted
-  seed          INTEGER,
-  image_path    TEXT,
-  posted_at     TEXT,      -- ISO timestamp (UTC)
-  reveal_at     TEXT,      -- ISO timestamp (UTC), computed from RoundTime in TimeZone
-  left_name     TEXT,      -- color pair picked for this round, e.g. 'Pink'
-  left_color    TEXT,      -- '#E0559A'
-  left_emoji    TEXT,
-  right_name    TEXT,
-  right_color   TEXT,
-  right_emoji   TEXT,
-  winner        TEXT,      -- 'left' | 'right'
-  winner_share  REAL,      -- % of painted floor (difficulty)
-  share_left    REAL,      -- coverage, % of total floor
-  share_right   REAL,
-  unpainted     REAL       -- % of total floor
+  id                INTEGER PRIMARY KEY AUTOINCREMENT,
+  channel_id        INTEGER NOT NULL,   -- single server, so no guild_id needed
+  status            TEXT    NOT NULL,   -- 'Pending' | 'Open' | 'Revealed' | 'Done'
+  message_id        INTEGER,            -- NULL until posted
+  reveal_message_id INTEGER,            -- NULL until the reveal is posted
+  seed              INTEGER NOT NULL,   -- < 2^63
+  generator_version INTEGER NOT NULL,   -- RoundGenerator.GeneratorVersion at creation
+  image_path        TEXT    NOT NULL,   -- round PNG
+  reveal_image_path TEXT    NOT NULL,   -- reveal PNG, rendered at creation too
+  created_at        INTEGER NOT NULL,
+  posted_at         INTEGER,
+  reveal_at         INTEGER NOT NULL,   -- next RoundTime in TimeZone after creation
+  left_name         TEXT    NOT NULL,   -- color pair picked for this round, e.g. 'Pink'
+  left_color        TEXT    NOT NULL,   -- '#E0559A'
+  left_emoji        TEXT    NOT NULL,
+  right_name        TEXT    NOT NULL,
+  right_color       TEXT    NOT NULL,
+  right_emoji       TEXT    NOT NULL,
+  winner            TEXT    NOT NULL,   -- 'left' | 'right'
+  winner_share      REAL    NOT NULL,   -- share of painted floor, 0–1 (difficulty)
+  share_left        REAL    NOT NULL,   -- coverage, share of total floor, 0–1
+  share_right       REAL    NOT NULL,
+  unpainted         REAL    NOT NULL    -- share of total floor, 0–1
 )
 
 votes (
-  round_id      INTEGER,
-  user_id       INTEGER,
-  choice        TEXT,      -- 'left' | 'right'
-  voted_at      TEXT,      -- time of the latest change
+  round_id  INTEGER NOT NULL REFERENCES rounds (id),
+  user_id   INTEGER NOT NULL,
+  choice    TEXT    NOT NULL,           -- 'left' | 'right'
+  voted_at  INTEGER NOT NULL,           -- time of the latest change
   PRIMARY KEY (round_id, user_id)
 )
 ```
@@ -305,13 +310,19 @@ A partial unique index enforces the "one unfinished round" invariant:
 CREATE UNIQUE INDEX one_active_round ON rounds (status <> 'Done') WHERE status <> 'Done';
 ```
 
+**Images** are rendered once, when the round is created, and stored on disk (`Images:Directory`). If a file is missing, for example after a crash between creating the row and saving the images, it's regenerated from the stored seed. A warning is logged if the generator version has changed since.
+
 Streaks, accuracy and the leaderboard can be computed from `votes` joined with `rounds`. Add a cached `user_stats` table later only if it's needed.
 
 ---
 
 ## 7. Configuration
 
-`appsettings.json`, loaded with `Microsoft.Extensions.Configuration` and bound to strongly typed options classes (`GameOptions`, `TeamOptions`, `MapOptions`, …) through the Options pattern. The options are validated at startup (`ValidateOnStart`): share ranges, floor ranges, and enough color contrast between the two teams.
+`appsettings.json` (read from the app's own folder) is bound to `BotOptions`. User secrets and `TURFGUESS_*` environment variables override it, e.g. `TURFGUESS_Discord__ChannelId`. The options are validated at startup, and the bot refuses to start with a list of every problem. Validation covers:
+- the token and channel,
+- the round time and time zone,
+- generator ranges,
+- color pairs (valid hex, distinct names and emoji).
 
 ```jsonc
 {
@@ -321,7 +332,8 @@ Streaks, accuracy and the leaderboard can be computed from `votes` joined with `
     "TimeZone": "Europe/Amsterdam",   // IANA id; .NET resolves it on Windows and Linux
     "ShowVoteCount": true,            // "N players have voted" on the round message
     "MaxListedWinners": 50,           // extra names are cut off with "…and N more"
-    "MinRoundLength": "06:00:00"      // first-start rounds shorter than this skip to the following RoundTime
+    "MinRoundLength": "06:00:00",     // first-start rounds shorter than this skip to the following RoundTime
+    "Ink": "Marbled"                  // "Marbled" | "Flat" | "Shaded"
   },
   // Optional. Leave out to use the built-in pairs (section 5, Colors).
   // Each round picks one pair from its seed; emoji are shown on the vote buttons.
@@ -331,37 +343,43 @@ Streaks, accuracy and the leaderboard can be computed from `votes` joined with `
     { "A": { "Name": "Orange", "Color": "#DE6624", "Emoji": "🧡" },
       "B": { "Name": "Blue",   "Color": "#343BC4", "Emoji": "💙" } }
   ],
-  "Difficulty": {
-    // Fixed range. Each round picks a winner share uniformly in [min, max].
-    // Measured as a share of PAINTED floor: max(L, R) / (L + R). Must be > 50.
-    "MinWinnerShare": 50.5,   // %
-    "MaxWinnerShare": 54.0
-  },
-  "Map": {
-    "GridWidth": 96,
-    "GridHeight": 54,
-    "Symmetry": "Rotate",     // "Rotate" | "Mirror"
-    "ObstacleDensity": 0.03,
-    "MaxObstaclesPerHalf": 4,
-    "MinFloor": 0.45,
-    "MaxFloor": 0.70
-  },
-  "Paint": {
-    "UnpaintedMin": 0.05,     // fraction of total floor, picked per round in [min, max]
-    "UnpaintedMax": 0.15,
-    "Splatter": true,         // splats in the fight zone + sputters at the unpainted border near spawns
-    "DiligentSpawnChance": 0.3, // per team, per round: chance it painted its own spawn area diligently
-    "PixelsPerCell": 16,      // mask and render resolution
-    "CornerRadius": 0.75,     // outer corners of the outline, in cells, like CSS border-radius (0 = sharp, < 1)
-    "InnerCornerRadius": 0.5  // curve filling inner corners, in cells (0 = sharp, < 1)
+  "Generator": {
+    "Difficulty": {
+      // Fixed range. Each round picks a winner share uniformly in [min, max].
+      // Measured as a share of PAINTED floor: max(L, R) / (L + R). Must be > 50.
+      "MinWinnerShare": 50.5,   // %
+      "MaxWinnerShare": 54.0
+    },
+    "Map": {
+      "GridWidth": 96,
+      "GridHeight": 54,
+      "Symmetry": "Rotate",     // "Rotate" | "Mirror"
+      "ObstacleDensity": 0.03,
+      "MaxObstaclesPerHalf": 4,
+      "MinFloor": 0.45,
+      "MaxFloor": 0.70
+    },
+    "Paint": {
+      "UnpaintedMin": 0.05,     // fraction of total floor, picked per round in [min, max]
+      "UnpaintedMax": 0.15,
+      "Splatter": true,         // splats in the fight zone + sputters at the unpainted border near spawns
+      "DiligentSpawnChance": 0.3, // per team, per round: chance it painted its own spawn area diligently
+      "PixelsPerCell": 16,      // mask and render resolution
+      "CornerRadius": 0.75,     // outer corners of the outline, in cells, like CSS border-radius (0 = sharp, < 1)
+      "InnerCornerRadius": 0.5  // curve filling inner corners, in cells (0 = sharp, < 1)
+    }
   },
   "Discord": {
-    "ChannelId": 0
+    "ChannelId": 0,
+    "VoteCountInterval": "00:00:30"   // at most one vote-count edit per interval
     // The token is never stored in this file. It comes from the environment variable
     // TURFGUESS_Discord__Token, or from `dotnet user-secrets` during development.
   },
   "Database": {
-    "Path": "turfguess.db"
+    "Path": "turfguess.db"            // relative paths resolve against the working directory
+  },
+  "Images": {
+    "Directory": "images"
   }
 }
 ```
@@ -385,7 +403,7 @@ Streaks, accuracy and the leaderboard can be computed from `votes` joined with `
 
 **Discord specifics:**
 - Gateway intents: `GatewayIntents.Guilds` only. No privileged intents are needed.
-- Channel permissions: *Send Messages*, *Attach Files*, *Read Message History*.
+- Channel permissions: *View Channel*, *Send Messages*, *Embed Links*, *Attach Files*, *Read Message History* (permission integer `117760`). Invite scopes: `bot` and `applications.commands`.
 - Vote buttons have `customId = "vote:{roundId}:{left|right}"` and are handled by an `InteractionService` handler, `[ComponentInteraction("vote:*:*")]`. Discord.Net routes clicks by custom id, not by an in-memory view, so **the buttons keep working after a restart** with no re-registration needed.
 - The vote confirmation is sent with `RespondAsync(..., ephemeral: true)`.
 - The reveal message is sent with `allowedMentions: AllowedMentions.None`, so names render without pinging anyone.
@@ -407,34 +425,52 @@ TurfGuess/
       Util/Rng.cs                #   SplitMix64 PRNG
       RoundGenerator.cs          #   seed + options -> GeneratedRound (map, mask, score)
     TurfGuess.Bot/               # worker app (Generic Host)
-      Program.cs
+      Program.cs                 #   config, validation, DI wiring
       appsettings.json
-      Options/                   #   strongly typed config + validation
-      Data/RoundRepository.cs    #   SQLite + Dapper
+      Options/BotOptions.cs      #   strongly typed config + startup validation
+      Data/Database.cs           #   connections + schema
+      Data/RoundRepository.cs    #   SQLite + Dapper: rounds, conditional vote upsert
+      Game/RoundSchedule.cs      #   next RoundTime in TimeZone, DST, first-round rule
       Game/RoundService.cs       #   round lifecycle: idempotent "advance one step" + recovery
-      Game/RoundScheduler.cs     #   BackgroundService: waits for RoundTime in TimeZone
-      Discord/DiscordHost.cs     #   client login, InteractionService setup
+      Game/RoundScheduler.cs     #   BackgroundService: wakes at reveal times / on admin signal
+      Game/RoundImages.cs        #   render + store PNGs, regenerate if missing
+      Game/MessageText.cs        #   all player-facing text (Discord-free, unit-tested)
+      Game/VoteService.cs        #   votes; closing enforced by the database
+      Game/VoteCountService.cs   #   debounced "N players have voted" edits
+      Game/IRoundChannel.cs      #   what the game needs from the chat platform
+      Discord/DiscordBotService.cs   # client login, command registration, interaction routing
+      Discord/DiscordRoundChannel.cs # IRoundChannel on Discord: post, close, find, reveal
       Discord/VoteModule.cs      #   button handler
-      Discord/AdminModule.cs     #   slash commands
+      Discord/AdminModule.cs     #   /turf-admin slash commands
     TurfGuess.Preview/           # console app: writes N sample PNGs + a contact sheet, no Discord
   tests/
     TurfGuess.Core.Tests/
+    TurfGuess.Bot.Tests/         # game logic with a fake channel, schedule, repository, text, config
 ```
+
+The game logic only talks to Discord through `IRoundChannel`, so the round lifecycle, recovery, voting and reveal text are tested with an in-memory fake channel, without a token.
 
 `TurfGuess.Core` must stay **pure and Discord-free**: seed + options in, map/paint/image out. That way it can be iterated on quickly with `dotnet run --project src/TurfGuess.Preview -- --count 12 --seed 42`.
 
-### Slash commands (later)
-- `/turf stats`: your accuracy and streak
-- `/turf leaderboard`
-- `/turf admin reveal-now` and `/turf admin new-round` for testing
+### Slash commands
+Admin commands live under their own top-level command, **`/turf-admin`**. Discord sets permissions per top-level command, so this keeps the admin commands limited to administrators (`DefaultMemberPermissions(Administrator)`) while the future player commands under `/turf` stay public. They're registered to the game's server, so they show up instantly.
+
+| Command | Who | Status |
+|---|---|---|
+| `/turf-admin reveal-now` | Admins | ✅ Reveals the open round now and posts the next one. Handy for testing. |
+| `/turf-admin status` | Admins | ✅ Shows the current round, its colors, reveal time and vote count. |
+| `/turf stats` | Everyone | Later (milestone 4): your accuracy and streak |
+| `/turf leaderboard` | Everyone | Later (milestone 4) |
+
+All replies are ephemeral (only the person who used the command sees them).
 
 ---
 
 ## 9. Milestones
 
-1. **Generator prototype:** `TurfGuess.Core` (map generation, paint, rendering) plus the `TurfGuess.Preview` console app, producing a contact sheet of 12 seeds. *This is where we find out whether it's fun.*
-2. **Tune:** map styles, margin ranges, visual polish, a colorblind check.
-3. **Bot MVP:** daily post, button voting, the reveal at the next RoundTime with the list of correct guessers, SQLite, restart catch-up.
+1. ✅ **Generator prototype:** `TurfGuess.Core` (map generation, paint, rendering) plus the `TurfGuess.Preview` console app, producing a contact sheet of 12 seeds. *This is where we find out whether it's fun.*
+2. ✅ **Tune:** map styles, margin ranges, visual polish. The colorblind check is deferred.
+3. 🟡 **Bot MVP:** daily post, button voting, the reveal at the next RoundTime with the list of correct guessers, SQLite, restart catch-up. The code and unit tests are done. A live run on a test server is still to do.
 4. **Engagement:** streaks, leaderboard, reveal GIF, map names.
 5. **Hosting:** a small VPS or Raspberry Pi. Publish it as a self-contained app (`dotnet publish -r linux-arm64 --self-contained`) and run it as a systemd service through `Microsoft.Extensions.Hosting.Systemd`. On Windows it can run as a service instead (`Microsoft.Extensions.Hosting.WindowsServices`).
 

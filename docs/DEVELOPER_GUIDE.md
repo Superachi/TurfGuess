@@ -13,7 +13,7 @@ Turf Guess turns a **seed** (a 64-bit number) into a **round**:
 3. a score counted from that mask,
 4. images: the round image to post, and a reveal image.
 
-All of this lives in **`TurfGuess.Core`**, a pure, deterministic library with no Discord or database code. The same seed and options always give the same round. Two apps sit on top of it:
+All of this lives in **`TurfGuess.Core`**, a pure, deterministic library with no Discord or database code. The same seed and options always give the same round. Two apps sit on top of it: the Preview console app and the Discord bot.
 
 ```mermaid
 flowchart LR
@@ -27,15 +27,16 @@ flowchart LR
     end
     MR --> PNG([round / reveal PNG])
     Preview[TurfGuess.Preview<br/>console app] --> RG
-    Bot[TurfGuess.Bot<br/>planned] -.-> RG
+    Bot[TurfGuess.Bot<br/>Discord bot] --> RG
 ```
 
 | Project | Status | Role |
 |---|---|---|
 | `src/TurfGuess.Core` | ✅ | Map generation, paint, scoring, rendering, color pairs |
 | `src/TurfGuess.Preview` | ✅ | Console app that writes sample rounds and contact sheets |
+| `src/TurfGuess.Bot` | 🟡 Built, not yet run live | Discord bot: scheduler, round lifecycle, voting buttons, SQLite, reveals, admin commands |
 | `tests/TurfGuess.Core.Tests` | ✅ | xUnit tests for Core (77 tests) |
-| `src/TurfGuess.Bot` | 🚧 Planned (milestone 3) | Discord bot: scheduler, voting buttons, SQLite, reveals. See DESIGN.md §2, §6–8 |
+| `tests/TurfGuess.Bot.Tests` | ✅ | xUnit tests for the bot's game logic, data and text (37 tests) |
 
 **The one rule to remember:** the **paint mask** is the single source of truth. The score is counted from it and the renderer only draws it. Nothing visual may ever change what's counted.
 
@@ -43,11 +44,11 @@ flowchart LR
 
 ## Getting started
 
-**Requirements:** the .NET 10 SDK. SkiaSharp brings its own native binaries on Windows. A Linux host additionally needs `SkiaSharp.NativeAssets.Linux`, which gets added with the bot.
+**Requirements:** the .NET 10 SDK. SkiaSharp brings its own native binaries on Windows. The bot also references `SkiaSharp.NativeAssets.Linux` for Linux hosts.
 
 ```bash
 dotnet build                                   # whole solution
-dotnet test                                    # 77 tests, ~6 s
+dotnet test                                    # 114 tests (77 Core + 37 Bot), ~10 s
 dotnet run --project src/TurfGuess.Preview -c Release -- --count 12 --seed 42
 ```
 
@@ -57,7 +58,7 @@ Use `-c Release` for the Preview app. Generation is noticeably slower in Debug.
 
 ```
 TurfGuess/
-  DESIGN.md                      # the spec: decisions, behaviour, planned bot
+  DESIGN.md                      # the spec: decisions, behaviour, data model, config
   TurfGuess.slnx                 # .NET 10 XML solution
   docs/                          # this guide + the user guide
   src/
@@ -72,7 +73,9 @@ TurfGuess/
       Noise/GradientNoise.cs     # seeded Perlin-style noise + fBm
       Util/Rng.cs                # SplitMix64 PRNG
     TurfGuess.Preview/Program.cs
+    TurfGuess.Bot/                 # Discord bot (see "The bot" below)
   tests/TurfGuess.Core.Tests/
+  tests/TurfGuess.Bot.Tests/
   preview/                       # Preview output (git-ignored)
 ```
 
@@ -209,6 +212,88 @@ All tuning values are `private const` fields grouped by style in `MapRenderer.cs
 
 ---
 
+## The bot (`src/TurfGuess.Bot`)
+
+A .NET Generic Host worker using **Discord.Net 3.20** (WebSocket + Interactions), **SQLite** through Microsoft.Data.Sqlite and **Dapper**. For setup and running it, see the [User Guide](USER_GUIDE.md#running-the-bot).
+
+### Architecture
+
+The game logic never touches Discord types. It talks to the chat platform through **`IRoundChannel`**, which has post, find, close and reveal methods. `DiscordRoundChannel` is the real implementation, and the tests use an in-memory `FakeChannel`.
+
+```mermaid
+flowchart LR
+    subgraph Hosted["Hosted services"]
+        DBS[DiscordBotService<br/>login, commands, routing]
+        SCH[RoundScheduler<br/>wakes at reveal times]
+        VCS[VoteCountService<br/>debounced count edits]
+    end
+    subgraph Game["Game (Discord-free)"]
+        RS[RoundService<br/>lifecycle state machine]
+        VS[VoteService]
+        RI[RoundImages]
+        MT[MessageText]
+        SCHED[RoundSchedule]
+    end
+    REPO[(RoundRepository<br/>SQLite)]
+    CH[[IRoundChannel]]
+    DRC[DiscordRoundChannel]
+
+    SCH --> RS
+    RS --> SCHED & RI & REPO & CH
+    VS --> REPO
+    VCS --> REPO & CH
+    CH -.implemented by.-> DRC
+    DRC --> MT
+    DBS -->|buttons| VM[VoteModule] --> VS
+    DBS -->|/turf-admin| AM[AdminModule] --> RS
+    RI --> CORE[TurfGuess.Core]
+```
+
+### Startup (`Program.cs`)
+
+1. Configuration: `appsettings.json` from the app folder, then user secrets, then `TURFGUESS_*` environment variables.
+2. `BotOptionsValidator.Validate`. On any error, print every problem and exit with code 1.
+3. Create the schema (`Database.EnsureSchema`, WAL mode).
+4. Register the services and start three hosted services:
+   - `DiscordBotService` logs in with `GatewayIntents.Guilds` only. On `Ready` it registers the slash commands to the channel's server (guild commands appear instantly) and completes `ChannelReadySignal`.
+   - `RoundScheduler` waits for that signal, then loops: `next = RoundService.AdvanceAsync(now)`, then sleeps until `next`. It caps each sleep at 5 minutes, so a changed system clock can't make it oversleep, and wakes early when `SchedulerSignal.Wake()` is called. On an error it logs and retries after a minute.
+   - `VoteCountService` edits "N players have voted" at most once per `VoteCountInterval`, for rounds that got new votes.
+
+### The round lifecycle (`Game/RoundService.cs`)
+
+`AdvanceAsync(now)` looks at the one unfinished round and takes the next step, until the round is `Open` and waiting for its reveal time:
+
+| Current state | Step |
+|---|---|
+| No unfinished round | **Create:** new seed → `RoundGenerator.Generate` → `ColorPairs.Pick` → insert as `Pending` (`reveal_at` from `RoundSchedule`) → render and save both PNGs → store their paths |
+| `Pending` | **Post:** `FindRoundMessageAsync`. If the message is already there (crash after sending), adopt it. Otherwise post it. Then mark `Open` with the message id. |
+| `Open`, before `reveal_at` | Return `reveal_at` |
+| `Open`, at or after `reveal_at` | Mark `Revealed`. **This is what closes voting.** |
+| `Revealed` | **Reveal:** disable the buttons → `FindRevealMessageAsync`, adopting an existing reveal or posting one with the summary → mark `Done` |
+
+Each database write happens **before** the Discord call it prepares for, and each Discord id is saved **after**. Every step is safe to repeat, so normal operation, catch-up after downtime and crash recovery all use the same loop. The "find" methods scan the bot's last 50 messages in the channel:
+- the round message is found by its button id prefix, `vote:{roundId}:`,
+- the reveal is found by its embed footer, `Round #{id} · Results`.
+
+**The schedule** (`Game/RoundSchedule.cs`): `NextOccurrence(after, time, zone)` gives the next moment the clock in `zone` shows `time`. Times skipped by a daylight-saving jump move to the first valid time. `RevealAt` adds the first-round rule: if the first round would be shorter than `MinRoundLength`, it skips one day.
+
+### Voting
+
+- **Buttons** have custom id `vote:{roundId}:{left|right}`. `VoteModule` handles them with `[ComponentInteraction("vote:*:*")]`. Discord.Net routes clicks by that id, so the buttons keep working across restarts with no state to restore.
+- **`RoundRepository.TryUpsertVote`** inserts or changes the vote **only if the round is `Open`**, in a single SQL statement (`INSERT … SELECT … WHERE EXISTS (… status = 'Open') ON CONFLICT DO UPDATE`). SQLite runs writes one at a time, so a vote can never slip in after the round moved to `Revealed`. Disabled buttons are only a visual cue.
+- Replies are **ephemeral**, so only the voter sees them.
+
+### Messages (`Game/MessageText.cs` + `Discord/DiscordRoundChannel.cs`)
+
+- **Round message:** an embed with a title, a description with `<t:unix:R>` timestamps (each client shows them in its own time zone), an attached PNG and the footer `Round #{id}`, plus two grey buttons with the team emoji and name. Vote-count edits rebuild the existing embed and only change its description, so the image stays.
+- **Reveal:** an embed in the winner's color, with the winner, coverage, unpainted share and vote counts, the correct guessers as `<@id>` mentions, the reveal PNG and the footer `Round #{id} · Results`. It's sent with **`AllowedMentions.None`**, so names render but nobody is pinged. The list stops at `MaxListedWinners` and within 2000 characters ("…and N more").
+
+### Discord ids and time in the database
+
+Snowflakes are `ulong` in Discord.Net and `INTEGER` (signed 64-bit) in SQLite. The repository works with `long`, and the code casts at the edges. This is safe because current snowflakes are far below 2^63. Times are Unix seconds. Seeds are kept below 2^63 for the same reason.
+
+---
+
 ## Options reference
 
 All options are mutable classes, so the bot can bind them from `appsettings.json` (DESIGN.md §7). `GeneratorOptions.Validate()` enforces the ranges below.
@@ -266,6 +351,15 @@ dotnet test
 | `SpawnPaintTests` | Diligence chance 0/1 controls the flags; mix at the default; diligent teams leave less unpainted floor near spawn; targets unaffected; invalid chance rejected |
 | `ColorPairsTests` | Pairs valid and distinct; pick is deterministic; all pairs and both sides used; empty list rejected |
 | `MarbleDampingTests` | Yellow/green damped; other hues full; smooth fade |
+
+**Bot tests** (`tests/TurfGuess.Bot.Tests`). Each one runs against a fresh SQLite file and image folder in a temp directory (`TestEnvironment`), with `FakeChannel` standing in for Discord:
+
+| File | Covers |
+|---|---|
+| `RoundServiceTests` | First start creates and posts a round; nothing happens before the reveal time; reveal plus next round at the round time; correct guessers (including changed votes); votes rejected after reveal; multi-day downtime reveals once and posts one round; **a crash right after posting a round or a reveal never posts it twice**; missing images regenerated; `RevealNow` |
+| `RoundScheduleTests` | Today vs tomorrow; catch-up rounds are shorter; 25-hour and 23-hour rounds across daylight-saving changes; skipped times; the first-round minimum |
+| `RepositoryTests` | Round round-trip; only one unfinished round; status only moves forward; votes only while open and changeable; large snowflakes; repeatable schema creation |
+| `MessageAndOptionsTests` | Reveal text (winner, coverage, votes, mentions, cut-off, 2000-character limit, no votes); round description; button ids; config validation |
 
 Round tests run at `PixelsPerCell = 4` to stay fast. The math doesn't depend on resolution. Internals are visible to the test project via `InternalsVisibleTo`.
 

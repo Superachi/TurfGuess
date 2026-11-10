@@ -4,3 +4,7 @@ preview/
 *.user
 .vs/
 *.db
+/images/
+src/TurfGuess.Bot/images/
+*.db-shm
+*.db-wal

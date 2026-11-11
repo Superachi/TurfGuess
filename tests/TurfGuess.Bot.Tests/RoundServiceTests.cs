@@ -56,6 +56,9 @@ public class RoundServiceTests
         votes.Cast(first.Id, 3, "player3", winner);
         votes.Cast(first.Id, 3, "player3", winner.Opposite()); // changed their mind
         votes.Cast(first.Id, 3, "player3", winner);            // and back
+        env.Votes.ToggleNotify(first.Id, 5, "player5");
+        env.Votes.ToggleNotify(first.Id, 6, "player6");
+        env.Votes.ToggleNotify(first.Id, 6, "player6");        // turned off again
 
         var next = await env.Rounds.AdvanceAsync(Local(11, 9), default);
 
@@ -66,6 +69,7 @@ public class RoundServiceTests
         Assert.Equal(first.Id, roundId);
         Assert.Equal(new ulong[] { 1, 3 }, summary.CorrectGuessers);
         Assert.Equal(3, summary.LeftVotes + summary.RightVotes);
+        Assert.Equal(new ulong[] { 5 }, summary.Notify);
 
         var second = env.Repo.GetActive()!;
         Assert.NotEqual(first.Id, second.Id);

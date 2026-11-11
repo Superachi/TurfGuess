@@ -32,4 +32,8 @@ public interface IRoundChannel
 }
 
 /// <summary>Vote results for a reveal.</summary>
-public sealed record RevealSummary(int LeftVotes, int RightVotes, IReadOnlyList<ulong> CorrectGuessers);
+public sealed record RevealSummary(int LeftVotes, int RightVotes, IReadOnlyList<ulong> CorrectGuessers)
+{
+    /// <summary>Players who pressed "Notify me"; they are pinged by the reveal message.</summary>
+    public IReadOnlyList<ulong> Notify { get; init; } = [];
+}

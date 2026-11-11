@@ -160,7 +160,10 @@ public sealed class RoundService(
             var summary = new RevealSummary(
                 LeftVotes: votes.Count(v => v.ChoiceSide == Side.Left),
                 RightVotes: votes.Count(v => v.ChoiceSide == Side.Right),
-                CorrectGuessers: votes.Where(v => v.ChoiceSide == winner).Select(v => (ulong)v.UserId).ToList());
+                CorrectGuessers: votes.Where(v => v.ChoiceSide == winner).Select(v => (ulong)v.UserId).ToList())
+            {
+                Notify = repo.GetNotifyIds(round.Id),
+            };
 
             var (_, revealPath) = images.Ensure(round);
             revealId = await channel.PostRevealAsync(round, summary, revealPath, ct);

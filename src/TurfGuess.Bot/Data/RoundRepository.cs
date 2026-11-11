@@ -132,6 +132,33 @@ public sealed class RoundRepository(Database db)
             new { roundId }).Select(id => (ulong)id).ToList();
     }
 
+    /// <summary>
+    /// Flips a player's "notify me" setting for a round, only while the round is Open.
+    /// Returns the new state (true = will be pinged), or null when the round is closed or missing.
+    /// </summary>
+    public bool? ToggleNotify(long roundId, long userId)
+    {
+        using var c = db.Open();
+        using var tx = c.BeginTransaction();
+        bool open = c.ExecuteScalar<long>("SELECT COUNT(*) FROM rounds WHERE id = @roundId AND status = 'Open'", new { roundId }, tx) > 0;
+        if (!open) return null;
+
+        int removed = c.Execute("DELETE FROM round_notifications WHERE round_id = @roundId AND user_id = @userId",
+            new { roundId, userId }, tx);
+        if (removed == 0)
+            c.Execute("INSERT INTO round_notifications (round_id, user_id) VALUES (@roundId, @userId)", new { roundId, userId }, tx);
+        tx.Commit();
+        return removed == 0;
+    }
+
+    /// <summary>Players who asked to be pinged when this round's results are posted.</summary>
+    public IReadOnlyList<ulong> GetNotifyIds(long roundId)
+    {
+        using var c = db.Open();
+        return c.Query<long>("SELECT user_id FROM round_notifications WHERE round_id = @roundId ORDER BY rowid",
+            new { roundId }).Select(id => (ulong)id).ToList();
+    }
+
     public int CountVotes(long roundId)
     {
         using var c = db.Open();

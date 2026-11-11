@@ -25,4 +25,23 @@ public sealed class VoteModule(VoteService votes, RoundRepository repo) : Intera
         // Only the voter sees the reply, so nobody can see how others voted.
         await RespondAsync(round is null ? MessageText.VotingClosed : MessageText.VoteAccepted(round, side), ephemeral: true);
     }
+
+    /// <summary>The "Notify me" button: each click flips whether the player is pinged at the reveal.</summary>
+    [ComponentInteraction("notify:*", ignoreGroupNames: true)]
+    public async Task NotifyAsync(string roundIdText)
+    {
+        if (!long.TryParse(roundIdText, out long roundId))
+        {
+            await RespondAsync(MessageText.VotingClosed, ephemeral: true);
+            return;
+        }
+
+        var state = votes.ToggleNotify(roundId, Context.User.Id, Context.User.Username);
+        await RespondAsync(state switch
+        {
+            true => MessageText.NotifyOn,
+            false => MessageText.NotifyOff,
+            null => MessageText.VotingClosed,
+        }, ephemeral: true);
+    }
 }

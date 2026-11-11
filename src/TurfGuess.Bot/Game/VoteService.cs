@@ -42,6 +42,15 @@ public sealed class VoteService(RoundRepository repo, TimeProvider clock, ILogge
         return VoteResult.Accepted;
     }
 
+    /// <summary>Toggles "notify me when results are in". Null when the round is closed.</summary>
+    public bool? ToggleNotify(long roundId, ulong userId, string userName)
+    {
+        var state = repo.ToggleNotify(roundId, (long)userId);
+        if (state is { } on)
+            logger.LogInformation("Round {RoundId}: {UserName} ({UserId}) turned notifications {State}.", roundId, userName, userId, on ? "on" : "off");
+        return state;
+    }
+
     /// <summary>Parses a button id like "vote:12:left".</summary>
     public static bool TryParseButton(string roundIdText, string sideText, out long roundId, out Side side)
     {

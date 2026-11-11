@@ -87,5 +87,12 @@ public sealed class Database
             voted_at  INTEGER NOT NULL,
             PRIMARY KEY (round_id, user_id)
         );
+
+        -- Players who asked to be pinged when a round's results are posted.
+        CREATE TABLE IF NOT EXISTS round_notifications (
+            round_id INTEGER NOT NULL REFERENCES rounds (id),
+            user_id  INTEGER NOT NULL,
+            PRIMARY KEY (round_id, user_id)
+        );
         """;
 }

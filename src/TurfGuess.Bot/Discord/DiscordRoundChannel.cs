@@ -80,8 +80,12 @@ public sealed class DiscordRoundChannel(DiscordSocketClient client, BotOptions o
             .Build();
 
         using var file = new FileAttachment(imagePath, fileName);
-        // Mentions are disabled, so the correct guessers are named without being pinged.
-        var message = await channel.SendFileAsync(file, embed: embed, allowedMentions: AllowedMentions.None, options: Request(ct));
+        // The embed names the correct guessers without pinging them. Only the players who pressed
+        // "Notify me" are pinged, through the message content.
+        var pinged = summary.Notify.Take(MessageText.MaxPinged).ToList();
+        var mentions = pinged.Count == 0 ? AllowedMentions.None : new AllowedMentions { UserIds = pinged };
+        var message = await channel.SendFileAsync(file, text: MessageText.NotifyPing(summary.Notify), embed: embed,
+            allowedMentions: mentions, options: Request(ct));
         return message.Id;
     }
 
@@ -131,6 +135,8 @@ public sealed class DiscordRoundChannel(DiscordSocketClient client, BotOptions o
             emote: new Emoji(round.LeftEmoji), disabled: disabled)
         .WithButton(round.RightName, MessageText.ButtonId(round.Id, Side.Right), ButtonStyle.Secondary,
             emote: new Emoji(round.RightEmoji), disabled: disabled)
+        .WithButton(MessageText.NotifyLabel, MessageText.NotifyButtonId(round.Id), ButtonStyle.Primary,
+            emote: new Emoji(MessageText.NotifyEmoji), disabled: disabled)
         .Build();
 
     private static IEnumerable<string> ButtonIds(IEnumerable<IMessageComponent> components)

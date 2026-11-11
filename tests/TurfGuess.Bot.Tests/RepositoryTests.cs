@@ -119,4 +119,23 @@ public class RepositoryTests
         env.Database.EnsureSchema();
         Assert.False(env.Repo.AnyRounds());
     }
+
+    [Fact]
+    public void Notify_toggles_on_and_off_while_the_round_is_open()
+    {
+        using var env = new TestEnvironment();
+        long id = env.Repo.Insert(NewRound());
+        Assert.Null(env.Repo.ToggleNotify(id, 7)); // Pending: not open yet
+
+        env.Repo.MarkOpen(id, 1, 100);
+        Assert.True(env.Repo.ToggleNotify(id, 7));
+        Assert.True(env.Repo.ToggleNotify(id, 8));
+        Assert.Equal(new ulong[] { 7, 8 }, env.Repo.GetNotifyIds(id));
+
+        Assert.False(env.Repo.ToggleNotify(id, 7));
+        Assert.Equal(new ulong[] { 8 }, env.Repo.GetNotifyIds(id));
+
+        env.Repo.MarkRevealed(id);
+        Assert.Null(env.Repo.ToggleNotify(id, 9));
+    }
 }

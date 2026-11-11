@@ -33,7 +33,8 @@ What makes it fun:
 1. **Every day at the round time** (for example 09:00), the bot posts a new arena in the game channel, with two buttons, one per team color, e.g. `🩷 Pink` and `💚 Green`.
 2. **Click the color you think covers more floor.** Only you see your vote: the bot confirms it with a message nobody else can see. The round message lists **who** has voted, but never what they picked, so you can't just follow the crowd.
 3. **Changed your mind?** Click the other button. Your latest click counts, right up until the reveal.
-4. **At the next round time**, voting closes and the bot posts the result:
+4. **Want a reminder?** Click **🔔 Notify me** and the bot pings you when the results are posted. Click it again to turn the ping off. It's separate from voting, so you can use it without voting.
+5. **At the next round time**, voting closes and the bot posts the result:
    - the winning color,
    - each color's share of the floor, plus how much was left unpainted,
    - how many people voted for each color,

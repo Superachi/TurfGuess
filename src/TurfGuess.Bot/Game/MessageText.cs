@@ -31,6 +31,20 @@ public static class MessageText
 
     public static string ButtonId(long roundId, Side side) => $"vote:{roundId}:{SideCodec.Format(side)}";
 
+    public static string NotifyButtonId(long roundId) => $"notify:{roundId}";
+
+    public const string NotifyLabel = "Notify me";
+    public const string NotifyEmoji = "🔔";
+    public const string NotifyOn = "🔔 You'll be pinged when the results are posted. Click the button again to turn it off.";
+    public const string NotifyOff = "🔕 You won't be pinged. Click the button again to turn it back on.";
+
+    /// <summary>Most players pinged at a reveal (Discord allows 100 allowed mentions; the text must also fit).</summary>
+    public const int MaxPinged = 80;
+
+    /// <summary>The ping line above the reveal, or null when nobody asked to be notified.</summary>
+    public static string? NotifyPing(IReadOnlyList<ulong> ids) =>
+        ids.Count == 0 ? null : "🔔 " + string.Join(' ', ids.Take(MaxPinged).Select(id => $"<@{id}>"));
+
     public static string ButtonIdPrefix(long roundId) => $"vote:{roundId}:";
 
     /// <summary>Discord's limit for an embed description.</summary>

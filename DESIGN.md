@@ -228,7 +228,7 @@ Paint should *flow* from each spawn and wrap around obstacles, not just split th
 - Upscale the grid (e.g. 16 px/cell → 1536×864) and render with SkiaSharp.
 - Layers, bottom to top:
   1. Background (void): flat dark grey (`#282A30`), no texture.
-  2. Floor: flat neutral gray. **No grid lines**: the cell grid shapes the map but isn't drawn.
+  2. Floor: flat neutral gray. Only the unpainted floor gets a subtle **checkerboard** (squares half a cell wide, alternate squares slightly darker, `FloorCheckerShade`), so bare patches read as texture against the smooth paint. The cell grid itself isn't drawn.
   3. Paint: drawn in one of three **ink styles** (`RenderStyle.Ink`):
      - **Flat**: one solid color per team, for a minimalist look.
      - **Marbled** (default): an oil-slick look. Domain-warped noise (noise sampled at coordinates pushed around by more noise, twice) is folded through a sine into flowing, swirled bands. The bands swing between the warm and cool hue-shifted tones of the team color (up to 15° of hue) at nearly constant lightness. For yellow and green base colors (OKLCh hue 90°–150°, fading out by 65° and 175°), the hue shift is reduced to 35%, because those colors turn muddy olive when shifted. Glossy streaks along the band crests are supported but switched off.
@@ -236,7 +236,7 @@ Paint should *flow* from each spawn and wrap around obstacles, not just split th
      - Each pixel gets a *tone* from broad, smooth noise swells plus a faint bump map lit from the top-left.
      - Tone is applied in **OKLCh** (a perceptual color space). Lights get slightly lighter and drift **warm, toward yellow**; shadows get slightly darker, a little richer and drift **cool, toward blue**, by up to 20° of hue. Pink goes rose in the lights and magenta-purple in the shadows; green goes from yellow-green to bluish green.
      - Borders between colors sit in cool shadow, which outlines each region, plus soft gloss highlights on the bumps that face the light, which make the ink look wet.
-  4. Walls and obstacles: raised look (a lighter top face plus a drop shadow).
+  4. Walls and obstacles: raised look (a lighter top face plus a drop shadow), with diagonal hatching on the top face in the same style as the spawn zones (`WallHatchShade`).
   5. Spawn pads in team colors.
   6. Optional: round number and game name in a corner.
 - The renderer receives the final paint mask from the paint step (section 4.2, step 7) at the same resolution and draws it. It never counts anything itself.

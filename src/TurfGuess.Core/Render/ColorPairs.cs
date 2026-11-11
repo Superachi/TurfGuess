@@ -23,8 +23,8 @@ public static class ColorPairs
         Pair("Purple", "#8E3CC4", "💜", "Sky Blue", "#17A2F5", "🩵"),
         Pair("Blue Purple", "#6C3FD1", "💜", "Orange", "#DE6624", "🧡"),
         Pair("Lime Green", "#62C024", "💚", "Purple", "#8E3CC4", "💜"),
-        Pair("Vanilla", "#F0E6BE", "🤍", "Royal Blue", "#5A7FEA", "💙"),
-        Pair("Silver", "#D6DAE2", "🩶", "Gold", "#D4AF37", "💛"),
+        Pair("Silver", "#C4C9D3", "🩶", "Royal Blue", "#5A7FEA", "💙"),
+        Pair("Silver", "#C4C9D3", "🩶", "Gold", "#D4AF37", "💛"),
         Pair("Scarlet", "#B8141F", "❤️", "Pink", "#E0559A", "🩷"),
         Pair("Scarlet", "#E0282E", "❤️", "Blue", "#343BC4", "💙"),
     ];

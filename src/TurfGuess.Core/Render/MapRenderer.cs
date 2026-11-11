@@ -153,6 +153,9 @@ public static class MapRenderer
             }
         }
 
+        if (style.Outline != ArenaOutline.None)
+            ApplyOutline(pixels, mask, w, h, Math.Max(2, p / 4), style.Outline);
+
         var bitmap = new SKBitmap(new SKImageInfo(w, h + extraHeight, SKColorType.Rgba8888, SKAlphaType.Opaque));
         IntPtr dst = bitmap.GetPixels();
         int rowBytes = bitmap.RowBytes;
@@ -167,6 +170,47 @@ public static class MapRenderer
         }
 
         return bitmap;
+    }
+
+    /// <summary>
+    /// Outlines the arena with the inverted color of the pixels next to the edge.
+    /// Outside: void pixels within <paramref name="width"/> of the arena take the inverted color of the nearest arena pixel.
+    /// Inside: arena pixels within <paramref name="width"/> of the void are inverted in place.
+    /// </summary>
+    private static void ApplyOutline(int[] pixels, PixelKind[] mask, int w, int h, int width, ArenaOutline mode)
+    {
+        var src = (int[])pixels.Clone();
+        int r2 = width * width;
+        const int Invert = 0x00FFFFFF;
+
+        for (int y = 0; y < h; y++)
+        {
+            for (int x = 0; x < w; x++)
+            {
+                int i = y * w + x;
+                bool isVoid = mask[i] == PixelKind.Void;
+                if (mode == ArenaOutline.Outside && !isVoid) continue;
+                if (mode == ArenaOutline.Inside && isVoid) continue;
+
+                int best = int.MaxValue, bestIndex = -1;
+                for (int dy = -width; dy <= width; dy++)
+                {
+                    for (int dx = -width; dx <= width; dx++)
+                    {
+                        int d2 = dx * dx + dy * dy;
+                        if (d2 > r2 || d2 >= best) continue;
+                        int nx = x + dx, ny = y + dy;
+                        bool nVoid = nx < 0 || ny < 0 || nx >= w || ny >= h || mask[ny * w + nx] == PixelKind.Void;
+                        // Outside looks for the nearest arena pixel, inside for the nearest void.
+                        if (mode == ArenaOutline.Outside ? nVoid : !nVoid) continue;
+                        best = d2;
+                        bestIndex = ny * w + nx;
+                    }
+                }
+                if (bestIndex < 0) continue;
+                pixels[i] = (mode == ArenaOutline.Outside ? src[bestIndex] : src[i]) ^ Invert;
+            }
+        }
     }
 
     private static bool IsWall(Grid<CellType> cells, int x, int y) => cells.InBounds(x, y) && cells[x, y] == CellType.Wall;

@@ -23,10 +23,22 @@ public enum InkStyle
 }
 
 /// <summary>Visual settings for one round: which team is which color.</summary>
+/// <summary>Optional outline around the arena, drawn in the inverted color of the pixels it sits next to.</summary>
+public enum ArenaOutline
+{
+    /// <summary>No outline.</summary>
+    None,
+    /// <summary>Drawn just outside the arena edge, on the background.</summary>
+    Outside,
+    /// <summary>Drawn just inside the arena edge, over the outermost pixels.</summary>
+    Inside,
+}
+
 public sealed class RenderStyle
 {
     public string GameName { get; set; } = "Turf Guess";
     public InkStyle Ink { get; set; } = InkStyle.Marbled;
+    public ArenaOutline Outline { get; set; } = ArenaOutline.None;
     public TeamStyle Left { get; set; } = new() { Name = "Orange", Color = "#CF581B", Emoji = "🧡" };
     public TeamStyle Right { get; set; } = new() { Name = "Blue", Color = "#141494", Emoji = "💙" };
 }

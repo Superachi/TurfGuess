@@ -6,7 +6,7 @@ using TurfGuess.Core.Grid;
 using TurfGuess.Core.Render;
 using TurfGuess.Core.Scoring;
 
-// Usage: dotnet run --project src/TurfGuess.Preview -- [--count 12] [--seed 42] [--out preview] [--ink Flat|Shaded|Marbled]
+// Usage: dotnet run --project src/TurfGuess.Preview -- [--count 12] [--seed 42] [--out preview] [--ink Flat|Shaded|Marbled] [--outline None|Outside|Inside]
 //        [--ppc 16] [--symmetry Rotate|Mirror] [--no-reveal] [--columns 4] [--radius 0.75] [--inner-radius 0.5]
 //        dotnet run --project src/TurfGuess.Preview -- --pairs [--seed 42]
 //          [--pairs-file pairs.json] [--pairs-out name.png] [--pairs-full]
@@ -24,6 +24,7 @@ options.Paint.PixelsPerCell = args_.Int("ppc", options.Paint.PixelsPerCell);
 options.Paint.CornerRadius = args_.Double("radius", options.Paint.CornerRadius);
 options.Paint.InnerCornerRadius = args_.Double("inner-radius", options.Paint.InnerCornerRadius);
 var inkStyle = Enum.Parse<InkStyle>(args_.Str("ink", new RenderStyle().Ink.ToString()), ignoreCase: true);
+var outline = Enum.Parse<ArenaOutline>(args_.Str("outline", new RenderStyle().Outline.ToString()), ignoreCase: true);
 if (args_.Has("symmetry")) options.Map.Symmetry = Enum.Parse<SymmetryMode>(args_.Str("symmetry", "Rotate"), ignoreCase: true);
 
 if (args_.Flag("pairs"))
@@ -37,7 +38,7 @@ if (args_.Flag("pairs"))
     for (int i = 0; i < pairs.Count; i++)
     {
         var pair = pairs[i];
-        var pairStyle = new RenderStyle { Left = pair.A, Right = pair.B, Ink = inkStyle };
+        var pairStyle = new RenderStyle { Left = pair.A, Right = pair.B, Ink = inkStyle, Outline = outline };
         pairThumbs.Add((MapRenderer.RenderRound(pairRound, pairStyle),
             $"{i + 1}. {pair.A.Name} {pair.A.Color}  vs  {pair.B.Name} {pair.B.Color}"));
         if (args_.Flag("pairs-full"))
@@ -66,6 +67,7 @@ for (int i = 0; i < count; i++)
     var round = RoundGenerator.Generate(seed, options);
     var style = ColorPairs.Pick(seed);
     style.Ink = inkStyle;
+    style.Outline = outline;
     long genMs = sw.ElapsedMilliseconds;
 
     using var image = MapRenderer.RenderRound(round, style, $"{style.GameName} · Seed {seed}");

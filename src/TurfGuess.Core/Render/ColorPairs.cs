@@ -11,7 +11,7 @@ public sealed class ColorPair
 
 /// <summary>
 /// The built-in color pairs and the per-round pick (DESIGN.md §5, Colors).
-/// Defaults: three hand-picked regular-battle ink pairs from the Inkipedia ink gallery.
+/// Defaults: three hand-picked regular-battle ink pairs from the Inkipedia ink gallery, plus five extra combos.
 /// </summary>
 public static class ColorPairs
 {
@@ -20,6 +20,11 @@ public static class ColorPairs
         Pair("Pink", "#E0559A", "🩷", "Green", "#2E7D32", "💚"),
         Pair("Orange", "#DE6624", "🧡", "Blue", "#343BC4", "💙"),
         Pair("Yellow", "#D0BE08", "💛", "Blue", "#3A0CCD", "💙"),
+        Pair("Purple", "#8E3CC4", "💜", "Sky Blue", "#4DB8E8", "🩵"),
+        Pair("Dark Sea Green", "#8FBC8F", "💚", "Orange", "#DE6624", "🧡"),
+        Pair("Blue Purple", "#6C3FD1", "💜", "Orange", "#DE6624", "🧡"),
+        Pair("Royal Blue", "#4169E1", "💙", "Hot Pink", "#FF69B4", "🩷"),
+        Pair("Lime Green", "#6FCF2A", "💚", "Purple", "#8E3CC4", "💜"),
     ];
 
     /// <summary>

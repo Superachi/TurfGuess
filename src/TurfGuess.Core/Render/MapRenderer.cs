@@ -20,6 +20,7 @@ public static class MapRenderer
     private static readonly Rgb WallSide = new(220, 224, 232);
     private static readonly Rgb WallDark = new(140, 144, 156);
     private static readonly Rgb WallDarkSide = new(160, 164, 175);
+    private const double WallHatchShade = 0.86;     // darkness of the alternate hatch stripe on wall tops
     private static readonly SKColor BannerColor = new(28, 29, 34);
 
     /// <summary>The image posted with a new round.</summary>
@@ -128,6 +129,12 @@ public static class MapRenderer
                         else if (lx < bevel && !IsWall(cells, cx - 1, cy)) c = WallSide;
                         else if (ly >= p - bevel && !IsWall(cells, cx, cy + 1)) c = WallDark;
                         else if (lx >= p - bevel && !IsWall(cells, cx + 1, cy)) c = WallDarkSide;
+                        else
+                        {
+                            // Diagonal hatching on the top face, like the spawn zones.
+                            bool wallStripe = ((x + y) / Math.Max(2, p / 2)) % 2 == 0;
+                            if (!wallStripe) c = WallTop.Scale(WallHatchShade);
+                        }
                         break;
                     }
                 }

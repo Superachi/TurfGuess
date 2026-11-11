@@ -334,6 +334,7 @@ dotnet run --project src\TurfGuess.Preview -c Release -- --count 6 --seed 100
 | Option | What it does |
 |---|---|
 | `--pairs` | Instead of rounds, renders **one arena in every color pair** to `color_pairs.png`. Uses `--seed` for the arena. |
+| `--pairs-full` | Also saves each pair as its own full-size image (`pair_01_pink_green.png`, …), for sharing or accessibility checks |
 | `--pairs-file <file.json>` | Use your own list of color pairs instead of the built-in twelve |
 | `--pairs-out <name.png>` | File name for the sheet (default `color_pairs.png`) |
 

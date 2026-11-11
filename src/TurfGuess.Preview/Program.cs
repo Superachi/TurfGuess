@@ -9,7 +9,7 @@ using TurfGuess.Core.Scoring;
 // Usage: dotnet run --project src/TurfGuess.Preview -- [--count 12] [--seed 42] [--out preview] [--ink Flat|Shaded|Marbled]
 //        [--ppc 16] [--symmetry Rotate|Mirror] [--no-reveal] [--columns 4] [--radius 0.75] [--inner-radius 0.5]
 //        dotnet run --project src/TurfGuess.Preview -- --pairs [--seed 42]
-//          [--pairs-file pairs.json] [--pairs-out name.png]
+//          [--pairs-file pairs.json] [--pairs-out name.png] [--pairs-full]
 //          renders one map in every color pair -> preview/color_pairs.png
 
 var args_ = ParseArgs(args);
@@ -40,6 +40,12 @@ if (args_.Flag("pairs"))
         var pairStyle = new RenderStyle { Left = pair.A, Right = pair.B, Ink = inkStyle };
         pairThumbs.Add((MapRenderer.RenderRound(pairRound, pairStyle),
             $"{i + 1}. {pair.A.Name} {pair.A.Color}  vs  {pair.B.Name} {pair.B.Color}"));
+        if (args_.Flag("pairs-full"))
+        {
+            using var full = MapRenderer.RenderRound(pairRound, pairStyle, $"{pair.A.Name} vs {pair.B.Name}");
+            string slug = $"{i + 1:00}_{pair.A.Name}_{pair.B.Name}".ToLowerInvariant().Replace(' ', '-');
+            File.WriteAllBytes(Path.Combine(outDir, $"pair_{slug}.png"), MapRenderer.EncodePng(full));
+        }
     }
     string pairsPath = Path.Combine(outDir, args_.Str("pairs-out", "color_pairs.png"));
     WriteContactSheet(pairThumbs, args_.Int("columns", 3), pairsPath);

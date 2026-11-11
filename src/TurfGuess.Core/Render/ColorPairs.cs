@@ -17,13 +17,13 @@ public static class ColorPairs
 {
     public static IReadOnlyList<ColorPair> Default { get; } =
     [
-        Pair("Pink", "#E0559A", "🩷", "Green", "#2E7D32", "💚"),
+        Pair("Pink", "#E0559A", "🩷", "Green", "#2A7D48", "💚"),
         Pair("Orange", "#DE6624", "🧡", "Blue", "#343BC4", "💙"),
-        Pair("Yellow", "#D0BE08", "💛", "Blue", "#3A0CCD", "💙"),
+        Pair("Yellow", "#D4AE0A", "💛", "Blue", "#3A0CCD", "💙"),
         Pair("Purple", "#8E3CC4", "💜", "Sky Blue", "#17A2F5", "🩵"),
         Pair("Blue Purple", "#6C3FD1", "💜", "Orange", "#DE6624", "🧡"),
-        Pair("Lime Green", "#6FCF2A", "💚", "Purple", "#8E3CC4", "💜"),
-        Pair("Vanilla", "#F3E5AB", "🤍", "Royal Blue", "#4169E1", "💙"),
+        Pair("Lime Green", "#62C024", "💚", "Purple", "#8E3CC4", "💜"),
+        Pair("Vanilla", "#F0E6BE", "🤍", "Royal Blue", "#5A7FEA", "💙"),
         Pair("Silver", "#C0C5CE", "🩶", "Gold", "#D4AF37", "💛"),
     ];
 

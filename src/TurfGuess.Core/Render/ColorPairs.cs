@@ -11,7 +11,7 @@ public sealed class ColorPair
 
 /// <summary>
 /// The built-in color pairs and the per-round pick (DESIGN.md §5, Colors).
-/// Defaults: three hand-picked regular-battle ink pairs from the Inkipedia ink gallery, plus five extra combos.
+/// Defaults: three hand-picked regular-battle ink pairs from the Inkipedia ink gallery, plus nine custom combos.
 /// </summary>
 public static class ColorPairs
 {

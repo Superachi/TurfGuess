@@ -246,16 +246,25 @@ Paint should *flow* from each spawn and wrap around obstacles, not just split th
 - Later: an animated GIF of a counting bar filling up, for the suspense.
 
 ### Colors
-- **Every round picks a color pair** from a list, deterministically from its seed. Which color goes to the left team is also picked from the seed. Each team's name is its color name ("Pink vs Green"), and each color has an emoji for its vote button (🩷 💚 💙 🩵 🧡 💜 💛 ❤️).
-- **Built-in pairs:** three hand-picked regular-battle ink pairs from the Inkipedia ink gallery. The other 15 regular-battle pairs looked too garish and were dropped:
+- **Every round picks a color pair** from a list, deterministically from its seed. Which color goes to the left team is also picked from the seed. Each team's name is its color name ("Pink vs Green"), and each color has an emoji for its vote button (🩷 💚 💙 🩵 🧡 💜 💛 ❤️ 🩶 🖤 🤍).
+- **Built-in pairs:** twelve pairs. The first three are hand-picked regular-battle ink pairs from the Inkipedia ink gallery (the other 15 regular-battle pairs looked too garish and were dropped), tuned by eye. The rest are custom combos reviewed in the Preview app:
 
   | Pair | Colors |
   |---|---|
-  | Pink vs Green | `#E0559A` / `#2E7D32` (adjusted: pink brighter, green darker than the wiki's `#C83D79` / `#409D3B`) |
+  | Pink vs Green | `#E0559A` / `#1E9A52` |
   | Orange vs Blue | `#DE6624` / `#343BC4` |
-  | Yellow vs Blue | `#D0BE08` / `#3A0CCD` |
+  | Yellow vs Blue | `#D4AE0A` / `#343BC4` |
+  | Purple vs Sky Blue | `#8E3CC4` / `#17A2F5` |
+  | Blue Purple vs Orange | `#6C3FD1` / `#DE6624` |
+  | Lime Green vs Purple | `#62C024` / `#8E3CC4` |
+  | Silver vs Royal Blue | `#C4C9D3` / `#5A7FEA` |
+  | Silver vs Gold | `#C4C9D3` / `#D4AF37` |
+  | Blue vs Pink | `#343BC4` / `#E0559A` |
+  | Scarlet vs Blue | `#E0282E` / `#343BC4` |
+  | Black vs White | `#1C1C22` / `#F5F5F5` |
+  | Dark Green vs Orange | `#1C5B38` / `#DE6624` |
 
-  More pairs are being chosen from established palettes. The candidates are reviewed with `--pairs --pairs-file` in the Preview app.
+  Candidate pairs are reviewed with `--pairs` (or `--pairs --pairs-file`) in the Preview app.
 - The list can be replaced in config (`ColorPairs`). Config validation checks that the two colors in each pair differ enough in lightness and hue, and that their names and emoji differ.
 - The pair picked for a round is **stored with the round** (section 6), so a config change never changes the colors of a round that's already posted.
 

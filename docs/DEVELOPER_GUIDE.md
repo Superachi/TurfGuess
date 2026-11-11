@@ -210,7 +210,7 @@ All tuning values are `private const` fields grouped by style in `MapRenderer.cs
 
 #### Color pairs (`Render/ColorPairs.cs`)
 
-`ColorPairs.Default` holds three pairs: Pink/Green, Orange/Blue and Yellow/Blue. `ColorPairs.Pick(seed)` picks a pair, and which color goes left, from `Rng.Derive(seed, 0xC0102)`. Each `TeamStyle` has a `Name`, a hex `Color` and an `Emoji`, which goes on the vote button.
+`ColorPairs.Default` holds twelve pairs (see the table in the [User Guide](USER_GUIDE.md#team-colors)). The first three are the original Pink/Green, Orange/Blue and Yellow/Blue. A few colors, such as Blue `#343BC4`, Purple `#8E3CC4` and Orange `#DE6624`, are shared across pairs on purpose. `ColorPairs.Pick(seed)` picks a pair, and which color goes left, from `Rng.Derive(seed, 0xC0102)`. Each `TeamStyle` has a `Name`, a hex `Color` and an `Emoji`, which goes on the vote button.
 
 ---
 

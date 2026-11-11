@@ -90,13 +90,22 @@ The percentages are shares of the **whole floor**, unpainted included, so they d
 
 ### Team colors
 
-Each round uses one of three color pairs, picked at random:
+Each round uses one of twelve color pairs, picked at random:
 
 | Pair | Colors |
 |---|---|
-| 🩷 Pink vs 💚 Green | `#E0559A` / `#2E7D32` |
+| 🩷 Pink vs 💚 Green | `#E0559A` / `#1E9A52` |
 | 🧡 Orange vs 💙 Blue | `#DE6624` / `#343BC4` |
-| 💛 Yellow vs 💙 Blue | `#D0BE08` / `#3A0CCD` |
+| 💛 Yellow vs 💙 Blue | `#D4AE0A` / `#343BC4` |
+| 💜 Purple vs 🩵 Sky Blue | `#8E3CC4` / `#17A2F5` |
+| 💜 Blue Purple vs 🧡 Orange | `#6C3FD1` / `#DE6624` |
+| 💚 Lime Green vs 💜 Purple | `#62C024` / `#8E3CC4` |
+| 🩶 Silver vs 💙 Royal Blue | `#C4C9D3` / `#5A7FEA` |
+| 🩶 Silver vs 💛 Gold | `#C4C9D3` / `#D4AF37` |
+| 💙 Blue vs 🩷 Pink | `#343BC4` / `#E0559A` |
+| ❤️ Scarlet vs 💙 Blue | `#E0282E` / `#343BC4` |
+| 🖤 Black vs 🤍 White | `#1C1C22` / `#F5F5F5` |
+| 💚 Dark Green vs 🧡 Orange | `#1C5B38` / `#DE6624` |
 
 Which color starts on the left is random too.
 
@@ -325,7 +334,7 @@ dotnet run --project src\TurfGuess.Preview -c Release -- --count 6 --seed 100
 | Option | What it does |
 |---|---|
 | `--pairs` | Instead of rounds, renders **one arena in every color pair** to `color_pairs.png`. Uses `--seed` for the arena. |
-| `--pairs-file <file.json>` | Use your own list of color pairs instead of the built-in three |
+| `--pairs-file <file.json>` | Use your own list of color pairs instead of the built-in twelve |
 | `--pairs-out <name.png>` | File name for the sheet (default `color_pairs.png`) |
 
 A pairs file is a JSON list. Each pair has an `A` and a `B` color with a name, a hex color and an emoji:

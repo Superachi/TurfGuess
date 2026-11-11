@@ -100,8 +100,8 @@ Each round uses one of twelve color pairs, picked at random:
 | 💜 Purple vs 🩵 Sky Blue | `#8E3CC4` / `#17A2F5` |
 | 💜 Blue Purple vs 🧡 Orange | `#6C3FD1` / `#DE6624` |
 | 💚 Lime Green vs 💜 Purple | `#62C024` / `#8E3CC4` |
-| 🩶 Silver vs 💙 Royal Blue | `#C4C9D3` / `#5A7FEA` |
-| 🩶 Silver vs 💛 Gold | `#C4C9D3` / `#D4AF37` |
+| 🩶 Silver vs 💙 Royal Blue | `#D2D7E0` / `#5A7FEA` |
+| 🩶 Silver vs 💛 Gold | `#D2D7E0` / `#D4AF37` |
 | 💙 Blue vs 🩷 Pink | `#343BC4` / `#E0559A` |
 | ❤️ Scarlet vs 💙 Blue | `#E0282E` / `#343BC4` |
 | 🖤 Black vs 🤍 White | `#1C1C22` / `#F5F5F5` |

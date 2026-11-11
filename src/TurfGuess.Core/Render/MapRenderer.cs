@@ -20,7 +20,7 @@ public static class MapRenderer
     private static readonly Rgb WallSide = new(220, 224, 232);
     private static readonly Rgb WallDark = new(140, 144, 156);
     private static readonly Rgb WallDarkSide = new(160, 164, 175);
-    private const double FloorGridShade = -14;      // grid line offset on unpainted floor (negative = darker)
+    private const double FloorCheckerShade = -9;    // darker checker squares on unpainted floor (negative = darker)
     private const double WallHatchShade = 0.86;     // darkness of the alternate hatch stripe on wall tops
     private static readonly SKColor BannerColor = new(28, 29, 34);
 
@@ -99,8 +99,9 @@ public static class MapRenderer
                         break;
 
                     case PixelKind.Unpainted:
-                        // Cell grid on the bare floor only; painted areas stay smooth.
-                        c = x % p == 0 || y % p == 0 ? FloorColor.Add(FloorGridShade) : FloorColor;
+                        // Checkerboard on the bare floor only (squares are half a cell); painted areas stay smooth.
+                        int half = Math.Max(1, p / 2);
+                        c = ((x / half) + (y / half)) % 2 == 0 ? FloorColor : FloorColor.Add(FloorCheckerShade);
                         break;
 
                     case PixelKind.Left:

@@ -195,6 +195,7 @@ Paint should *flow* from each spawn and wrap around obstacles, not just split th
    - **Diligent teams.** Each round, one draw with probability `DiligentSpawnChance` (default 30%) decides whether **both** teams painted their own spawn area diligently or **neither** did, so the spawns are never lopsided. A diligent team's closeness term is scaled down to 0.25, so far less floor near its spawn stays unpainted, and the unpainted share shifts toward the middle when both are diligent.
    - **Independent neglect variance.** On top of that, each team's neglect is scaled by its own random factor in `[1 − v, 1 + v]` (`SpawnNeglectVariance`, default 0.6), independent of the winner, so the two spawns can be very differently bare.
    - **Middle edge.** The team that neglected its spawn more gets a slight edge in the fight band (`MiddleEdge`, 0.15): it rushed forward. Shares stay exact because of the quantile.
+   - **Stray ink.** Each team independently has a `StrayInkChance` (0.4) of leaving either 1–2 wandering trails or 1–3 bomb splotches deep in the other team's half. Blotchy noise punches holes in the ink so it interleaves with the surrounding color, like the fight zone. Shares stay exact because of the quantile.
    - A short **spawn trail** right around each pad (cost-distance < 2.5, with a ragged edge) is always painted.
    - **Sputters at the unpainted border.** The key also gets fine jitter and grain, so the edge between paint and unpainted floor is ragged like the front line. A preliminary quantile estimates where that border will be, and 14–25 small splats with droplets (radius 0.35–0.9 cells) are stamped just inside the unpainted side, near spawns. Stamped pixels are forced painted, and the final quantile still hits the target share exactly. They're controlled by `Splatter`.
    - The cut-off is chosen as a **quantile**, so the unpainted share lands on a value picked at random in `[UnpaintedMin, UnpaintedMax]`.
@@ -377,6 +378,7 @@ Streaks, accuracy and the leaderboard can be computed from `votes` joined with `
       "Splatter": true,         // splats in the fight zone + sputters at the unpainted border near spawns
       "DiligentSpawnChance": 0.3, // per round: chance both teams painted its own spawn area diligently
       "SpawnNeglectVariance": 0.6, // each team's spawn neglect is scaled by a random factor in [1-v, 1+v]
+      "StrayInkChance": 0.4,    // per team and round: a trail or bomb splotches deep in the other team's half
       "PixelsPerCell": 16,      // mask and render resolution
       "CornerRadius": 0.75,     // outer corners of the outline, in cells, like CSS border-radius (0 = sharp, < 1)
       "InnerCornerRadius": 0.5  // curve filling inner corners, in cells (0 = sharp, < 1)

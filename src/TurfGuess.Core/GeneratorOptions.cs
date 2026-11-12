@@ -25,6 +25,7 @@ public sealed class GeneratorOptions
         if (Paint.PixelsPerCell is < 2 or > 64) errors.Add("Paint.PixelsPerCell must be in [2, 64].");
         if (Paint.DiligentSpawnChance is < 0 or > 1) errors.Add("Paint.DiligentSpawnChance must be in [0, 1].");
         if (Paint.SpawnNeglectVariance is < 0 or > 1) errors.Add("Paint.SpawnNeglectVariance must be in [0, 1].");
+        if (Paint.StrayInkChance is < 0 or > 1) errors.Add("Paint.StrayInkChance must be in [0, 1].");
         if (Paint.CornerRadius is < 0 or >= 1) errors.Add("Paint.CornerRadius must be in [0, 1).");
         if (Paint.InnerCornerRadius is < 0 or >= 1) errors.Add("Paint.InnerCornerRadius must be in [0, 1).");
 
@@ -75,6 +76,12 @@ public sealed class PaintOptions
     /// multiplied by a random factor in [1 − v, 1 + v]. 0 = both spawns equally bare.
     /// </summary>
     public double SpawnNeglectVariance { get; set; } = 0.6;
+
+    /// <summary>
+    /// Chance, per team and round, of stray ink deep in the other team's territory: either a trail
+    /// (a player running through) or some splotches (bombs). The two teams roll independently.
+    /// </summary>
+    public double StrayInkChance { get; set; } = 0.4;
 
     /// <summary>Mask and render resolution.</summary>
     public int PixelsPerCell { get; set; } = 16;

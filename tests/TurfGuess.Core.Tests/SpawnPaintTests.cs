@@ -113,6 +113,34 @@ public class SpawnPaintTests
     }
 
     [Fact]
+    public void Stray_ink_keeps_targets_exact_and_changes_the_paint()
+    {
+        int differing = 0;
+        for (ulong seed = 1; seed <= 8; seed++)
+        {
+            var off = Options(0);
+            off.Paint.StrayInkChance = 0;
+            var on = Options(0);
+            on.Paint.StrayInkChance = 1;
+            var a = RoundGenerator.Generate(seed, off);
+            var b = RoundGenerator.Generate(seed, on);
+            Assert.InRange(Math.Abs(b.Score.WinnerShare - b.TargetWinnerShare), 0, 1.0 / b.Score.PaintedPixels);
+            for (int y = 0; y < a.Paint.Height; y++)
+                for (int x = 0; x < a.Paint.Width; x++)
+                    if (a.Paint[x, y] != b.Paint[x, y]) { differing++; y = a.Paint.Height; break; }
+        }
+        Assert.True(differing > 0, "stray ink should change at least some rounds");
+    }
+
+    [Fact]
+    public void Invalid_stray_chance_is_rejected()
+    {
+        var o = Options(0);
+        o.Paint.StrayInkChance = -0.1;
+        Assert.Throws<ArgumentException>(() => RoundGenerator.Generate(1, o));
+    }
+
+    [Fact]
     public void Invalid_chance_is_rejected() =>
         Assert.Throws<ArgumentException>(() => RoundGenerator.Generate(1, Options(1.5)));
 }

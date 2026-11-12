@@ -52,6 +52,9 @@ public static class PaintSimulator
     // Splat stamps.
     private const double SplatStrength = 8.0;
     private const double SplatCandidateBand = 0.5;
+    private const double StrayBreakupFrequency = 0.6; // per cell, blotch size of the holes in stray ink
+    private const double StrayBreakupCut = 0.15;      // noise above this leaves a hole (higher = more solid)
+    private const double StrayMinDepth = 0.6;       // stray ink starts at least this far past the front, in the other team's half
 
     public static PaintResult? Paint(GameMap map, PaintOptions options, Side winner, double winnerShare, double unpaintedShare, ulong seed)
     {
@@ -224,6 +227,9 @@ public static class PaintSimulator
         if (options.Splatter)
             ApplySplats(new Rng(Rng.Derive(seed, 5)), score, isPainted, floorPixels, pixelToFloor, pw, ph, p, front);
 
+        if (options.StrayInkChance > 0)
+            ApplyStrayInk(new Rng(Rng.Derive(seed, 11)), new GradientNoise(Rng.Derive(seed, 12)), options.StrayInkChance, score, isPainted, floorPixels, pixelToFloor, pw, ph, p, front);
+
         // 6. Quantile threshold: exactly nLeft painted pixels go to the left team.
         var keys = new float[nPainted];
         var idx = new int[nPainted];
@@ -376,6 +382,80 @@ public static class PaintSimulator
                 if (isPainted[fi]) score[fi] = splatValue;
             });
         }
+    }
+
+    /// <summary>
+    /// Stray ink deep in the other team's territory: a trail (a player running through) or splotches
+    /// (bombs). Each team rolls independently, so either, both or neither may have some. Stamped
+    /// pixels are forced to that team's side; the final quantile keeps the shares exact.
+    /// </summary>
+    private static void ApplyStrayInk(Rng rng, GradientNoise breakup, double chance, float[] score, bool[] isPainted, List<int> floorPixels,
+        int[] pixelToFloor, int pw, int ph, int p, float front)
+    {
+        foreach (var side in new[] { Side.Left, Side.Right })
+        {
+            if (!rng.Chance(chance)) continue;
+
+            // Positive score = left, so left ink goes where the score is far below the front.
+            double sign = side == Side.Left ? 1 : -1;
+            float value = (float)(front + sign * SplatStrength);
+            // Blotchy noise punches holes in the ink, so it interleaves with the surrounding color
+            // like the fight zone instead of being a solid stamp.
+            Action<int> paint = fi =>
+            {
+                if (!isPainted[fi]) return;
+                int pi = floorPixels[fi];
+                double gx = (pi % pw + 0.5) / p, gy = (pi / pw + 0.5) / p;
+                if (breakup.Fbm(gx * StrayBreakupFrequency, gy * StrayBreakupFrequency, 3) > StrayBreakupCut) return;
+                score[fi] = value;
+            };
+
+            bool trail = rng.Chance(0.5);
+            int count = trail ? rng.Next(1, 3) : rng.Next(1, 4);
+            for (int n = 0; n < count; n++)
+            {
+                int start = -1;
+                for (int t = 0; t < 120; t++)
+                {
+                    int i = rng.Next(0, floorPixels.Count);
+                    if (isPainted[i] && (front - score[i]) * sign > StrayMinDepth)
+                    {
+                        start = floorPixels[i];
+                        break;
+                    }
+                }
+                if (start < 0) continue;
+                double x = start % pw, y = start / pw;
+
+                if (!trail)
+                {
+                    StampSplat(rng, x, y, rng.Range(0.9, 1.8) * p, 4, 9, pw, ph, pixelToFloor, paint);
+                    continue;
+                }
+
+                // A wandering line of overlapping blobs; it turns away from walls and the void.
+                double heading = rng.Range(0, 2 * Math.PI);
+                double width = rng.Range(0.55, 0.85) * p;
+                int steps = (int)(rng.Range(6, 14) * p / (0.3 * p));
+                for (int s = 0; s < steps; s++)
+                {
+                    heading += rng.Range(-0.35, 0.35);
+                    double nx = x + Math.Cos(heading) * 0.3 * p, ny = y + Math.Sin(heading) * 0.3 * p;
+                    for (int tries = 0; tries < 8 && !IsFloor(nx, ny); tries++)
+                    {
+                        heading += rng.Range(0.6, 1.4) * (rng.Chance(0.5) ? 1 : -1);
+                        nx = x + Math.Cos(heading) * 0.3 * p;
+                        ny = y + Math.Sin(heading) * 0.3 * p;
+                    }
+                    if (!IsFloor(nx, ny)) break;
+                    x = nx; y = ny;
+                    StampSplat(rng, x, y, width, 0, 1, pw, ph, pixelToFloor, paint);
+                }
+            }
+        }
+
+        bool IsFloor(double fx, double fy) =>
+            fx >= 0 && fy >= 0 && fx < pw && fy < ph && pixelToFloor[(int)fy * pw + (int)fx] >= 0;
     }
 
     /// <summary>

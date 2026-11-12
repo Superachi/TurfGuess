@@ -337,6 +337,7 @@ All options are mutable classes, so the bot can bind them from `appsettings.json
 | `Splatter` | true | | Splats in the fight zone and sputters at the unpainted border near spawns |
 | `DiligentSpawnChance` | 0.3 | 0–1 | Per round: chance both teams painted their own spawn area diligently (otherwise neither did) |
 | `SpawnNeglectVariance` | 0.6 | 0–1 | Each team's spawn neglect `n` is multiplied by its own random factor in `[1 − v, 1 + v]`, independent of the winner, so the spawns can be very differently bare |
+| `StrayInkChance` | 0.4 | 0–1 | Per team and round: chance of a trail or bomb splotches deep in the other team's half, broken up by noise (0 = off) |
 | `PixelsPerCell` | 16 | 2–64 | Mask and image resolution |
 | `CornerRadius` | 0.75 | 0–<1 | Outer corner radius, in cells |
 | `InnerCornerRadius` | 0.5 | 0–<1 | Inner corner radius, in cells |

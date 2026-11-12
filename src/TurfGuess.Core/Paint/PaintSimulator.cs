@@ -190,12 +190,29 @@ public static class PaintSimulator
         var jitter = new GradientNoise(Rng.Derive(seed, 3));
         var grain = new GradientNoise(Rng.Derive(seed, 4));
         var score = new float[nFloor];
+
+        // Tilt: a gentle slope along y turns the front from vertical to a random angle. Near the
+        // middle the log-ratio changes by about 2/(D+1) per cell (D = distance to the middle), so
+        // a slope of tan(angle) times that moves the front sideways by tan(angle) per cell of y.
+        double tilt = 0, tiltCenterY = ph / (2.0 * p);
+        if (options.FrontTiltMaxDegrees > 0)
+        {
+            double angle = new Rng(Rng.Derive(seed, 13)).Range(-options.FrontTiltMaxDegrees, options.FrontTiltMaxDegrees) * Math.PI / 180;
+            double sum = 0; int n = 0;
+            for (int i = 0; i < nFloor; i++)
+            {
+                if (Math.Abs(Math.Log(dr[i] + 1.0) - Math.Log(dl[i] + 1.0)) < 0.05) { sum += dl[i]; n++; }
+            }
+            double mid = n > 0 ? sum / n : maxMin;
+            tilt = Math.Tan(angle) * 2.0 / (mid + 1.0);
+        }
+
         for (int i = 0; i < nFloor; i++)
         {
             if (!isPainted[i]) continue;
             int pi = floorPixels[i];
             double gx = (pi % pw + 0.5) / p, gy = (pi / pw + 0.5) / p;
-            double s = Math.Log(dr[i] + 1.0) - Math.Log(dl[i] + 1.0)
+            double s = Math.Log(dr[i] + 1.0) - Math.Log(dl[i] + 1.0) + tilt * (gy - tiltCenterY)
                 + JitterAmplitude * jitter.Fbm(gx * JitterFrequency, gy * JitterFrequency, 3)
                 + GrainAmplitude * grain.Sample(gx * GrainFrequency, gy * GrainFrequency);
             score[i] = (float)s;

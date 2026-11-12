@@ -26,6 +26,7 @@ public sealed class GeneratorOptions
         if (Paint.DiligentSpawnChance is < 0 or > 1) errors.Add("Paint.DiligentSpawnChance must be in [0, 1].");
         if (Paint.SpawnNeglectVariance is < 0 or > 1) errors.Add("Paint.SpawnNeglectVariance must be in [0, 1].");
         if (Paint.StrayInkChance is < 0 or > 1) errors.Add("Paint.StrayInkChance must be in [0, 1].");
+        if (Paint.FrontTiltMaxDegrees is < 0 or > 60) errors.Add("Paint.FrontTiltMaxDegrees must be in [0, 60].");
         if (Paint.CornerRadius is < 0 or >= 1) errors.Add("Paint.CornerRadius must be in [0, 1).");
         if (Paint.InnerCornerRadius is < 0 or >= 1) errors.Add("Paint.InnerCornerRadius must be in [0, 1).");
 
@@ -82,6 +83,12 @@ public sealed class PaintOptions
     /// (a player running through) or some splotches (bombs). The two teams roll independently.
     /// </summary>
     public double StrayInkChance { get; set; } = 0.4;
+
+    /// <summary>
+    /// Largest tilt of the front line away from vertical, in degrees. Each round picks an angle in
+    /// [−max, +max]. 0 = always vertical.
+    /// </summary>
+    public double FrontTiltMaxDegrees { get; set; } = 20;
 
     /// <summary>Mask and render resolution.</summary>
     public int PixelsPerCell { get; set; } = 16;

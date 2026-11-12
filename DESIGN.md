@@ -227,8 +227,8 @@ Paint should *flow* from each spawn and wrap around obstacles, not just split th
 
 - Upscale the grid (e.g. 16 px/cell → 1536×864) and render with SkiaSharp.
 - Layers, bottom to top:
-  1. Background (void): flat dark grey (`#282A30`), no texture.
-  2. Floor: flat neutral gray. **No grid lines**: the cell grid shapes the map but isn't drawn.
+  1. Background (void): flat dark grey (`#282A30`), no texture. The arena has a thin outline (a quarter of a cell wide) in the unpainted floor color, drawn on the background just outside the edge (`RenderStyle.Outline`: `Outside` by default, `Inside` or `None`).
+  2. Floor: flat neutral gray. Only the unpainted floor gets a subtle **checkerboard** (squares half a cell wide, alternate squares slightly darker, `FloorCheckerShade`), so bare patches read as texture against the smooth paint. The cell grid itself isn't drawn.
   3. Paint: drawn in one of three **ink styles** (`RenderStyle.Ink`):
      - **Flat**: one solid color per team, for a minimalist look.
      - **Marbled** (default): an oil-slick look. Domain-warped noise (noise sampled at coordinates pushed around by more noise, twice) is folded through a sine into flowing, swirled bands. The bands swing between the warm and cool hue-shifted tones of the team color (up to 15° of hue) at nearly constant lightness. For yellow and green base colors (OKLCh hue 90°–150°, fading out by 65° and 175°), the hue shift is reduced to 35%, because those colors turn muddy olive when shifted. Glossy streaks along the band crests are supported but switched off.
@@ -236,7 +236,7 @@ Paint should *flow* from each spawn and wrap around obstacles, not just split th
      - Each pixel gets a *tone* from broad, smooth noise swells plus a faint bump map lit from the top-left.
      - Tone is applied in **OKLCh** (a perceptual color space). Lights get slightly lighter and drift **warm, toward yellow**; shadows get slightly darker, a little richer and drift **cool, toward blue**, by up to 20° of hue. Pink goes rose in the lights and magenta-purple in the shadows; green goes from yellow-green to bluish green.
      - Borders between colors sit in cool shadow, which outlines each region, plus soft gloss highlights on the bumps that face the light, which make the ink look wet.
-  4. Walls and obstacles: raised look (a lighter top face plus a drop shadow).
+  4. Walls and obstacles: raised look (a lighter top face plus a drop shadow), with diagonal hatching on the top face in the same style as the spawn zones (`WallHatchShade`).
   5. Spawn pads in team colors.
   6. Optional: round number and game name in a corner.
 - The renderer receives the final paint mask from the paint step (section 4.2, step 7) at the same resolution and draws it. It never counts anything itself.
@@ -246,16 +246,25 @@ Paint should *flow* from each spawn and wrap around obstacles, not just split th
 - Later: an animated GIF of a counting bar filling up, for the suspense.
 
 ### Colors
-- **Every round picks a color pair** from a list, deterministically from its seed. Which color goes to the left team is also picked from the seed. Each team's name is its color name ("Pink vs Green"), and each color has an emoji for its vote button (🩷 💚 💙 🩵 🧡 💜 💛 ❤️).
-- **Built-in pairs:** three hand-picked regular-battle ink pairs from the Inkipedia ink gallery. The other 15 regular-battle pairs looked too garish and were dropped:
+- **Every round picks a color pair** from a list, deterministically from its seed. Which color goes to the left team is also picked from the seed. Each team's name is its color name ("Pink vs Green"), and each color has an emoji for its vote button (🩷 💚 💙 🩵 🧡 💜 💛 ❤️ 🩶 🖤 🤍).
+- **Built-in pairs:** twelve pairs. The first three are hand-picked regular-battle ink pairs from the Inkipedia ink gallery (the other 15 regular-battle pairs looked too garish and were dropped), tuned by eye. The rest are custom combos reviewed in the Preview app:
 
   | Pair | Colors |
   |---|---|
-  | Pink vs Green | `#E0559A` / `#2E7D32` (adjusted: pink brighter, green darker than the wiki's `#C83D79` / `#409D3B`) |
+  | Pink vs Green | `#E0559A` / `#1E9A52` |
   | Orange vs Blue | `#DE6624` / `#343BC4` |
-  | Yellow vs Blue | `#D0BE08` / `#3A0CCD` |
+  | Yellow vs Blue | `#D4AE0A` / `#343BC4` |
+  | Purple vs Sky Blue | `#8E3CC4` / `#17A2F5` |
+  | Blue Purple vs Orange | `#6C3FD1` / `#DE6624` |
+  | Lime Green vs Purple | `#62C024` / `#8E3CC4` |
+  | Silver vs Royal Blue | `#D2D7E0` / `#5A7FEA` |
+  | Silver vs Gold | `#D2D7E0` / `#D4AF37` |
+  | Blue vs Pink | `#343BC4` / `#E0559A` |
+  | Scarlet vs Blue | `#E0282E` / `#343BC4` |
+  | Black vs White | `#1C1C22` / `#F5F5F5` |
+  | Dark Green vs Orange | `#1C5B38` / `#DE6624` |
 
-  More pairs are being chosen from established palettes. The candidates are reviewed with `--pairs --pairs-file` in the Preview app.
+  Candidate pairs are reviewed with `--pairs` (or `--pairs --pairs-file`) in the Preview app.
 - The list can be replaced in config (`ColorPairs`). Config validation checks that the two colors in each pair differ enough in lightness and hue, and that their names and emoji differ.
 - The pair picked for a round is **stored with the round** (section 6), so a config change never changes the colors of a round that's already posted.
 

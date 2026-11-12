@@ -20,6 +20,8 @@ public static class MapRenderer
     private static readonly Rgb WallSide = new(220, 224, 232);
     private static readonly Rgb WallDark = new(140, 144, 156);
     private static readonly Rgb WallDarkSide = new(160, 164, 175);
+    private const double FloorCheckerShade = -9;    // darker checker squares on unpainted floor (negative = darker)
+    private const double WallHatchShade = 0.86;     // darkness of the alternate hatch stripe on wall tops
     private static readonly SKColor BannerColor = new(28, 29, 34);
 
     /// <summary>The image posted with a new round.</summary>
@@ -97,7 +99,9 @@ public static class MapRenderer
                         break;
 
                     case PixelKind.Unpainted:
-                        c = FloorColor;
+                        // Checkerboard on the bare floor only (squares are half a cell); painted areas stay smooth.
+                        int half = Math.Max(1, p / 2);
+                        c = ((x / half) + (y / half)) % 2 == 0 ? FloorColor : FloorColor.Add(FloorCheckerShade);
                         break;
 
                     case PixelKind.Left:
@@ -128,6 +132,12 @@ public static class MapRenderer
                         else if (lx < bevel && !IsWall(cells, cx - 1, cy)) c = WallSide;
                         else if (ly >= p - bevel && !IsWall(cells, cx, cy + 1)) c = WallDark;
                         else if (lx >= p - bevel && !IsWall(cells, cx + 1, cy)) c = WallDarkSide;
+                        else
+                        {
+                            // Diagonal hatching on the top face, like the spawn zones.
+                            bool wallStripe = ((x + y) / Math.Max(2, p / 2)) % 2 == 0;
+                            if (!wallStripe) c = WallTop.Scale(WallHatchShade);
+                        }
                         break;
                     }
                 }
@@ -143,6 +153,9 @@ public static class MapRenderer
             }
         }
 
+        if (style.Outline != ArenaOutline.None)
+            ApplyOutline(pixels, mask, w, h, Math.Max(2, p / 4), style.Outline);
+
         var bitmap = new SKBitmap(new SKImageInfo(w, h + extraHeight, SKColorType.Rgba8888, SKAlphaType.Opaque));
         IntPtr dst = bitmap.GetPixels();
         int rowBytes = bitmap.RowBytes;
@@ -157,6 +170,42 @@ public static class MapRenderer
         }
 
         return bitmap;
+    }
+
+    /// <summary>
+    /// Outlines the arena in the unpainted floor color.
+    /// Outside: void pixels within <paramref name="width"/> of the arena are filled.
+    /// Inside: arena pixels within <paramref name="width"/> of the void are overwritten.
+    /// </summary>
+    private static void ApplyOutline(int[] pixels, PixelKind[] mask, int w, int h, int width, ArenaOutline mode)
+    {
+        int r2 = width * width;
+        int outline = FloorColor.ToRgba();
+
+        for (int y = 0; y < h; y++)
+        {
+            for (int x = 0; x < w; x++)
+            {
+                int i = y * w + x;
+                bool isVoid = mask[i] == PixelKind.Void;
+                if (mode == ArenaOutline.Outside && !isVoid) continue;
+                if (mode == ArenaOutline.Inside && isVoid) continue;
+
+                // Outside looks for an arena pixel nearby, inside for a void pixel (or the image edge).
+                bool near = false;
+                for (int dy = -width; dy <= width && !near; dy++)
+                {
+                    for (int dx = -width; dx <= width; dx++)
+                    {
+                        if (dx * dx + dy * dy > r2) continue;
+                        int nx = x + dx, ny = y + dy;
+                        bool nVoid = nx < 0 || ny < 0 || nx >= w || ny >= h || mask[ny * w + nx] == PixelKind.Void;
+                        if (mode == ArenaOutline.Outside ? !nVoid : nVoid) { near = true; break; }
+                    }
+                }
+                if (near) pixels[i] = outline;
+            }
+        }
     }
 
     private static bool IsWall(Grid<CellType> cells, int x, int y) => cells.InBounds(x, y) && cells[x, y] == CellType.Wall;

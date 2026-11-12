@@ -11,15 +11,24 @@ public sealed class ColorPair
 
 /// <summary>
 /// The built-in color pairs and the per-round pick (DESIGN.md §5, Colors).
-/// Defaults: three hand-picked regular-battle ink pairs from the Inkipedia ink gallery.
+/// Defaults: three hand-picked regular-battle ink pairs from the Inkipedia ink gallery, plus nine custom combos.
 /// </summary>
 public static class ColorPairs
 {
     public static IReadOnlyList<ColorPair> Default { get; } =
     [
-        Pair("Pink", "#E0559A", "🩷", "Green", "#2E7D32", "💚"),
+        Pair("Pink", "#E0559A", "🩷", "Green", "#1E9A52", "💚"),
         Pair("Orange", "#DE6624", "🧡", "Blue", "#343BC4", "💙"),
-        Pair("Yellow", "#D0BE08", "💛", "Blue", "#3A0CCD", "💙"),
+        Pair("Yellow", "#D4AE0A", "💛", "Blue", "#343BC4", "💙"),
+        Pair("Purple", "#8E3CC4", "💜", "Sky Blue", "#17A2F5", "🩵"),
+        Pair("Blue Purple", "#6C3FD1", "💜", "Orange", "#DE6624", "🧡"),
+        Pair("Lime Green", "#62C024", "💚", "Purple", "#8E3CC4", "💜"),
+        Pair("Silver", "#D2D7E0", "🩶", "Royal Blue", "#5A7FEA", "💙"),
+        Pair("Silver", "#D2D7E0", "🩶", "Gold", "#D4AF37", "💛"),
+        Pair("Blue", "#343BC4", "💙", "Pink", "#E0559A", "🩷"),
+        Pair("Scarlet", "#E0282E", "❤️", "Blue", "#343BC4", "💙"),
+        Pair("Black", "#1C1C22", "🖤", "White", "#F5F5F5", "🤍"),
+        Pair("Dark Green", "#1C5B38", "💚", "Orange", "#DE6624", "🧡"),
     ];
 
     /// <summary>

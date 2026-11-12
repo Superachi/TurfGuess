@@ -87,6 +87,32 @@ public class SpawnPaintTests
     }
 
     [Fact]
+    public void Variance_makes_the_two_spawns_differ_more()
+    {
+        static double MeanGap(double variance)
+        {
+            double gap = 0;
+            for (ulong seed = 1; seed <= 12; seed++)
+            {
+                var o = Options(0);
+                o.Paint.SpawnNeglectVariance = variance;
+                var r = RoundGenerator.Generate(seed, o);
+                gap += Math.Abs(UnpaintedNear(r, Side.Left, 12) - UnpaintedNear(r, Side.Right, 12));
+            }
+            return gap;
+        }
+        Assert.True(MeanGap(0.9) > MeanGap(0), "variance should widen the left/right gap");
+    }
+
+    [Fact]
+    public void Invalid_variance_is_rejected()
+    {
+        var o = Options(0);
+        o.Paint.SpawnNeglectVariance = 1.5;
+        Assert.Throws<ArgumentException>(() => RoundGenerator.Generate(1, o));
+    }
+
+    [Fact]
     public void Invalid_chance_is_rejected() =>
         Assert.Throws<ArgumentException>(() => RoundGenerator.Generate(1, Options(1.5)));
 }

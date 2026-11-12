@@ -24,6 +24,7 @@ public sealed class GeneratorOptions
         if (Paint.UnpaintedMin < 0 || Paint.UnpaintedMax >= 0.5 || Paint.UnpaintedMin > Paint.UnpaintedMax) errors.Add("Paint.UnpaintedMin/Max must satisfy 0 <= min <= max < 0.5.");
         if (Paint.PixelsPerCell is < 2 or > 64) errors.Add("Paint.PixelsPerCell must be in [2, 64].");
         if (Paint.DiligentSpawnChance is < 0 or > 1) errors.Add("Paint.DiligentSpawnChance must be in [0, 1].");
+        if (Paint.SpawnNeglectVariance is < 0 or > 1) errors.Add("Paint.SpawnNeglectVariance must be in [0, 1].");
         if (Paint.CornerRadius is < 0 or >= 1) errors.Add("Paint.CornerRadius must be in [0, 1).");
         if (Paint.InnerCornerRadius is < 0 or >= 1) errors.Add("Paint.InnerCornerRadius must be in [0, 1).");
 
@@ -68,6 +69,12 @@ public sealed class PaintOptions
     /// Diligent teams leave far less unpainted floor near its spawn.
     /// </summary>
     public double DiligentSpawnChance { get; set; } = 0.3;
+
+    /// <summary>
+    /// How much each team's spawn neglect varies independently, as a fraction: each team's neglect is
+    /// multiplied by a random factor in [1 − v, 1 + v]. 0 = both spawns equally bare.
+    /// </summary>
+    public double SpawnNeglectVariance { get; set; } = 0.6;
 
     /// <summary>Mask and render resolution.</summary>
     public int PixelsPerCell { get; set; } = 16;

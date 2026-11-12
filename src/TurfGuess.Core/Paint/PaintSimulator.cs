@@ -35,6 +35,9 @@ public static class PaintSimulator
     private const double SpawnSplatBand = 0.25;        // how far into the unpainted area (in units of the key)
     private const double SpawnSplatMinCloseness = 0.4; // only near a spawn, not in far corners
 
+    // Extra score (in the fight band) for the team that neglected its spawn more: it painted the middle.
+    private const double MiddleEdge = 0.15;
+
     // Fight zone: around the front line both colors interleave in blotches.
     private const double FightFrequency = 0.35;  // per cell
     private const double FightAmplitude = 0.9;
@@ -120,8 +123,11 @@ public static class PaintSimulator
         // so the winner can't be read off which side has the barer spawn.
         bool diligentLeft = diligence.Chance(options.DiligentSpawnChance);
         bool diligentRight = diligentLeft;
-        double neglectLeft = diligentLeft ? DiligentNeglect : SpawnNeglect;
-        double neglectRight = diligentRight ? DiligentNeglect : SpawnNeglect;
+        // On top of that, each team's neglect is scaled by its own random factor, independent of who
+        // wins, so the two spawns can be very differently bare and players have to judge each one.
+        double variance = options.SpawnNeglectVariance;
+        double neglectLeft = (diligentLeft ? DiligentNeglect : SpawnNeglect) * diligence.Range(1 - variance, 1 + variance);
+        double neglectRight = (diligentRight ? DiligentNeglect : SpawnNeglect) * diligence.Range(1 - variance, 1 + variance);
 
         var holes = new GradientNoise(Rng.Derive(seed, 2));
         var borderJitter = new GradientNoise(Rng.Derive(seed, 8));
@@ -200,6 +206,10 @@ public static class PaintSimulator
         // 5b. Fight zone. Find where the front line will roughly be for this margin, then add
         //     blotchy noise that fades out away from it, so both colors interleave there.
         float front = Threshold(score, isPainted, nLeft);
+        //     The team that neglected its spawn more rushed forward, so it gets a slight edge in this band
+        //     (positive score = left). The quantile below keeps the shares exact; the edge only moves
+        //     paint around.
+        double middleEdge = MiddleEdge * Math.Clamp(neglectLeft - neglectRight, -1, 1);
         var fight = new GradientNoise(Rng.Derive(seed, 6));
         for (int i = 0; i < nFloor; i++)
         {
@@ -208,7 +218,7 @@ public static class PaintSimulator
             if (z is > 4 or < -4) continue;
             int pi = floorPixels[i];
             double gx = (pi % pw + 0.5) / p, gy = (pi / pw + 0.5) / p;
-            score[i] += (float)(FightAmplitude * Math.Exp(-z * z) * fight.Fbm(gx * FightFrequency, gy * FightFrequency, 3));
+            score[i] += (float)(Math.Exp(-z * z) * (FightAmplitude * fight.Fbm(gx * FightFrequency, gy * FightFrequency, 3) + middleEdge));
         }
 
         if (options.Splatter)

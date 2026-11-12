@@ -324,6 +324,7 @@ dotnet run --project src\TurfGuess.Preview -c Release -- --count 6 --seed 100
 | Option | Default | What it does |
 |---|---|---|
 | `--ink <style>` | `Marbled` | How the paint is drawn: `Marbled` (swirled, oil-slick bands), `Flat` (one solid color per team) or `Shaded` (lit, glossy ink) |
+| `--outline <mode>` | `Outside` | Grey outline around the arena, in the unpainted floor color: `Outside` (on the background, just beyond the edge), `Inside` (over the outermost pixels) or `None` |
 | `--radius <cells>` | `0.75` | How rounded the **outer** corners of the arena are. `0` = sharp, must be below `1` |
 | `--inner-radius <cells>` | `0.5` | How rounded the **inner** corners are. `0` = sharp, must be below `1` |
 | `--ppc <n>` | `16` | Pixels per map cell. Changes the image size (16 → 1536×864) |

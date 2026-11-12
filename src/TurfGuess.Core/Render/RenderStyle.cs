@@ -38,7 +38,7 @@ public sealed class RenderStyle
 {
     public string GameName { get; set; } = "Turf Guess";
     public InkStyle Ink { get; set; } = InkStyle.Marbled;
-    public ArenaOutline Outline { get; set; } = ArenaOutline.None;
+    public ArenaOutline Outline { get; set; } = ArenaOutline.Outside;
     public TeamStyle Left { get; set; } = new() { Name = "Orange", Color = "#CF581B", Emoji = "🧡" };
     public TeamStyle Right { get; set; } = new() { Name = "Blue", Color = "#141494", Emoji = "💙" };
 }

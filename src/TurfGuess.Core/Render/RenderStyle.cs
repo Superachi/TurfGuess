@@ -23,7 +23,7 @@ public enum InkStyle
 }
 
 /// <summary>Visual settings for one round: which team is which color.</summary>
-/// <summary>Optional outline around the arena, drawn in the inverted color of the pixels it sits next to.</summary>
+/// <summary>Optional outline around the arena, drawn in the unpainted floor color.</summary>
 public enum ArenaOutline
 {
     /// <summary>No outline.</summary>

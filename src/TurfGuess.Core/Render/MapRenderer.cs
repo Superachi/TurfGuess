@@ -173,15 +173,14 @@ public static class MapRenderer
     }
 
     /// <summary>
-    /// Outlines the arena with the inverted color of the pixels next to the edge.
-    /// Outside: void pixels within <paramref name="width"/> of the arena take the inverted color of the nearest arena pixel.
-    /// Inside: arena pixels within <paramref name="width"/> of the void are inverted in place.
+    /// Outlines the arena in the unpainted floor color.
+    /// Outside: void pixels within <paramref name="width"/> of the arena are filled.
+    /// Inside: arena pixels within <paramref name="width"/> of the void are overwritten.
     /// </summary>
     private static void ApplyOutline(int[] pixels, PixelKind[] mask, int w, int h, int width, ArenaOutline mode)
     {
-        var src = (int[])pixels.Clone();
         int r2 = width * width;
-        const int Invert = 0x00FFFFFF;
+        int outline = FloorColor.ToRgba();
 
         for (int y = 0; y < h; y++)
         {
@@ -192,23 +191,19 @@ public static class MapRenderer
                 if (mode == ArenaOutline.Outside && !isVoid) continue;
                 if (mode == ArenaOutline.Inside && isVoid) continue;
 
-                int best = int.MaxValue, bestIndex = -1;
-                for (int dy = -width; dy <= width; dy++)
+                // Outside looks for an arena pixel nearby, inside for a void pixel (or the image edge).
+                bool near = false;
+                for (int dy = -width; dy <= width && !near; dy++)
                 {
                     for (int dx = -width; dx <= width; dx++)
                     {
-                        int d2 = dx * dx + dy * dy;
-                        if (d2 > r2 || d2 >= best) continue;
+                        if (dx * dx + dy * dy > r2) continue;
                         int nx = x + dx, ny = y + dy;
                         bool nVoid = nx < 0 || ny < 0 || nx >= w || ny >= h || mask[ny * w + nx] == PixelKind.Void;
-                        // Outside looks for the nearest arena pixel, inside for the nearest void.
-                        if (mode == ArenaOutline.Outside ? nVoid : !nVoid) continue;
-                        best = d2;
-                        bestIndex = ny * w + nx;
+                        if (mode == ArenaOutline.Outside ? !nVoid : nVoid) { near = true; break; }
                     }
                 }
-                if (bestIndex < 0) continue;
-                pixels[i] = (mode == ArenaOutline.Outside ? src[bestIndex] : src[i]) ^ Invert;
+                if (near) pixels[i] = outline;
             }
         }
     }

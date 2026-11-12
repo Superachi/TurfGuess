@@ -67,7 +67,9 @@ Each round runs from one round time to the next, which is normally 24 hours.
 
 The round message shows how hard the round is, e.g. *S-rank difficulty 🔥🔥🔥🔥*. The rank only says how close the two colors are, never which one is ahead.
 
-| Rank | Shown as | Winner's share of the painted floor |
+The ranks are five equal slices of the configured `Generator:Difficulty` range, so each rank comes up about one day in five whatever range you set. The table shows the default range (50.3–52.3%).
+
+| Rank | Shown as | Winner's share of the painted floor (default range) |
 |---|---|---|
 | **C** (easiest) | C-rank difficulty 🔥 | 51.9% or more |
 | **B** | B-rank difficulty 🔥🔥 | 51.5% – 51.9% |
@@ -75,7 +77,7 @@ The round message shows how hard the round is, e.g. *S-rank difficulty 🔥🔥�
 | **S** | S-rank difficulty 🔥🔥🔥🔥 | 50.7% – 51.1% |
 | **X** (hardest) | X-rank difficulty 🔥🔥🔥🔥🔥 | under 50.7% |
 
-With the default settings (50.3–52.3%), each rank comes up about one day in five. The bands are fixed, so if you change `Generator:Difficulty`, some ranks come up more often or not at all.
+With a different range the bands move with it. For example, with 50.05–51.0% each band is 0.19 points wide, and X is anything under 50.24%.
 
 ### The reveal
 

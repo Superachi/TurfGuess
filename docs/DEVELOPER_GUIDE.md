@@ -177,7 +177,7 @@ Radii are in cells and must be **below 1**. An opening with radius *r* removes f
 | `UnpaintedShare` | `U / floor` | Shown at the reveal |
 | `Winner` | `L > R ? Left : Right` | Ties are impossible because `MinWinnerShare > 50` |
 
-`Difficulty.RankFor(winnerShare)` (`Scoring/DifficultyRank.cs`) turns `WinnerShare` into a rank shown in the round message: X under 50.7%, S under 51.1%, A under 51.5%, B under 51.9%, otherwise C. The bands are fixed 0.4-point steps over the default 50.3–52.3% range, not derived from the configured range, so a rank always means the same split.
+`Difficulty.RankFor(winnerShare, range)` (`Scoring/DifficultyRank.cs`) turns `WinnerShare` into a rank shown in the round message. The configured `Difficulty` range `[MinWinnerShare, MaxWinnerShare]` is cut into five equal bands: X is the closest fifth, then S, A, B, and C is the widest fifth. Each rank therefore comes up about one round in five whatever the range is. With the default 50.3–52.3% range that is X under 50.7%, S under 51.1%, A under 51.5%, B under 51.9%, otherwise C. A range with min equal to max always ranks A.
 
 ### Stage 4: rendering (`Render/MapRenderer.cs`)
 

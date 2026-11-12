@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using TurfGuess.Bot.Data;
+using TurfGuess.Core;
 using TurfGuess.Core.Grid;
 using TurfGuess.Core.Scoring;
 
@@ -44,18 +45,18 @@ public static class MessageText
     /// or null to leave the voter line out (Game:ShowVoteCount off). Only who voted, never what.
     /// </summary>
     public static string RoundDescription(RoundRecord round, IReadOnlyList<ulong>? voters, bool closed,
-        int maxListed = MaxListedVoters, int limit = EmbedDescriptionLimit)
+        int maxListed = MaxListedVoters, int limit = EmbedDescriptionLimit, DifficultyOptions? difficulty = null)
     {
         var sb = new StringBuilder();
         if (closed)
         {
             sb.Append("**Voting is closed.** The results are below.\n");
-            sb.Append(DifficultyLine(round));
+            sb.Append(DifficultyLine(round, difficulty));
         }
         else
         {
             sb.Append("Which team do you think painted more? Cast your vote!\n");
-            sb.Append(DifficultyLine(round)).Append('\n');
+            sb.Append(DifficultyLine(round, difficulty)).Append('\n');
             sb.Append($"Results <t:{round.RevealAt}:R> (<t:{round.RevealAt}:f>).");
         }
 
@@ -77,9 +78,9 @@ public static class MessageText
     /// How close the round is, as a rank from C (easiest) to X (hardest). It says nothing about
     /// who won, so it's shown while voting is open.
     /// </summary>
-    public static string DifficultyLine(RoundRecord round)
+    public static string DifficultyLine(RoundRecord round, DifficultyOptions? difficulty = null)
     {
-        var rank = Difficulty.RankFor(round.WinnerShare);
+        var rank = Difficulty.RankFor(round.WinnerShare, difficulty ?? new DifficultyOptions());
         int flames = (int)rank + 1; // C = 1 … X = 5
         return $"{rank}-rank difficulty {string.Concat(Enumerable.Repeat("🔥", flames))}";
     }

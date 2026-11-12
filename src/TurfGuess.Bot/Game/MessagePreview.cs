@@ -60,7 +60,7 @@ public static partial class MessagePreview
 
         Section(sb, "1. Round message (posted at the round time)");
         Embed(sb, MessageText.RoundTitle(options.Game.Name, round.Id),
-            Show(MessageText.RoundDescription(round, options.Game.ShowVoteCount ? [] : null, closed: false)),
+            Show(MessageText.RoundDescription(round, options.Game.ShowVoteCount ? [] : null, closed: false, difficulty: options.Generator.Difficulty)),
             $"round_{round.Id}.png", MessageText.RoundFooter(round.Id));
         sb.AppendLine($"Buttons: {buttons(false)}");
         sb.AppendLine();
@@ -71,7 +71,7 @@ public static partial class MessagePreview
 
         Section(sb, "3. Round message, live voter list (edited at most every " +
                     $"{options.Discord.VoteCountInterval.TotalSeconds:0} s)");
-        sb.AppendLine(Show(MessageText.RoundDescription(round, voters, closed: false)));
+        sb.AppendLine(Show(MessageText.RoundDescription(round, voters, closed: false, difficulty: options.Generator.Difficulty)));
         sb.AppendLine();
 
         Section(sb, "4. Clicking after voting closed (only the clicker sees this)");
@@ -80,7 +80,7 @@ public static partial class MessagePreview
 
         Section(sb, "5. Round message after the reveal");
         Embed(sb, MessageText.RoundTitle(options.Game.Name, round.Id),
-            Show(MessageText.RoundDescription(round, options.Game.ShowVoteCount ? voters : null, closed: true)),
+            Show(MessageText.RoundDescription(round, options.Game.ShowVoteCount ? voters : null, closed: true, difficulty: options.Generator.Difficulty)),
             $"round_{round.Id}.png", MessageText.RoundFooter(round.Id));
         sb.AppendLine($"Buttons: {buttons(true)}");
         sb.AppendLine();

@@ -8,7 +8,7 @@ using TurfGuess.Core.Scoring;
 
 // Usage: dotnet run --project src/TurfGuess.Preview -- [--count 12] [--seed 42] [--out preview] [--ink Flat|Shaded|Marbled] [--outline None|Outside|Inside]
 //        [--ppc 16] [--symmetry Rotate|Mirror] [--no-reveal] [--columns 4] [--radius 0.75] [--inner-radius 0.5]
-//        [--neglect-variance 0.6] [--stray-ink 0.4] [--tilt 20]
+//        [--neglect-variance 0.6] [--stray-ink 0.4] [--tilt 20] [--min-share 50.3] [--max-share 52.3]
 //        dotnet run --project src/TurfGuess.Preview -- --pairs [--seed 42]
 //          [--pairs-file pairs.json] [--pairs-out name.png] [--pairs-full]
 //          renders one map in every color pair -> preview/color_pairs.png
@@ -27,6 +27,8 @@ options.Paint.InnerCornerRadius = args_.Double("inner-radius", options.Paint.Inn
 options.Paint.SpawnNeglectVariance = args_.Double("neglect-variance", options.Paint.SpawnNeglectVariance);
 options.Paint.StrayInkChance = args_.Double("stray-ink", options.Paint.StrayInkChance);
 options.Paint.FrontTiltMaxDegrees = args_.Double("tilt", options.Paint.FrontTiltMaxDegrees);
+options.Difficulty.MinWinnerShare = args_.Double("min-share", options.Difficulty.MinWinnerShare);
+options.Difficulty.MaxWinnerShare = args_.Double("max-share", options.Difficulty.MaxWinnerShare);
 var inkStyle = Enum.Parse<InkStyle>(args_.Str("ink", new RenderStyle().Ink.ToString()), ignoreCase: true);
 var outline = Enum.Parse<ArenaOutline>(args_.Str("outline", new RenderStyle().Outline.ToString()), ignoreCase: true);
 if (args_.Has("symmetry")) options.Map.Symmetry = Enum.Parse<SymmetryMode>(args_.Str("symmetry", "Rotate"), ignoreCase: true);
@@ -86,9 +88,9 @@ for (int i = 0; i < count; i++)
     var s = round.Score;
     var winnerName = s.Winner == Side.Left ? style.Left.Name : style.Right.Name;
     Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
-        $"{seed,6} {round.Attempts,3} {winnerName,-10} {round.TargetWinnerShare,7:P2} {s.WinnerShare,7:P2} {s.CoverageLeft,6:P1} {s.CoverageRight,6:P1} {s.UnpaintedShare,6:P1} {Diligent(round),3} {s.Rank(),4} {genMs,6}"));
+        $"{seed,6} {round.Attempts,3} {winnerName,-10} {round.TargetWinnerShare,7:P2} {s.WinnerShare,7:P2} {s.CoverageLeft,6:P1} {s.CoverageRight,6:P1} {s.UnpaintedShare,6:P1} {Diligent(round),3} {s.Rank(options.Difficulty),4} {genMs,6}"));
 
-    thumbs.Add((MapRenderer.RenderRound(round, style), $"#{seed}  {style.Left.Name} vs {style.Right.Name}: {winnerName} {s.WinnerShare:P1}, rank {s.Rank()}"));
+    thumbs.Add((MapRenderer.RenderRound(round, style), $"#{seed}  {style.Left.Name} vs {style.Right.Name}: {winnerName} {s.WinnerShare:P1}, rank {s.Rank(options.Difficulty)}"));
 }
 
 WriteContactSheet(thumbs, columns, Path.Combine(outDir, "contact_sheet.png"));

@@ -17,7 +17,7 @@ public static class ColorPairs
 {
     public static IReadOnlyList<ColorPair> Default { get; } =
     [
-        Pair("Pink", "#E0559A", "🩷", "Green", "#1E9A52", "💚"),
+        Pair("Pink", "#E0559A", "❤️", "Green", "#1E9A52", "💚"),
         Pair("Orange", "#DE6624", "🧡", "Blue", "#343BC4", "💙"),
         Pair("Yellow", "#D4AE0A", "💛", "Blue", "#343BC4", "💙"),
         Pair("Purple", "#8E3CC4", "💜", "Sky Blue", "#17A2F5", "🩵"),
@@ -25,7 +25,7 @@ public static class ColorPairs
         Pair("Lime Green", "#62C024", "💚", "Purple", "#8E3CC4", "💜"),
         Pair("Silver", "#D2D7E0", "🤍", "Royal Blue", "#5A7FEA", "💙"),
         Pair("Silver", "#D2D7E0", "🤍", "Gold", "#D4AF37", "💛"),
-        Pair("Blue", "#343BC4", "💙", "Pink", "#E0559A", "🩷"),
+        Pair("Blue", "#343BC4", "💙", "Pink", "#E0559A", "❤️"),
         Pair("Scarlet", "#E0282E", "❤️", "Blue", "#343BC4", "💙"),
         Pair("Black", "#1C1C22", "🖤", "White", "#F5F5F5", "🤍"),
         Pair("Dark Green", "#1C5B38", "💚", "Orange", "#DE6624", "🧡"),

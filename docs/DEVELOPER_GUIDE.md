@@ -341,6 +341,8 @@ All options are mutable classes, so the bot can bind them from `appsettings.json
 | `SpawnNeglectVariance` | 0.6 | 0–1 | Each team's spawn neglect `n` is multiplied by its own random factor in `[1 − v, 1 + v]`, independent of the winner, so the spawns can be very differently bare |
 | `StrayInkChance` | 0.4 | 0–1 | Per team and round: chance of a trail or bomb splotches deep in the other team's half, broken up by noise (0 = off) |
 | `RaidTrailsPerTeam` | 6 | 0–12 | Long, curving, broken-up trails each team runs through the other team's turf, starting on its own side of the front (0 = none) |
+| `ChaosIntensityMin` | 0.5 | 0–1 | Low end of the per-round chaos range. Chaos is swapped ink on both sides: noise-shaped blotches of each team's colour inside the other half (0 = none, 1 = a lot of the arena) |
+| `ChaosIntensityMax` | 0.9 | 0–1 | High end of the per-round chaos range; each round picks a value between min and max (higher blurs the front line) |
 | `InfiltratorChancePerTeam` | 0 | 0–1 | Per team and round: chance that a player sneaked past the front and painted part of the enemy base (thin approach trail ending in a blotchy patch near the enemy spawn) (0 = off) |
 | `InfiltratorExtraChance` | 0.3 | 0–1 | Chance that an infiltrating team sent a second sneak |
 | `FrontTiltMaxDegrees` | 20 | 0–60 | Largest tilt of the front line away from vertical; each round picks an angle in `[−max, +max]` (0 = vertical) |

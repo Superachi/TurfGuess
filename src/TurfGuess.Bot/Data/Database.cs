@@ -41,6 +41,17 @@ public sealed class Database
 
         // Upgrades for databases created by older versions.
         AddColumnIfMissing(c, "votes", "user_name", "TEXT NOT NULL DEFAULT ''");
+        AddColumnIfMissing(c, "rounds", "kind", "TEXT NOT NULL DEFAULT 'Ranked' CHECK (kind IN ('Ranked', 'Regular'))");
+        AddColumnIfMissing(c, "rounds", "show_votes", "INTEGER NOT NULL DEFAULT 0");
+        AddColumnIfMissing(c, "rounds", "started_by", "INTEGER NOT NULL DEFAULT 0");
+
+        // Displayed round count, separate for each kind. Existing rounds are numbered in id order within their kind.
+        AddColumnIfMissing(c, "rounds", "number", "INTEGER NOT NULL DEFAULT 0");
+        c.Execute("UPDATE rounds SET number = (SELECT COUNT(*) FROM rounds r2 WHERE r2.kind = rounds.kind AND r2.id <= rounds.id) WHERE number = 0;");
+
+        // At most one unfinished round per kind (the old index allowed one in total).
+        c.Execute("DROP INDEX IF EXISTS one_active_round;");
+        c.Execute("CREATE UNIQUE INDEX IF NOT EXISTS one_active_round_per_kind ON rounds (kind) WHERE status <> 'Done';");
     }
 
     private static void AddColumnIfMissing(SqliteConnection c, string table, string column, string definition)
@@ -75,9 +86,6 @@ public sealed class Database
             share_right       REAL    NOT NULL,
             unpainted         REAL    NOT NULL
         );
-
-        -- Every row in this partial index has the same key value, so at most one round is unfinished.
-        CREATE UNIQUE INDEX IF NOT EXISTS one_active_round ON rounds (status <> 'Done') WHERE status <> 'Done';
 
         CREATE TABLE IF NOT EXISTS votes (
             round_id  INTEGER NOT NULL REFERENCES rounds (id),

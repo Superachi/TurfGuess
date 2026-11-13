@@ -24,7 +24,7 @@ public sealed class RoundImages(BotOptions options, ILogger<RoundImages> logger)
     {
         System.IO.Directory.CreateDirectory(Directory);
         var style = StyleFor(round);
-        string caption = $"{options.Game.Name} · Round #{round.Id}";
+        string caption = $"{options.Game.Name} · {(round.Kind == RoundKind.Regular ? "Regular Battle" : "Round")} #{round.DisplayNumber}";
 
         string imagePath = Path.Combine(Directory, $"round_{round.Id}.png");
         string revealPath = Path.Combine(Directory, $"reveal_{round.Id}.png");

@@ -8,7 +8,7 @@ using TurfGuess.Core.Scoring;
 
 // Usage: dotnet run --project src/TurfGuess.Preview -- [--count 12] [--seed 42] [--out preview] [--ink Flat|Shaded|Marbled] [--outline None|Outside|Inside]
 //        [--ppc 16] [--symmetry Rotate|Mirror] [--no-reveal] [--blind] [--columns 4] [--radius 0.75] [--inner-radius 0.5]
-//        [--neglect-variance 0.6] [--stray-ink 0.4] [--tilt 20] [--raid-trails 4] [--infiltrators 0.5] [--min-share 50.3] [--max-share 52.3] [--no-reroll]
+//        [--neglect-variance 0.6] [--stray-ink 0.4] [--tilt 20] [--raid-trails 4] [--chaos-min 0.5] [--chaos-max 0.9] [--infiltrators 0.5] [--min-share 50.3] [--max-share 52.3] [--no-reroll]
 //        dotnet run --project src/TurfGuess.Preview -- --pairs [--seed 42]
 //          [--pairs-file pairs.json] [--pairs-out name.png] [--pairs-full]
 //          renders one map in every color pair -> preview/color_pairs.png
@@ -30,6 +30,8 @@ options.Paint.StrayInkChance = args_.Double("stray-ink", options.Paint.StrayInkC
 options.Paint.FrontTiltMaxDegrees = args_.Double("tilt", options.Paint.FrontTiltMaxDegrees);
 options.Paint.InfiltratorChancePerTeam = args_.Double("infiltrators", options.Paint.InfiltratorChancePerTeam);
 options.Paint.RaidTrailsPerTeam = args_.Int("raid-trails", options.Paint.RaidTrailsPerTeam);
+options.Paint.ChaosIntensityMin = args_.Double("chaos-min", options.Paint.ChaosIntensityMin);
+options.Paint.ChaosIntensityMax = args_.Double("chaos-max", options.Paint.ChaosIntensityMax);
 options.Difficulty.MinWinnerShare = args_.Double("min-share", options.Difficulty.MinWinnerShare);
 options.Difficulty.MaxWinnerShare = args_.Double("max-share", options.Difficulty.MaxWinnerShare);
 if (args_.Flag("no-reroll")) options.Difficulty.RerollsC = options.Difficulty.RerollsB = options.Difficulty.RerollsA = options.Difficulty.RerollsS = 0;

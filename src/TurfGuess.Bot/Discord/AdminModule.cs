@@ -49,7 +49,7 @@ public sealed class AdminModule(
         scheduler.Wake();
         await FollowupAsync(cancelled is null
             ? "There was no active round. A new one is posted straight away."
-            : $"Round #{cancelled.Id} is cancelled and its votes are dropped. A new round is posted straight away. Weekly scores are unchanged.",
+            : $"Round #{cancelled.DisplayNumber} is cancelled and its votes are dropped. A new round is posted straight away. Weekly scores are unchanged.",
             ephemeral: true);
     }
 
@@ -110,7 +110,7 @@ public sealed class AdminModule(
         }
 
         string text =
-            $"**Round #{round.Id}** · {round.Status}\n" +
+            $"**Round #{round.DisplayNumber}** · {round.Status}\n" +
             $"{round.LeftEmoji} {round.LeftName} vs {round.RightEmoji} {round.RightName}\n" +
             $"Reveal: <t:{round.RevealAt}:f> (<t:{round.RevealAt}:R>)\n" +
             $"Votes so far: {repo.CountVotes(round.Id)}";

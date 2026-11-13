@@ -237,7 +237,7 @@ Both commands only work in the game's channel.
 
 | Command | What it does |
 |---|---|
-| `/turf battle [show-votes:true]` | Starts a Regular Battle. With `show-votes`, the round message lists who voted for which team while it runs, and voters are told their vote is public. Fails with "already running" while another battle is open. |
+| `/turf battle [show-votes:true]` | Starts a Regular Battle. With `show-votes`, the round message lists who voted for which team while it runs, and voters are told their vote is public. Disabled (answers "already running") while another battle is open. If a battle message already exists from today, it is reset into the new battle instead of posting another message, and the caller gets a private note pointing to it; `show-votes` applies to the new battle. |
 | `/turf battle-reveal` | Reveals the running Regular Battle now. Only the player who started it, or an administrator, can do this. |
 
 The reveal lists who guessed right and wrong, with no points and no standings.

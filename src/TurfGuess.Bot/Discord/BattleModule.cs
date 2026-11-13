@@ -31,11 +31,21 @@ public sealed class BattleModule(
         await DeferAsync(ephemeral: true);
         try
         {
-            var (round, started) = await rounds.StartBattleAsync(Context.User.Id, showVotes, clock.GetUtcNow(), default);
-            logger.LogInformation("{UserName} ({UserId}) ran /turf battle: {Result}.", Context.User.Username, Context.User.Id,
-                started ? $"round {round.Id} started" : $"refused, round {round.Id} is still running");
+            var now = clock.GetUtcNow();
 
-            await FollowupAsync(MessageText.BattleStarted(round, started), ephemeral: true);
+            // Today's battle message is reused (reset) instead of posting another one.
+            var last = repo.GetLatestPosted(RoundKind.Regular);
+            ulong? reuse = last?.MessageId is { } id && SameLocalDay(last.CreatedAtTime, now) ? (ulong)id : null;
+
+            var (round, started) = await rounds.StartBattleAsync(Context.User.Id, showVotes, now, default, reuse);
+            bool reused = started && reuse is not null && round.MessageId == (long)reuse;
+            logger.LogInformation("{UserName} ({UserId}) ran /turf battle: {Result}.", Context.User.Username, Context.User.Id,
+                !started ? $"refused, round {round.Id} is still running"
+                : reused ? $"round {round.Id} started over message {reuse}" : $"round {round.Id} started");
+
+            string? link = reused && Context.Guild is { } guild
+                ? $"https://discord.com/channels/{guild.Id}/{options.Discord.ChannelId}/{reuse}" : null;
+            await FollowupAsync(reused ? MessageText.BattleReusedMessage(round, link) : MessageText.BattleStarted(round, started), ephemeral: true);
         }
         catch (Exception ex)
         {
@@ -142,6 +152,12 @@ public sealed class BattleModule(
         var text = MessageText.BattleAlreadyRunning(running);
         if (Context.Interaction.HasResponded) await FollowupAsync(text, ephemeral: true);
         else await RespondAsync(text, ephemeral: true);
+    }
+
+    private bool SameLocalDay(DateTimeOffset a, DateTimeOffset b)
+    {
+        var zone = options.Game.ParsedTimeZone;
+        return TimeZoneInfo.ConvertTime(a, zone).Date == TimeZoneInfo.ConvertTime(b, zone).Date;
     }
 
     /// <summary>Battles are posted in the game's channel, so the commands only work there.</summary>

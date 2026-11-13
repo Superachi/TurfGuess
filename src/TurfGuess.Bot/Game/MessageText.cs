@@ -110,7 +110,7 @@ public static class MessageText
     /// <summary>Reply to /turf battle (only the caller sees it).</summary>
     public static string BattleStarted(RoundRecord round, bool started) => started
         ? $"{RegularEmoji} Regular Battle started! Voting ends <t:{round.RevealAt}:R>."
-        : $"A Regular Battle is already running. It ends <t:{round.RevealAt}:R>.";
+        : $"A Regular Battle is already running, so the command is disabled until it ends <t:{round.RevealAt}:R>.";
 
     public static string BattleRevealButtonId(long roundId) => $"battle-reveal:{roundId}";
     public static string BattleResetButtonId(long roundId) => $"battle-reset:{roundId}";
@@ -120,6 +120,12 @@ public static class MessageText
     public const string BattleResetting = "Setting up a fresh Regular Battle…";
     public static string BattleAlreadyRunning(RoundRecord round) =>
         $"A Regular Battle is already running (ends <t:{round.RevealAt}:R>), so Reset is now a Reveal button on this message.";
+
+    /// <summary>Reply to /turf battle when today's battle message was reset instead of posting a new one.</summary>
+    public static string BattleReusedMessage(RoundRecord round, string? link) =>
+        $"{RegularEmoji} A fresh Regular Battle is running! Voting ends <t:{round.RevealAt}:R>.\n" +
+        (link is null ? "Look at the previous Regular Battle message in the channel."
+                      : $"Look at the previous Regular Battle message: {link}");
 
     public const string NoBattleRunning = "There's no Regular Battle running right now.";
     public const string BattleRevealNotAllowed = "Only the player who started this Regular Battle, or an admin, can reveal it early.";

@@ -40,11 +40,41 @@ public sealed class RoundService(
     // Advancing and resetting never run at the same time.
     private readonly SemaphoreSlim _gate = new(1, 1);
 
-    /// <summary>Advances the game as far as it can at <paramref name="now"/>. Returns when to call again.</summary>
+    /// <summary>
+    /// Advances the game as far as it can at <paramref name="now"/>: the ranked round, then the regular
+    /// battle if one is running. Returns when to call again.
+    /// </summary>
     public async Task<DateTimeOffset> AdvanceAsync(DateTimeOffset now, CancellationToken ct)
     {
         await _gate.WaitAsync(ct);
-        try { return await AdvanceCoreAsync(now, ct); }
+        try
+        {
+            var ranked = await AdvanceCoreAsync(RoundKind.Ranked, now, ct);
+            var battle = await AdvanceCoreAsync(RoundKind.Regular, now, ct);
+            return ranked < battle ? ranked : battle;
+        }
+        finally { _gate.Release(); }
+    }
+
+    /// <summary>
+    /// Starts a regular battle (🔫) and posts it. Only one can run at a time: when one is already
+    /// going, nothing is created and that battle is returned with Started = false.
+    /// </summary>
+    public async Task<(RoundRecord Round, bool Started)> StartBattleAsync(ulong userId, bool showVotes, DateTimeOffset now, CancellationToken ct)
+    {
+        await _gate.WaitAsync(ct);
+        try
+        {
+            var running = repo.GetActive(RoundKind.Regular);
+            if (running is not null) return (running, false);
+
+            var created = CreateRound(now, RoundKind.Regular, (long)userId, showVotes);
+            logger.LogInformation("Round {RoundId}: regular battle started by {UserId}{Public}.",
+                created.Id, userId, showVotes ? " with public votes" : "");
+
+            await AdvanceCoreAsync(RoundKind.Regular, now, ct); // posts it
+            return (repo.Get(created.Id) ?? created, true);
+        }
         finally { _gate.Release(); }
     }
 
@@ -73,16 +103,18 @@ public sealed class RoundService(
         finally { _gate.Release(); }
     }
 
-    private async Task<DateTimeOffset> AdvanceCoreAsync(DateTimeOffset now, CancellationToken ct)
+    /// <summary>Moves one kind of round forward. A ranked round is created when none exists; a battle only on request.</summary>
+    private async Task<DateTimeOffset> AdvanceCoreAsync(RoundKind kind, DateTimeOffset now, CancellationToken ct)
     {
         for (int step = 0; step < MaxStepsPerAdvance; step++)
         {
             ct.ThrowIfCancellationRequested();
-            var round = repo.GetActive();
+            var round = repo.GetActive(kind);
 
             if (round is null)
             {
-                CreateRound(now);
+                if (kind == RoundKind.Regular) return DateTimeOffset.MaxValue;
+                CreateRound(now, RoundKind.Ranked);
                 continue;
             }
 
@@ -99,35 +131,40 @@ public sealed class RoundService(
                     break;
 
                 case RoundStatus.Revealed:
-                    await RevealAsync(round, ct);
+                    if (kind == RoundKind.Regular) await RevealBattleAsync(round, ct);
+                    else await RevealAsync(round, ct);
                     break;
             }
         }
 
-        throw new InvalidOperationException($"The current round didn't settle after {MaxStepsPerAdvance} steps.");
+        throw new InvalidOperationException($"The current {kind} round didn't settle after {MaxStepsPerAdvance} steps.");
     }
 
-    /// <summary>Moves the open round's reveal to now. Returns false when no round is open.</summary>
-    public bool RevealNow(DateTimeOffset now)
+    /// <summary>Moves the open round's reveal to now. Returns false when no round of that kind is open.</summary>
+    public bool RevealNow(DateTimeOffset now, RoundKind kind = RoundKind.Ranked)
     {
-        var round = repo.GetActive();
+        var round = repo.GetActive(kind);
         return round is { Status: RoundStatus.Open } && repo.SetRevealAt(round.Id, now.ToUnixTimeSeconds());
     }
 
-    private void CreateRound(DateTimeOffset now)
+    private RoundRecord CreateRound(DateTimeOffset now, RoundKind kind, long startedBy = 0, bool showVotes = false)
     {
         ulong seed = seeds.NextSeed();
         var generated = RoundGenerator.Generate(seed, options.Generator);
         var style = ColorPairs.Pick(seed, options.EffectiveColorPairs, options.Game.Name);
 
-        bool isFirst = !repo.AnyRounds();
-        var revealAt = RoundSchedule.RevealAt(now, options.Game.ParsedRoundTime, options.Game.ParsedTimeZone,
-            isFirst, options.Game.MinRoundLength);
+        var revealAt = kind == RoundKind.Regular
+            ? now + options.Game.BattleLength
+            : RoundSchedule.RevealAt(now, options.Game.ParsedRoundTime, options.Game.ParsedTimeZone,
+                !repo.AnyRounds(), options.Game.MinRoundLength);
 
         var record = new RoundRecord
         {
             ChannelId = (long)options.Discord.ChannelId,
             Status = RoundStatus.Pending,
+            Kind = kind,
+            ShowVotes = showVotes,
+            StartedBy = startedBy,
             Seed = (long)seed,
             GeneratorVersion = generated.GeneratorVersion,
             CreatedAt = now.ToUnixTimeSeconds(),
@@ -156,6 +193,7 @@ public sealed class RoundService(
             "(coverage {Left} {ShareLeft}, {Right} {ShareRight}, {Unpainted} unpainted). Reveal at {RevealAt}.",
             record.Id, record.LeftName, record.RightName, seed, record.TeamName(record.WinnerSide), Pct(record.WinnerShare, 2),
             record.LeftName, Pct(record.ShareLeft), record.RightName, Pct(record.ShareRight), Pct(record.Unpainted), LocalTime(revealAt));
+        return record;
     }
 
     private string LocalTime(DateTimeOffset at) =>
@@ -206,6 +244,41 @@ public sealed class RoundService(
 
         repo.MarkDone(round.Id, (long)revealId.Value);
         await PostFinishedWeeksAsync(round, ct);
+    }
+
+    /// <summary>
+    /// Closes and reveals a regular battle. Nothing is scored and no weekly summary is posted:
+    /// the reveal only says who guessed right and wrong.
+    /// </summary>
+    private async Task RevealBattleAsync(RoundRecord round, CancellationToken ct)
+    {
+        var votes = repo.GetVotes(round.Id);
+        bool listVoters = options.Game.ShowVoteCount || round.ShowVotes;
+        await channel.CloseRoundMessageAsync(round, listVoters ? repo.GetVotersFor(round) : null, ct);
+
+        ulong? revealId = await channel.FindRevealMessageAsync(round, ct);
+        if (revealId is null)
+        {
+            var winner = round.WinnerSide;
+            var ordered = votes.OrderBy(v => v.UserName, StringComparer.OrdinalIgnoreCase).ThenBy(v => v.UserId).ToList();
+            PlayerOutcome Outcome(VoteRecord v) => new((ulong)v.UserId, false, 0);
+            var summary = new RevealSummary(
+                LeftVotes: votes.Count(v => v.ChoiceSide == Side.Left),
+                RightVotes: votes.Count(v => v.ChoiceSide == Side.Right),
+                Winners: ordered.Where(v => v.ChoiceSide == winner).Select(Outcome).ToList(),
+                Losers: ordered.Where(v => v.ChoiceSide != winner).Select(Outcome).ToList(),
+                Standings: []);
+
+            var (_, revealPath) = images.Ensure(round);
+            revealId = await channel.PostRevealAsync(round, summary, revealPath, ct);
+        }
+        else
+        {
+            logger.LogInformation("Round {RoundId}: found reveal message {MessageId} posted before a restart; adopting it.", round.Id, revealId);
+        }
+
+        LogRevealStats(round, votes, revealId.Value);
+        repo.MarkDone(round.Id, (long)revealId.Value);
     }
 
     /// <summary>The week a round counts for: the week of its reveal time, in the game's time zone.</summary>

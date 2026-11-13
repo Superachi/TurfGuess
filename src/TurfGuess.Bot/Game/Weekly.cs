@@ -1,12 +1,16 @@
 using System.Globalization;
+using TurfGuess.Core.Grid;
 
 namespace TurfGuess.Bot.Game;
 
 /// <summary>A player's place in a week's standings.</summary>
 public sealed record StandingEntry(ulong UserId, int Points, int Wins);
 
-/// <summary>A player who voted, and whether they placed a bet. Never says which team they picked.</summary>
-public sealed record Voter(ulong Id, bool Bet);
+/// <summary>
+/// A player who voted, and whether they placed a bet. <see cref="Choice"/> is only filled in for
+/// regular battles with public votes; otherwise it stays null and the team they picked is never shown.
+/// </summary>
+public sealed record Voter(ulong Id, bool Bet, Side? Choice = null);
 
 /// <summary>One player's result in a revealed round. <see cref="Delta"/> is the change actually applied (after the 0 floor).</summary>
 public sealed record PlayerOutcome(ulong UserId, bool Bet, int Delta);

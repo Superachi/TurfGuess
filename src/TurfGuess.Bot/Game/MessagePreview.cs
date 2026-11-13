@@ -68,9 +68,9 @@ public static partial class MessagePreview
         sb.AppendLine();
 
         Section(sb, "1. Round message (posted at the round time)");
-        Embed(sb, MessageText.RoundTitle(options.Game.Name, round.Id),
+        Embed(sb, MessageText.RoundTitle(options.Game.Name, round),
             Show(MessageText.RoundDescription(round, options.Game.ShowVoteCount ? [] : null, closed: false, difficulty: options.Generator.Difficulty)),
-            $"round_{round.Id}.png", MessageText.RoundFooter(round.Id));
+            $"round_{round.Id}.png", MessageText.RoundFooter(round));
         sb.AppendLine($"Buttons: {buttons(false)}");
         sb.AppendLine();
 
@@ -95,19 +95,73 @@ public static partial class MessagePreview
         sb.AppendLine();
 
         Section(sb, "5. Round message after the reveal");
-        Embed(sb, MessageText.RoundTitle(options.Game.Name, round.Id),
+        Embed(sb, MessageText.RoundTitle(options.Game.Name, round),
             Show(MessageText.RoundDescription(round, options.Game.ShowVoteCount ? voters : null, closed: true, difficulty: options.Generator.Difficulty)),
-            $"round_{round.Id}.png", MessageText.RoundFooter(round.Id));
+            $"round_{round.Id}.png", MessageText.RoundFooter(round));
         sb.AppendLine($"Buttons: {buttons(true)}");
         sb.AppendLine();
 
         Section(sb, $"6. Reveal (embed in {round.TeamName(winner)}'s color {(winner == Side.Left ? round.LeftColor : round.RightColor)}, no pings)");
         Embed(sb, null, Show(MessageText.Reveal(round, summary, options.Game.MaxListedWinners)),
-            $"reveal_{round.Id}.png", MessageText.RevealFooter(round.Id));
+            $"reveal_{round.Id}.png", MessageText.RevealFooter(round));
         sb.AppendLine();
 
         Section(sb, "7. Weekly summary (posted after the first reveal of a new week, no pings)");
         sb.AppendLine(Show(MessageText.WeekSummary("2026-11-02", [standings[0]]) ?? ""));
+        sb.AppendLine();
+
+        // The same sample round, played as a regular battle: 15 minutes, not scored, no Bet button.
+        var battle = new RoundRecord
+        {
+            Id = SampleRoundId + 1, Status = RoundStatus.Open, Kind = RoundKind.Regular, StartedBy = (long)ids[0],
+            Seed = round.Seed, RevealAt = now.AddMinutes(15).ToUnixTimeSeconds(),
+            LeftName = round.LeftName, LeftColor = round.LeftColor, LeftEmoji = round.LeftEmoji,
+            RightName = round.RightName, RightColor = round.RightColor, RightEmoji = round.RightEmoji,
+            Winner = round.Winner, WinnerShare = round.WinnerShare, ShareLeft = round.ShareLeft,
+            ShareRight = round.ShareRight, Unpainted = round.Unpainted,
+        };
+        var publicBattle = new RoundRecord
+        {
+            Id = battle.Id, Status = battle.Status, Kind = battle.Kind, StartedBy = battle.StartedBy, ShowVotes = true,
+            RevealAt = battle.RevealAt, LeftName = battle.LeftName, LeftEmoji = battle.LeftEmoji, RightName = battle.RightName,
+            RightEmoji = battle.RightEmoji, Winner = battle.Winner, WinnerShare = battle.WinnerShare,
+        };
+        var battleVoters = ids.Select((id, i) => new Voter(id, false, i < 6 ? Side.Left : Side.Right)).ToList();
+        string battleButtons = $"[ {round.LeftEmoji} {round.LeftName} ]  [ {round.RightEmoji} {round.RightName} ]";
+        var battleWinners = winners.Select(o => o with { Bet = false, Delta = 0 }).ToList();
+        var battleLosers = losers.Select(o => o with { Bet = false, Delta = 0 }).ToList();
+        var battleSummary = new RevealSummary(summary.LeftVotes, summary.RightVotes, battleWinners, battleLosers, []);
+
+        Section(sb, "8. /turf battle (only the caller sees these replies)");
+        sb.AppendLine(Show(MessageText.BattleStarted(battle, started: true)));
+        sb.AppendLine(Show(MessageText.BattleStarted(battle, started: false)));
+        sb.AppendLine();
+
+        Section(sb, "9. Regular Battle message (15 minutes, not scored, no Bet button)");
+        Embed(sb, MessageText.RoundTitle(options.Game.Name, battle),
+            Show(MessageText.RoundDescription(battle, options.Game.ShowVoteCount ? voters.Select(v => v with { Bet = false }).ToList() : null,
+                closed: false, difficulty: options.Generator.Difficulty)),
+            $"round_{battle.Id}.png", MessageText.RoundFooter(battle));
+        sb.AppendLine($"Buttons: {battleButtons}");
+        sb.AppendLine();
+
+        Section(sb, "9b. Regular Battle with show-votes (who voted for which team)");
+        Embed(sb, MessageText.RoundTitle(options.Game.Name, publicBattle),
+            Show(MessageText.RoundDescription(publicBattle, battleVoters, closed: false, difficulty: options.Generator.Difficulty)),
+            $"round_{battle.Id}.png", MessageText.RoundFooter(publicBattle));
+        sb.AppendLine($"Buttons: {battleButtons}");
+        sb.AppendLine(Show(MessageText.VoteAccepted(publicBattle, Side.Left)));
+        sb.AppendLine();
+
+        Section(sb, "10. Regular Battle reveal (no points, no weekly standings, no pings)");
+        Embed(sb, null, Show(MessageText.Reveal(battle, battleSummary, options.Game.MaxListedWinners)),
+            $"reveal_{battle.Id}.png", MessageText.RevealFooter(battle));
+        sb.AppendLine();
+
+        Section(sb, "11. /turf battle-reveal (only the caller sees these replies)");
+        sb.AppendLine(MessageText.BattleRevealing);
+        sb.AppendLine(MessageText.BattleRevealNotAllowed);
+        sb.AppendLine(MessageText.NoBattleRunning);
 
         return sb.ToString();
     }

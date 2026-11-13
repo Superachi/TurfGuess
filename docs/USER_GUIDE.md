@@ -179,6 +179,7 @@ The other settings are in [`src/TurfGuess.Bot/appsettings.json`](../src/TurfGues
 | `Game:TimeZone` | `Europe/Amsterdam` | Time zone for the round time (daylight saving is handled) |
 | `Game:Name` | `Judd's Judgment` | The game's name, shown in message titles, image captions and the reveal. Change it to anything you like. |
 | `Game:ShowVoteCount` | `true` | List who has voted on the round message, e.g. "3 players have voted: @alice, @bob, @carol". Names only, never what they picked. Sorted by name, and at most 50 names, then "…and N more". |
+| `Game:BattleLength` | `00:15:00` | How long a Regular Battle (started with `/turf battle`) stays open, between 1 minute and 6 hours |
 | `Game:MaxListedWinners` | `50` | Most correct guessers named in the reveal |
 | `Game:Ink` | `Marbled` | `Marbled`, `Flat` or `Shaded` |
 | `Generator:Difficulty:MinWinnerShare` / `MaxWinnerShare` | `50.3` / `52.3` | How close rounds are, as the winner's % of the painted floor |
@@ -222,6 +223,22 @@ The bot writes one line per event to its console, with a timestamp. When it runs
 | An admin command | `Admin dave (3333…) ran /turf-admin reveal-now; revealing the current round early.` |
 
 The answer is in the log from the moment a round is created, so don't share the logs with players. The log level is set in `appsettings.json` under `Logging:LogLevel`.
+
+### Ranked and Regular Battles
+
+There are two kinds of round:
+
+- **⚓ Ranked Battle** is the daily round. It is scored and counts towards the weekly standings. Difficulty is shown with 🔥.
+- **🔫 Regular Battle** is started by any player with a command. It lasts 15 minutes (`Game:BattleLength`), is never scored, never touches the weekly standings, and has no Bet button. Difficulty is shown with 🐟. A regular battle runs next to the ranked round, and only one can run at a time.
+
+Both commands only work in the game's channel.
+
+| Command | What it does |
+|---|---|
+| `/turf battle [show-votes:true]` | Starts a Regular Battle. With `show-votes`, the round message lists who voted for which team while it runs, and voters are told their vote is public. Fails with "already running" while another battle is open. |
+| `/turf battle-reveal` | Reveals the running Regular Battle now. Only the player who started it, or an administrator, can do this. |
+
+The reveal lists who guessed right and wrong, with no points and no standings.
 
 ### Admin commands
 

@@ -11,20 +11,22 @@ public sealed class RoundRepository(Database db)
         id, channel_id, status, message_id, reveal_message_id, seed, generator_version,
         image_path, reveal_image_path, created_at, posted_at, reveal_at,
         left_name, left_color, left_emoji, right_name, right_color, right_emoji,
-        winner, winner_share, share_left, share_right, unpainted
+        winner, winner_share, share_left, share_right, unpainted, kind, show_votes, started_by
         """;
 
+    /// <summary>Whether any ranked round exists (regular battles don't count).</summary>
     public bool AnyRounds()
     {
         using var c = db.Open();
-        return c.ExecuteScalar<long>("SELECT COUNT(*) FROM rounds") > 0;
+        return c.ExecuteScalar<long>("SELECT COUNT(*) FROM rounds WHERE kind = 'Ranked'") > 0;
     }
 
-    /// <summary>The one round that isn't Done, if any.</summary>
-    public RoundRecord? GetActive()
+    /// <summary>The one round of this kind that isn't Done, if any.</summary>
+    public RoundRecord? GetActive(RoundKind kind = RoundKind.Ranked)
     {
         using var c = db.Open();
-        return c.QuerySingleOrDefault<RoundRecord>($"SELECT {RoundColumns} FROM rounds WHERE status <> 'Done'");
+        return c.QuerySingleOrDefault<RoundRecord>(
+            $"SELECT {RoundColumns} FROM rounds WHERE status <> 'Done' AND kind = @kind", new { kind = kind.ToString() });
     }
 
     public RoundRecord? Get(long id)
@@ -41,13 +43,19 @@ public sealed class RoundRepository(Database db)
             INSERT INTO rounds (channel_id, status, seed, generator_version, image_path, reveal_image_path,
                                 created_at, reveal_at, left_name, left_color, left_emoji,
                                 right_name, right_color, right_emoji, winner, winner_share,
-                                share_left, share_right, unpainted)
+                                share_left, share_right, unpainted, kind, show_votes, started_by)
             VALUES (@ChannelId, 'Pending', @Seed, @GeneratorVersion, @ImagePath, @RevealImagePath,
                     @CreatedAt, @RevealAt, @LeftName, @LeftColor, @LeftEmoji,
                     @RightName, @RightColor, @RightEmoji, @Winner, @WinnerShare,
-                    @ShareLeft, @ShareRight, @Unpainted);
+                    @ShareLeft, @ShareRight, @Unpainted, @Kind, @ShowVotes, @StartedBy);
             SELECT last_insert_rowid();
-            """, r);
+            """, new
+        {
+            r.ChannelId, r.Seed, r.GeneratorVersion, r.ImagePath, r.RevealImagePath, r.CreatedAt, r.RevealAt,
+            r.LeftName, r.LeftColor, r.LeftEmoji, r.RightName, r.RightColor, r.RightEmoji,
+            r.Winner, r.WinnerShare, r.ShareLeft, r.ShareRight, r.Unpainted,
+            Kind = r.Kind.ToString(), r.ShowVotes, r.StartedBy,
+        });
     }
 
     public void SetImagePaths(long id, string imagePath, string revealImagePath)
@@ -144,6 +152,20 @@ public sealed class RoundRepository(Database db)
             FROM votes v WHERE v.round_id = @roundId
             ORDER BY v.user_name COLLATE NOCASE, v.user_id
             """, new { roundId }).Select(r => new Voter((ulong)r.UserId, r.Bet != 0)).ToList();
+    }
+
+    /// <summary>The voters to show on a round's message: with their team for public-vote battles, otherwise names (and bets) only.</summary>
+    public IReadOnlyList<Voter> GetVotersFor(RoundRecord round) =>
+        round.ShowVotes ? GetVotersWithChoice(round.Id) : GetVoters(round.Id);
+
+    /// <summary>Everyone who voted, with the team they picked (regular battles with public votes), sorted by name.</summary>
+    public IReadOnlyList<Voter> GetVotersWithChoice(long roundId)
+    {
+        using var c = db.Open();
+        return c.Query<(long UserId, string Choice)>("""
+            SELECT user_id AS UserId, choice AS Choice FROM votes WHERE round_id = @roundId
+            ORDER BY user_name COLLATE NOCASE, user_id
+            """, new { roundId }).Select(r => new Voter((ulong)r.UserId, false, SideCodec.Parse(r.Choice))).ToList();
     }
 
     /// <summary>

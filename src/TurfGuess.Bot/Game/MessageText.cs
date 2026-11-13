@@ -16,13 +16,23 @@ public static class MessageText
     /// <summary>Discord's message content limit.</summary>
     public const int DiscordMessageLimit = 2000;
 
-    public static string RoundTitle(string gameName, long roundId) => $"{gameName} · Round #{roundId}";
+    public const string RankedEmoji = "⚓";
+    public const string RegularEmoji = "🔫";
+
+    /// <summary>"⚓ Ranked Battle" or "🔫 Regular Battle".</summary>
+    public static string KindName(RoundKind kind) =>
+        kind == RoundKind.Regular ? $"{RegularEmoji} Regular Battle" : $"{RankedEmoji} Ranked Battle";
+
+    public static string RoundTitle(string gameName, RoundRecord round) =>
+        $"{gameName} · {KindName(round.Kind)} · Round #{round.Id}";
 
     /// <summary>Footer on the round message.</summary>
-    public static string RoundFooter(long roundId) => $"Round #{roundId}";
+    public static string RoundFooter(RoundRecord round) =>
+        round.Kind == RoundKind.Regular ? $"Regular Battle #{round.Id}" : $"Round #{round.Id}";
 
     /// <summary>Footer on the reveal; recovery finds an already posted reveal by this exact text.</summary>
-    public static string RevealFooter(long roundId) => $"Round #{roundId} · Results";
+    public static string RevealFooter(RoundRecord round) =>
+        round.Kind == RoundKind.Regular ? $"Regular Battle #{round.Id} · Results" : $"Round #{round.Id} · Results";
 
     /// <summary>
     /// How an embed refers to an image attached to the same message. Every embed, including the
@@ -56,7 +66,7 @@ public static class MessageText
         var sb = new StringBuilder();
         sb.Append(closed ? "**Voting is closed.** The results are below.\n\n" : "Which team do you think painted more? Cast your vote!\n\n");
         sb.Append(DifficultyLine(round, difficulty)).Append('\n');
-        sb.Append(PointsLine(round, difficulty));
+        sb.Append(round.Kind == RoundKind.Regular ? BattleLine(round) : PointsLine(round, difficulty));
         if (!closed) sb.Append($"\nResults <t:{round.RevealAt}:R> (<t:{round.RevealAt}:f>).");
 
         if (voters is null) return sb.ToString();
@@ -65,6 +75,12 @@ public static class MessageText
         if (voters.Count == 0)
         {
             sb.Append("No votes yet.");
+            return sb.ToString();
+        }
+
+        if (round.ShowVotes && voters.All(v => v.Choice is not null))
+        {
+            AppendVotesByTeam(sb, round, voters, maxListed, limit);
             return sb.ToString();
         }
 
@@ -80,8 +96,42 @@ public static class MessageText
     public static string DifficultyLine(RoundRecord round, DifficultyOptions? difficulty = null)
     {
         var rank = Difficulty.RankFor(round.WinnerShare, difficulty ?? new DifficultyOptions());
-        int flames = (int)rank + 1; // C = 1 … X = 5
-        return $"Rank {rank} | {string.Concat(Enumerable.Repeat("🔥", flames))}";
+        int count = (int)rank + 1; // C = 1 … X = 5
+        string icon = round.Kind == RoundKind.Regular ? "🐟" : "🔥";
+        return $"Rank {rank} | {string.Concat(Enumerable.Repeat(icon, count))}";
+    }
+
+    /// <summary>What a regular battle is: unscored, who started it, and whether votes are public.</summary>
+    public static string BattleLine(RoundRecord round) =>
+        $"{RegularEmoji} Regular Battle · no points, doesn't count towards the weekly score" +
+        (round.ShowVotes ? " · votes are public" : "") +
+        (round.StartedBy != 0 ? $"\nStarted by <@{round.StartedBy}>" : "");
+
+    /// <summary>Reply to /turf battle (only the caller sees it).</summary>
+    public static string BattleStarted(RoundRecord round, bool started) => started
+        ? $"{RegularEmoji} Regular Battle started! Voting ends <t:{round.RevealAt}:R>."
+        : $"A Regular Battle is already running. It ends <t:{round.RevealAt}:R>.";
+
+    public const string NoBattleRunning = "There's no Regular Battle running right now.";
+    public const string BattleRevealNotAllowed = "Only the player who started this Regular Battle, or an admin, can reveal it early.";
+    public const string BattleRevealing = "Revealing the Regular Battle now.";
+
+    /// <summary>"🔴 **Reds** (2): @A, @C" for each team, for battles where votes are public.</summary>
+    private static void AppendVotesByTeam(StringBuilder sb, RoundRecord round, IReadOnlyList<Voter> voters, int maxListed, int limit)
+    {
+        var sides = new[] { Side.Left, Side.Right };
+        for (int i = 0; i < sides.Length; i++)
+        {
+            var side = sides[i];
+            var picked = voters.Where(v => v.Choice == side).Select(v => $"<@{v.Id}>").ToList();
+            if (i > 0) sb.Append('\n');
+            sb.Append($"{round.TeamEmoji(side)} **{round.TeamName(side)}** ({picked.Count})");
+            if (picked.Count == 0) continue;
+
+            sb.Append(": ");
+            int room = (limit - sb.Length) / (sides.Length - i) - 4; // each team gets its share of what is left
+            AppendList(sb, picked, maxListed, room);
+        }
     }
 
     /// <summary>What the round is worth, and what a bet would win or lose.</summary>
@@ -105,6 +155,7 @@ public static class MessageText
             int points = PointsFor(round, difficulty);
             text += $"\n🎲 Your bet is on: win +{2 * points} / lose −{points}.";
         }
+        if (round.Kind == RoundKind.Regular && round.ShowVotes) text += "\nYour vote is public in this battle.";
         return text;
     }
 
@@ -145,6 +196,7 @@ public static class MessageText
     /// </summary>
     public static string Reveal(RoundRecord round, RevealSummary s, int maxListed, int limit = DiscordMessageLimit)
     {
+        if (round.Kind == RoundKind.Regular) return BattleReveal(round, s, maxListed, limit);
         var w = round.WinnerSide;
         var l = Side.Left;
         var r = Side.Right;
@@ -186,6 +238,51 @@ public static class MessageText
         }
 
         sb.Append(standings);
+        return sb.ToString();
+    }
+
+    /// <summary>The reveal of a regular battle: who was right and wrong, no points and no standings.</summary>
+    private static string BattleReveal(RoundRecord round, RevealSummary s, int maxListed, int limit)
+    {
+        var w = round.WinnerSide;
+        var l = Side.Left;
+        var r = Side.Right;
+
+        var sb = new StringBuilder();
+        sb.Append($"## {round.TeamEmoji(w)} {round.TeamName(w)} wins!\n");
+        sb.Append($"{round.TeamEmoji(l)} {round.TeamName(l)} **{Pct(round.ShareLeft)}** · ");
+        sb.Append($"{round.TeamEmoji(r)} {round.TeamName(r)} **{Pct(round.ShareRight)}** · ");
+        sb.Append($"{Pct(round.Unpainted)} unpainted\n");
+        sb.Append($"Votes: {round.TeamEmoji(l)} {s.LeftVotes} · {round.TeamEmoji(r)} {s.RightVotes}\n\n");
+
+        const string footer = $"\n{RegularEmoji} Regular Battle · no points awarded";
+        if (s.Winners.Count == 0 && s.Losers.Count == 0)
+        {
+            sb.Append("Nobody voted this battle.");
+        }
+        else
+        {
+            int room = limit - sb.Length - footer.Length;
+            if (s.Winners.Count > 0)
+            {
+                string label = $"✅ **Correct ({s.Winners.Count}):** ";
+                sb.Append(label);
+                AppendList(sb, s.Winners.Select(p => $"<@{p.UserId}>").ToList(), maxListed, s.Losers.Count > 0 ? (room - label.Length - 40) / 2 : room - label.Length);
+            }
+            else
+            {
+                sb.Append("Nobody guessed right this battle.");
+            }
+
+            if (s.Losers.Count > 0)
+            {
+                if (s.Winners.Count > 0) sb.Append('\n');
+                sb.Append($"❌ **Wrong ({s.Losers.Count}):** ");
+                AppendList(sb, s.Losers.Select(p => $"<@{p.UserId}>").ToList(), maxListed, limit - sb.Length - footer.Length);
+            }
+        }
+
+        sb.Append(footer);
         return sb.ToString();
     }
 

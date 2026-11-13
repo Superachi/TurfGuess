@@ -18,12 +18,29 @@ public enum RoundStatus
     Done,
 }
 
+/// <summary>Which game a round belongs to. Each kind has at most one unfinished round at a time.</summary>
+public enum RoundKind
+{
+    /// <summary>⚓ The daily round. Scored, counts towards the weekly standings.</summary>
+    Ranked,
+
+    /// <summary>🔫 Started by a player with a command. Short, not scored, never touches the weekly standings.</summary>
+    Regular,
+}
+
 /// <summary>One row of the <c>rounds</c> table. Discord ids are stored as INTEGER (signed 64-bit).</summary>
 public sealed class RoundRecord
 {
     public long Id { get; set; }
     public long ChannelId { get; set; }
     public RoundStatus Status { get; set; }
+    public RoundKind Kind { get; set; } = RoundKind.Ranked;
+
+    /// <summary>Regular battles only: the round message lists who voted for which team while voting is open.</summary>
+    public bool ShowVotes { get; set; }
+
+    /// <summary>Regular battles only: the player who started it (0 for ranked rounds).</summary>
+    public long StartedBy { get; set; }
     public long? MessageId { get; set; }
     public long? RevealMessageId { get; set; }
 

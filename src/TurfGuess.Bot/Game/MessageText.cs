@@ -112,6 +112,15 @@ public static class MessageText
         ? $"{RegularEmoji} Regular Battle started! Voting ends <t:{round.RevealAt}:R>."
         : $"A Regular Battle is already running. It ends <t:{round.RevealAt}:R>.";
 
+    public static string BattleRevealButtonId(long roundId) => $"battle-reveal:{roundId}";
+    public static string BattleResetButtonId(long roundId) => $"battle-reset:{roundId}";
+    public const string BattleRevealButtonLabel = "Reveal";
+    public const string BattleResetButtonLabel = "Reset";
+    public const string BattleResetButtonEmoji = "🔁";
+    public const string BattleResetting = "Setting up a fresh Regular Battle…";
+    public static string BattleAlreadyRunning(RoundRecord round) =>
+        $"A Regular Battle is already running (ends <t:{round.RevealAt}:R>), so Reset is now a Reveal button on this message.";
+
     public const string NoBattleRunning = "There's no Regular Battle running right now.";
     public const string BattleRevealNotAllowed = "Only the player who started this Regular Battle, or an admin, can reveal it early.";
     public const string BattleRevealing = "Revealing the Regular Battle now.";

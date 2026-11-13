@@ -23,13 +23,26 @@ public sealed class DiscordRoundChannel(DiscordSocketClient client, BotOptions o
         return null;
     }
 
-    public async Task<ulong> PostRoundAsync(RoundRecord round, string imagePath, CancellationToken ct)
+    public async Task<ulong> PostRoundAsync(RoundRecord round, string imagePath, CancellationToken ct, ulong? replaceMessageId = null)
     {
         var channel = await ChannelAsync();
         string fileName = Path.GetFileName(imagePath);
         IReadOnlyList<Voter>? voters = options.Game.ShowVoteCount || round.ShowVotes ? [] : null;
 
         var embed = RoundEmbed(round, MessageText.RoundDescription(round, voters, closed: false, difficulty: options.Generator.Difficulty), fileName);
+
+        if (replaceMessageId is { } replaceId && await channel.GetMessageAsync(replaceId, options: Request(ct)) is IUserMessage old)
+        {
+            // Write the new battle over the old message so repeated battles don't flood the channel.
+            using var replacement = new FileAttachment(imagePath, fileName);
+            await old.ModifyAsync(p =>
+            {
+                p.Embed = embed;
+                p.Components = Buttons(round, disabled: false);
+                p.Attachments = new[] { replacement };
+            }, Request(ct));
+            return old.Id;
+        }
 
         using var file = new FileAttachment(imagePath, fileName);
         var message = await channel.SendFileAsync(file, embed: embed, components: Buttons(round, disabled: false),
@@ -71,6 +84,12 @@ public sealed class DiscordRoundChannel(DiscordSocketClient client, BotOptions o
     public async Task<ulong?> FindRevealMessageAsync(RoundRecord round, CancellationToken ct)
     {
         string footer = MessageText.RevealFooter(round);
+        if (round.Kind == RoundKind.Regular)
+        {
+            // A battle's reveal is written over its own message.
+            var own = await RoundMessageAsync(round, ct);
+            return own is not null && own.Embeds.Any(e => e.Footer?.Text == footer) ? own.Id : null;
+        }
         foreach (var m in await RecentOwnMessagesAsync(round, ct))
             if (m.Embeds.Any(e => e.Footer?.Text == footer))
                 return m.Id;
@@ -90,10 +109,34 @@ public sealed class DiscordRoundChannel(DiscordSocketClient client, BotOptions o
             .WithFooter(MessageText.RevealFooter(round))
             .Build();
 
+        if (round.Kind == RoundKind.Regular && await RoundMessageAsync(round, ct) is { } battleMessage)
+        {
+            using var revealFile = new FileAttachment(imagePath, fileName);
+            await battleMessage.ModifyAsync(p =>
+            {
+                p.Embed = embed;
+                p.Components = new ComponentBuilder()
+                    .WithButton(MessageText.BattleResetButtonLabel, MessageText.BattleResetButtonId(round.Id), ButtonStyle.Success,
+                        emote: new Emoji(MessageText.BattleResetButtonEmoji))
+                    .Build();
+                p.Attachments = new[] { revealFile };
+            }, Request(ct));
+            return battleMessage.Id;
+        }
+
         using var file = new FileAttachment(imagePath, fileName);
         // Mentions are disabled, so the correct guessers are named without being pinged.
         var message = await channel.SendFileAsync(file, embed: embed, allowedMentions: AllowedMentions.None, options: Request(ct));
         return message.Id;
+    }
+
+    public async Task ShowBattleRevealButtonAsync(ulong messageId, RoundRecord runningBattle, CancellationToken ct)
+    {
+        var channel = await ChannelAsync();
+        if (await channel.GetMessageAsync(messageId, options: Request(ct)) is not IUserMessage message) return;
+        await message.ModifyAsync(p => p.Components = new ComponentBuilder()
+            .WithButton(MessageText.BattleRevealButtonLabel, MessageText.BattleRevealButtonId(runningBattle.Id), ButtonStyle.Primary)
+            .Build(), Request(ct));
     }
 
     public async Task PostWeekSummaryAsync(string text, CancellationToken ct)
@@ -154,6 +197,9 @@ public sealed class DiscordRoundChannel(DiscordSocketClient client, BotOptions o
         if (round.Kind == RoundKind.Ranked)
             builder.WithButton(MessageText.BetButtonLabel, MessageText.BetButtonId(round.Id), ButtonStyle.Primary,
                 emote: new Emoji(MessageText.BetButtonEmoji), disabled: disabled);
+        else
+            builder.WithButton(MessageText.BattleRevealButtonLabel, MessageText.BattleRevealButtonId(round.Id), ButtonStyle.Primary,
+                disabled: disabled);
         return builder.Build();
     }
 

@@ -240,6 +240,10 @@ Both commands only work in the game's channel.
 
 The reveal lists who guessed right and wrong, with no points and no standings.
 
+To keep the channel tidy, a Regular Battle lives in one message. While it runs, the message has a **Reveal** button (same permission as `/turf battle-reveal`). The reveal is written over the same message, which then shows a **Reset** button; pressing it replaces the message with a fresh battle. If another battle is already running when Reset is pressed, the button turns into a Reveal button for that battle.
+
+**Auto-bet:** a player with 0 points this week is bet in automatically the first time they vote in a ranked round, since they have nothing to lose. They can press Bet to switch it off.
+
 ### Admin commands
 
 These slash commands are only visible to server administrators. Replies are only visible to you.

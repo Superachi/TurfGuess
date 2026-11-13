@@ -10,6 +10,20 @@ public class BattleTests
     private static readonly DateTimeOffset Now = new(2026, 11, 10, 12, 0, 0, TimeSpan.Zero);
 
     [Fact]
+    public async Task A_reset_writes_the_new_battle_over_the_given_message()
+    {
+        using var env = new TestEnvironment();
+        var (first, _) = await env.Rounds.StartBattleAsync(1, showVotes: false, Now, default);
+        await env.Rounds.AdvanceAsync(Now.AddHours(1), default); // revealed
+
+        var (second, started) = await env.Rounds.StartBattleAsync(2, showVotes: false, Now.AddHours(2), default, replaceMessageId: 777);
+        Assert.True(started);
+        Assert.NotEqual(first.Id, second.Id);
+        Assert.Equal((second.Id, 777UL), Assert.Single(env.Channel.Replacements));
+        Assert.Equal(777L, env.Repo.Get(second.Id)!.MessageId);
+    }
+
+    [Fact]
     public async Task Starting_a_battle_posts_it_and_it_ends_after_the_battle_length()
     {
         using var env = new TestEnvironment();

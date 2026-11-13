@@ -58,6 +58,15 @@ public sealed class ScoreRepository(Database db)
         return GetResults(roundId);
     }
 
+    /// <summary>A player's points so far in the given week (0 when they have none).</summary>
+    public int WeekPoints(string weekStart, long userId)
+    {
+        using var c = db.Open();
+        return (int)c.ExecuteScalar<long>(
+            "SELECT COALESCE(SUM(delta), 0) FROM round_results WHERE week_start = @weekStart AND user_id = @userId",
+            new { weekStart, userId });
+    }
+
     /// <summary>The week's standings, best first: points, then wins (correct guesses), then id for a stable order.</summary>
     public IReadOnlyList<StandingEntry> Standings(string weekStart)
     {

@@ -191,6 +191,16 @@ public sealed class RoundRepository(Database db)
         return removed == 0;
     }
 
+    /// <summary>Turns a player's bet on (only while the round is Open). Returns true when a bet was added.</summary>
+    public bool EnsureBet(long roundId, long userId)
+    {
+        using var c = db.Open();
+        return c.Execute("""
+            INSERT OR IGNORE INTO bets (round_id, user_id)
+            SELECT @roundId, @userId WHERE EXISTS (SELECT 1 FROM rounds WHERE id = @roundId AND status = 'Open')
+            """, new { roundId, userId }) > 0;
+    }
+
     public bool HasBet(long roundId, long userId)
     {
         using var c = db.Open();

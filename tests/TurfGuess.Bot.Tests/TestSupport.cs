@@ -37,7 +37,7 @@ public sealed class TestEnvironment : IDisposable
         Scores = new ScoreRepository(Database);
         Images = new RoundImages(Options, NullLogger<RoundImages>.Instance);
         Rounds = new RoundService(Repo, Scores, Channel, Images, Options, Seeds, Log.For<RoundService>());
-        Votes = new VoteService(Repo, TimeProvider.System, Log.For<VoteService>());
+        Votes = new VoteService(Repo, Scores, Options, TimeProvider.System, Log.For<VoteService>());
     }
 
     public void Dispose()
@@ -94,11 +94,21 @@ public sealed class FakeChannel : IRoundChannel
     public Task<ulong?> FindRoundMessageAsync(RoundRecord round, CancellationToken ct) =>
         Task.FromResult(Messages.FirstOrDefault(m => m.RoundId == round.Id && m.Kind == "round")?.Id);
 
-    public Task<ulong> PostRoundAsync(RoundRecord round, string imagePath, CancellationToken ct)
+    public List<(long RoundId, ulong ReplacedMessageId)> Replacements { get; } = [];
+
+    public Task<ulong> PostRoundAsync(RoundRecord round, string imagePath, CancellationToken ct, ulong? replaceMessageId = null)
     {
         Assert.True(File.Exists(imagePath), "round image missing");
+        if (replaceMessageId is { } id)
+        {
+            Replacements.Add((round.Id, id));
+            Messages.Add(new Message(id, round.Id, "round"));
+            return Task.FromResult(id);
+        }
         return Post(round.Id, "round");
     }
+
+    public Task ShowBattleRevealButtonAsync(ulong messageId, RoundRecord runningBattle, CancellationToken ct) => Task.CompletedTask;
 
     public Task CloseRoundMessageAsync(RoundRecord round, IReadOnlyList<Voter>? voters, CancellationToken ct)
     {

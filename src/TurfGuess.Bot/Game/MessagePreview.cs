@@ -60,6 +60,8 @@ public static partial class MessagePreview
         };
         var summary = new RevealSummary(winner == Side.Left ? 7 : 4, winner == Side.Left ? 4 : 7, winners, losers, standings);
 
+        string Stamp(RoundRecord r) => TimeZoneInfo.ConvertTime(r.RevealAtTime, options.Game.ParsedTimeZone)
+            .ToString("d MMMM yyyy HH:mm", CultureInfo.InvariantCulture); // Discord shows the footer timestamp in the viewer's own time zone
         string Show(string text) => raw ? text : Humanize(text, options.Game.ParsedTimeZone, now);
         string buttons(bool disabled) =>
             $"[ {round.LeftEmoji} {round.LeftName} ]  [ {round.RightEmoji} {round.RightName} ]  [ {MessageText.BetButtonEmoji} {MessageText.BetButtonLabel} ]" +
@@ -74,7 +76,7 @@ public static partial class MessagePreview
         Section(sb, "1. Round message (posted at the round time)");
         Embed(sb, MessageText.RoundTitle(round),
             Show(MessageText.RoundDescription(round, options.Game.ShowVoteCount ? [] : null, closed: false, difficulty: options.Generator.Difficulty)),
-            $"round_{round.Id}.png", MessageText.RoundFooter(round));
+            $"round_{round.Id}.png", MessageText.RoundFooter(round), Stamp(round));
         sb.AppendLine($"Buttons: {buttons(false)}");
         sb.AppendLine();
 
@@ -101,7 +103,7 @@ public static partial class MessagePreview
         Section(sb, "5. Round message after the reveal");
         Embed(sb, MessageText.RoundTitle(round),
             Show(MessageText.RoundDescription(round, options.Game.ShowVoteCount ? voters : null, closed: true, difficulty: options.Generator.Difficulty)),
-            $"round_{round.Id}.png", MessageText.RoundFooter(round));
+            $"round_{round.Id}.png", MessageText.RoundFooter(round), Stamp(round));
         sb.AppendLine($"Buttons: {buttons(true)}");
         sb.AppendLine();
 
@@ -131,28 +133,29 @@ public static partial class MessagePreview
             RightEmoji = battle.RightEmoji, Winner = battle.Winner, WinnerShare = battle.WinnerShare,
         };
         var battleVoters = ids.Select((id, i) => new Voter(id, false, i < 6 ? Side.Left : Side.Right)).ToList();
-        string battleButtons = $"[ {round.LeftEmoji} {round.LeftName} ]  [ {round.RightEmoji} {round.RightName} ]";
+        string battleButtons = $"[ {round.LeftEmoji} {round.LeftName} ]  [ {round.RightEmoji} {round.RightName} ]  [ {MessageText.BattleRevealButtonLabel} ]";
         var battleWinners = winners.Select(o => o with { Bet = false, Delta = 0 }).ToList();
         var battleLosers = losers.Select(o => o with { Bet = false, Delta = 0 }).ToList();
         var battleSummary = new RevealSummary(summary.LeftVotes, summary.RightVotes, battleWinners, battleLosers, []);
 
         Section(sb, "8. /turf battle (only the caller sees these replies)");
         sb.AppendLine(Show(MessageText.BattleStarted(battle, started: true)));
-        sb.AppendLine(Show(MessageText.BattleStarted(battle, started: false)));
+        sb.AppendLine(Show(MessageText.BattleStarted(battle, started: false)) + "  (the command is disabled while a battle runs)");
+        sb.AppendLine(Show(MessageText.BattleReusedMessage(battle, "https://discord.com/channels/1/2/3")) + "  (today's battle message was reset)");
         sb.AppendLine();
 
         Section(sb, "9. Regular Battle message (15 minutes, not scored, no Bet button)");
         Embed(sb, MessageText.RoundTitle(battle),
             Show(MessageText.RoundDescription(battle, options.Game.ShowVoteCount ? voters.Select(v => v with { Bet = false }).ToList() : null,
                 closed: false, difficulty: options.Generator.Difficulty)),
-            $"round_{battle.Id}.png", MessageText.RoundFooter(battle));
+            $"round_{battle.Id}.png", MessageText.RoundFooter(battle), Stamp(battle));
         sb.AppendLine($"Buttons: {battleButtons}");
         sb.AppendLine();
 
         Section(sb, "9b. Regular Battle with show-votes (who voted for which team)");
         Embed(sb, MessageText.RoundTitle(publicBattle),
             Show(MessageText.RoundDescription(publicBattle, battleVoters, closed: false, difficulty: options.Generator.Difficulty)),
-            $"round_{battle.Id}.png", MessageText.RoundFooter(publicBattle));
+            $"round_{battle.Id}.png", MessageText.RoundFooter(publicBattle), Stamp(publicBattle));
         sb.AppendLine($"Buttons: {battleButtons}");
         sb.AppendLine(Show(MessageText.VoteAccepted(publicBattle, Side.Left)));
         sb.AppendLine();
@@ -160,9 +163,11 @@ public static partial class MessagePreview
         Section(sb, "10. Regular Battle reveal (no points, no weekly standings, no pings)");
         Embed(sb, null, Show(MessageText.Reveal(battle, battleSummary, options.Game.MaxListedWinners)),
             $"reveal_{battle.Id}.png", MessageText.RevealFooter(battle));
+        sb.AppendLine($"Buttons: [ {MessageText.BattleResetButtonEmoji} {MessageText.BattleResetButtonLabel} ]  (the reveal is written over the battle's own message)");
+        sb.AppendLine(Show(MessageText.BattleAlreadyRunning(battle)) + "  (pressing Reset while a battle runs)");
         sb.AppendLine();
 
-        Section(sb, "11. /turf battle-reveal (only the caller sees these replies)");
+        Section(sb, "11. /turf battle-reveal or the Reveal button (only the caller sees these replies)");
         sb.AppendLine(MessageText.BattleRevealing);
         sb.AppendLine(MessageText.BattleRevealNotAllowed);
         sb.AppendLine(MessageText.NoBattleRunning);
@@ -176,12 +181,12 @@ public static partial class MessagePreview
         sb.AppendLine(new string('─', Math.Min(title.Length, 72)));
     }
 
-    private static void Embed(StringBuilder sb, string? title, string description, string image, string footer)
+    private static void Embed(StringBuilder sb, string? title, string description, string image, string footer, string? timestamp = null)
     {
         if (title is not null) sb.AppendLine($"│ **{title}**");
         foreach (var line in description.Split('\n')) sb.AppendLine($"│ {line}");
         sb.AppendLine($"│ [image: {image}]");
-        sb.AppendLine($"│ {footer}");
+        sb.AppendLine($"│ {footer}{(timestamp is null ? "" : " · " + timestamp)}");
     }
 
     /// <summary>Resolves &lt;t:unix:style&gt; timestamps and &lt;@id&gt; mentions roughly as a Discord client shows them.</summary>

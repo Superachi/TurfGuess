@@ -23,6 +23,23 @@ public class SpawnPaintTests
     }
 
     [Fact]
+    public void Infiltrators_keep_shares_exact_and_change_the_picture()
+    {
+        int differing = 0;
+        for (ulong seed = 1; seed <= 6; seed++)
+        {
+            var off = new GeneratorOptions { Paint = { PixelsPerCell = 4, InfiltratorChancePerTeam = 0 } };
+            var on = new GeneratorOptions { Paint = { PixelsPerCell = 4, InfiltratorChancePerTeam = 1 } };
+            var a = RoundGenerator.Generate(seed, off);
+            var b = RoundGenerator.Generate(seed, on);
+            Assert.InRange(b.Score.WinnerShare * 100, on.Difficulty.MinWinnerShare - 0.05, on.Difficulty.MaxWinnerShare + 0.05);
+            if (!a.Paint.Mask.AsSpan().SequenceEqual(b.Paint.Mask)) differing++;
+            Assert.True(b.Paint.Mask.AsSpan().SequenceEqual(RoundGenerator.Generate(seed, on).Paint.Mask), "deterministic");
+        }
+        Assert.True(differing > 0);
+    }
+
+    [Fact]
     public void Chance_zero_and_one_control_diligence()
     {
         for (ulong seed = 1; seed <= 5; seed++)

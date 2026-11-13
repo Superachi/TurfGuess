@@ -380,48 +380,79 @@ public static class MessageText
         return sb.ToString();
     }
 
-    /// <summary>Most characters of a standings list; Discord allows 2000 per message.</summary>
+    /// <summary>Most characters of a standings message; Discord allows 2000.</summary>
     private const int ListBudget = 1900;
 
-    /// <summary>The current week's standings for <c>/turf standings</c>, as many players as fit in one message.</summary>
-    public static string WeeklyStandings(string weekStart, IReadOnlyList<StandingEntry> standings)
+    /// <summary>Longest name shown in a standings table; longer ones end in "...".</summary>
+    public const int NameWidth = 24;
+
+    /// <summary>The current week's standings for <c>/turf standings</c>, as a table with as many players as fit in one message.</summary>
+    public static string WeeklyStandings(string weekStart, IReadOnlyList<StandingEntry> standings, IReadOnlyDictionary<ulong, string> names)
     {
         string title = $"📊 **Weekly standings · Week {Weekly.WeekNumber(weekStart)}**";
-        if (standings.Count == 0) return $"{title}{'\n'}Nobody has scored yet this week.";
+        if (standings.Count == 0) return $"{title}\nNobody has scored yet this week.";
 
         var leaders = Weekly.WeekWinners(standings);
-        var lines = standings.Select((e, i) =>
-            $"{i + 1}. {(leaders.Contains(e) ? "🏆 " : "")}<@{e.UserId}> {Plural(e.Points, "pt")} · {Plural(e.Wins, "win")}").ToList();
-        return Standings(title, lines);
+        string Row(string mark, string rank, string name, string points, string wins) =>
+            $"{mark}{rank,2}  {name,-NameWidth}  {points,4}  {wins,4}".TrimEnd();
+
+        var rows = standings.Select((e, i) =>
+            Row(leaders.Contains(e) ? "*" : " ", (i + 1).ToString(), ShortName(names, e.UserId), e.Points.ToString(), e.Wins.ToString())).ToList();
+        return Table(title, Row(" ", "#", "Player", "Pts", "Wins"), rows, leaders.Count > 0 ? "-# * leading the week" : null);
     }
 
     /// <summary>The all-time standings for <c>/turf all-time</c>: trophies and the ranked and regular win/loss record.</summary>
-    public static string AllTimeStandings(IReadOnlyList<AllTimeEntry> entries)
+    public static string AllTimeStandings(IReadOnlyList<AllTimeEntry> entries, IReadOnlyDictionary<ulong, string> names)
     {
         const string title = "🏛️ **All-time standings**";
-        if (entries.Count == 0) return $"{title}{'\n'}No round has been revealed yet.";
+        if (entries.Count == 0) return $"{title}\nNo round has been revealed yet.";
 
-        var lines = entries.Select((e, i) =>
-            $"{i + 1}. <@{e.UserId}> 🏆 {e.Trophies} · {RankedEmoji} {Record(e.RankedWins, e.RankedLosses)} · {RegularEmoji} {Record(e.RegularWins, e.RegularLosses)}").ToList();
-        return Standings(title, lines) + "\n-# 🏆 weekly trophies · wins–losses (win rate) in guesses";
+        string Row(string rank, string name, string trophies, string ranked, string regular) =>
+            $"{rank,3}  {name,-NameWidth} {trophies,2}  {ranked,-12}  {regular}".TrimEnd();
+
+        var rows = entries.Select((e, i) =>
+            Row((i + 1).ToString(), ShortName(names, e.UserId), e.Trophies.ToString(),
+                RecordCell(e.RankedWins, e.RankedLosses), RecordCell(e.RegularWins, e.RegularLosses))).ToList();
+        return Table(title, Row("#", "Player", "Tr", "Ranked", "Regular"), rows,
+            "-# Tr = weekly trophies · W-L = right-wrong guesses, with the win rate");
     }
 
-    /// <summary>"6W–2L (75%)", or "–" for a player who never played that kind.</summary>
-    public static string Record(int wins, int losses) =>
-        wins + losses == 0 ? "–" : $"{wins}W–{losses}L ({100 * wins / (wins + losses)}%)";
+    /// <summary>"6W-2L   75%", or "-" for a player who never played that kind.</summary>
+    public static string RecordCell(int wins, int losses) =>
+        wins + losses == 0 ? "-" : $"{wins}W-{losses}L".PadRight(7) + $"{100 * wins / (wins + losses)}%".PadLeft(5);
 
-    /// <summary>A title and as many lines as fit; whoever is left out is counted.</summary>
-    private static string Standings(string title, IReadOnlyList<string> lines)
+    /// <summary>
+    /// The name to show for a player: their latest known user name, cut to <see cref="NameWidth"/> characters
+    /// with "..." for the rest. Falls back to the id. Backticks and line breaks are removed so they can't break the table.
+    /// </summary>
+    public static string ShortName(IReadOnlyDictionary<ulong, string> names, ulong userId)
     {
-        var sb = new StringBuilder(title);
+        string name = names.TryGetValue(userId, out var n) && !string.IsNullOrWhiteSpace(n) ? n.Trim() : userId.ToString();
+        name = name.Replace('`', '\'').Replace('\r', ' ').Replace('\n', ' ');
+        var info = new System.Globalization.StringInfo(name);
+        return info.LengthInTextElements <= NameWidth ? name : info.SubstringByTextElements(0, NameWidth - 3) + "...";
+    }
+
+    /// <summary>
+    /// A title, then the rows in a code block (so the columns line up), as many as fit; whoever is left
+    /// out is counted. <paramref name="note"/> is small print under the table.
+    /// </summary>
+    private static string Table(string title, string header, IReadOnlyList<string> rows, string? note)
+    {
+        var table = new StringBuilder(header);
         int shown = 0;
-        foreach (var line in lines)
+        // Room for the title, the code fence, the "...and N more" line and the note.
+        int budget = ListBudget - title.Length - (note?.Length ?? 0) - 60;
+        foreach (var row in rows)
         {
-            if (sb.Length + 1 + line.Length > ListBudget) break;
-            sb.Append('\n').Append(line);
+            if (table.Length + 1 + row.Length > budget) break;
+            table.Append('\n').Append(row);
             shown++;
         }
-        if (shown < lines.Count) sb.Append($"\n…and {lines.Count - shown} more");
+
+        var sb = new StringBuilder(title).Append("\n```\n").Append(table).Append("\n```");
+        if (shown < rows.Count) sb.Append($"\n…and {rows.Count - shown} more");
+        if (note is not null) sb.Append('\n').Append(note);
         return sb.ToString();
     }
 

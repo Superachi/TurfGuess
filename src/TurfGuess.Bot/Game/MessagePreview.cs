@@ -195,14 +195,17 @@ public static partial class MessagePreview
         Card(sb, MessageText.RevealPing(battle, correct: true, bet: false, delta: null, SampleRevealMessageId), Show);
 
         Section(sb, "14. /turf standings and /turf all-time (only the caller sees these replies)");
-        sb.AppendLine(Show(MessageText.WeeklyStandings("2026-11-02", standings)));
+        var tableNames = ids.Select((id, i) => (id, name: $"Player{i + 1}")).ToDictionary(x => x.id, x => x.name);
+        tableNames[ids[2]] = "TheLongestUsernameEverMade_xX"; // shows how long names are cut
+        sb.AppendLine(MessageText.WeeklyStandings("2026-11-02", standings, tableNames));
         sb.AppendLine();
-        sb.AppendLine(Show(MessageText.AllTimeStandings(
+        sb.AppendLine(MessageText.AllTimeStandings(
         [
             new AllTimeEntry(ids[0], 3, 21, 9, 6, 2),
             new AllTimeEntry(ids[1], 1, 18, 12, 0, 0),
             new AllTimeEntry(ids[2], 0, 4, 6, 9, 3),
-        ])));
+            new AllTimeEntry(ids[3], 0, 0, 0, 1, 0),
+        ], tableNames));
         sb.AppendLine();
 
         return sb.ToString();

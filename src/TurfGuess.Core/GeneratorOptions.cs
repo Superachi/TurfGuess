@@ -91,13 +91,13 @@ public sealed class PaintOptions
     /// Long, curving, broken-up trails each team runs through the other team's turf, starting at
     /// its own side of the front line, like players running through the enemy half. 0 = none.
     /// </summary>
-    public int RaidTrailsPerTeam { get; set; } = 4;
+    public int RaidTrailsPerTeam { get; set; } = 8;
 
     /// <summary>
     /// Chance, per team and round, that a player sneaked past the front and painted part of the enemy
     /// base: a thin approach trail ending in a blotchy patch near the enemy spawn. 0 = none.
     /// </summary>
-    public double InfiltratorChancePerTeam { get; set; } = 0.5;
+    public double InfiltratorChancePerTeam { get; set; } = 0;
 
     /// <summary>Chance that an infiltrating team sent a second sneak.</summary>
     public double InfiltratorExtraChance { get; set; } = 0.3;

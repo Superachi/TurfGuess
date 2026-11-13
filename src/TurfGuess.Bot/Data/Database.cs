@@ -87,5 +87,38 @@ public sealed class Database
             voted_at  INTEGER NOT NULL,
             PRIMARY KEY (round_id, user_id)
         );
+
+        -- A row means the player wants to bet on this round. It only counts if they also voted.
+        CREATE TABLE IF NOT EXISTS bets (
+            round_id  INTEGER NOT NULL REFERENCES rounds (id),
+            user_id   INTEGER NOT NULL,
+            PRIMARY KEY (round_id, user_id)
+        );
+
+        -- One row per voter per revealed round, written once at the reveal. delta is the change
+        -- actually applied to the weekly score (after the 0 floor). week_start is the Monday, yyyy-MM-dd.
+        CREATE TABLE IF NOT EXISTS round_results (
+            round_id   INTEGER NOT NULL REFERENCES rounds (id),
+            user_id    INTEGER NOT NULL,
+            week_start TEXT    NOT NULL,
+            correct    INTEGER NOT NULL,
+            bet        INTEGER NOT NULL,
+            delta      INTEGER NOT NULL,
+            PRIMARY KEY (round_id, user_id)
+        );
+        CREATE INDEX IF NOT EXISTS round_results_week ON round_results (week_start);
+
+        -- Weeks whose summary is done, and who won them (the trophy tally).
+        CREATE TABLE IF NOT EXISTS closed_weeks (
+            week_start TEXT PRIMARY KEY
+        );
+
+        CREATE TABLE IF NOT EXISTS weekly_winners (
+            week_start TEXT    NOT NULL,
+            user_id    INTEGER NOT NULL,
+            points     INTEGER NOT NULL,
+            wins       INTEGER NOT NULL,
+            PRIMARY KEY (week_start, user_id)
+        );
         """;
 }

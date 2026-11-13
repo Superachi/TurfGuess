@@ -59,6 +59,7 @@ var database = new Database(options.Database.Path);
 database.EnsureSchema();
 services.AddSingleton(database);
 services.AddSingleton<RoundRepository>();
+services.AddSingleton<ScoreRepository>();
 
 // Game
 services.AddSingleton<ISeedSource, RandomSeedSource>();

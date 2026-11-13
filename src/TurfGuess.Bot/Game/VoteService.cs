@@ -42,6 +42,24 @@ public sealed class VoteService(RoundRepository repo, TimeProvider clock, ILogge
         return VoteResult.Accepted;
     }
 
+    /// <summary>
+    /// Flips the player's bet on the round. Returns the new state (true = betting) or null when
+    /// voting is closed. A bet only counts if the player has also voted when the round is revealed.
+    /// </summary>
+    public bool? ToggleBet(long roundId, ulong userId, string userName)
+    {
+        bool? bet = repo.ToggleBet(roundId, (long)userId);
+        if (bet is null)
+        {
+            logger.LogInformation("Round {RoundId}: {UserName} ({UserId}) pressed Bet after voting closed; rejected.", roundId, userName, userId);
+            return null;
+        }
+
+        logger.LogInformation("Round {RoundId}: {UserName} ({UserId}) turned their bet {State}.", roundId, userName, userId, bet.Value ? "on" : "off");
+        VoteRecorded?.Invoke(roundId);
+        return bet;
+    }
+
     /// <summary>Parses a button id like "vote:12:left".</summary>
     public static bool TryParseButton(string roundIdText, string sideText, out long roundId, out Side side)
     {

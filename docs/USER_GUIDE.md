@@ -42,6 +42,16 @@ What makes it fun:
 
 Each round runs from one round time to the next, which is normally 24 hours.
 
+### Points, bets and the weekly competition
+
+Every round has a difficulty rank from C (easiest) to X (hardest), worth 1 to 5 points.
+
+- **A correct guess earns the round's points.** A wrong guess costs nothing.
+- **Press 🎲 Bet** to risk those points: a correct guess earns **double**, a wrong guess **loses** the round's points. Press it again to take the bet back. You can change your bet, like your vote, until the reveal. A bet only counts if you voted too.
+- **Your weekly score never drops below 0**, so you can always catch up.
+- The reveal lists winners and losers with their points (🎲 marks a bet, `~` means no change) and the top 3 of the week.
+- **Weeks run Monday to Monday** in the game's time zone (`Game:TimeZone`). After the first reveal of a new week, the bot announces last week's winner: the most points, then the most wins (correct guesses). Players still tied all win. Everyone starts the new week at 0.
+
 ### Reading an arena
 
 ![A round image](images/round_example.png)

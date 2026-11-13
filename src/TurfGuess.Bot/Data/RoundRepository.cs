@@ -1,4 +1,5 @@
 using Dapper;
+using TurfGuess.Bot.Game;
 using TurfGuess.Core.Grid;
 
 namespace TurfGuess.Bot.Data;
@@ -124,12 +125,48 @@ public sealed class RoundRepository(Database db)
     /// Everyone who voted in a round, for the round message, sorted by name. Not by vote time:
     /// changing a vote updates voted_at, so that order would show who switched sides.
     /// </summary>
-    public IReadOnlyList<ulong> GetVoterIds(long roundId)
+    public IReadOnlyList<Voter> GetVoters(long roundId)
     {
         using var c = db.Open();
-        return c.Query<long>(
-            "SELECT user_id FROM votes WHERE round_id = @roundId ORDER BY user_name COLLATE NOCASE, user_id",
-            new { roundId }).Select(id => (ulong)id).ToList();
+        return c.Query<(long UserId, long Bet)>("""
+            SELECT v.user_id AS UserId,
+                   EXISTS (SELECT 1 FROM bets b WHERE b.round_id = v.round_id AND b.user_id = v.user_id) AS Bet
+            FROM votes v WHERE v.round_id = @roundId
+            ORDER BY v.user_name COLLATE NOCASE, v.user_id
+            """, new { roundId }).Select(r => new Voter((ulong)r.UserId, r.Bet != 0)).ToList();
+    }
+
+    /// <summary>
+    /// Flips a player's bet on a round, but only while the round is Open. Returns the new state
+    /// (true = betting), or null when voting is closed or the round doesn't exist.
+    /// </summary>
+    public bool? ToggleBet(long roundId, long userId)
+    {
+        using var c = db.Open();
+        using var tx = c.BeginTransaction();
+        bool open = c.ExecuteScalar<long>("SELECT COUNT(*) FROM rounds WHERE id = @roundId AND status = 'Open'",
+            new { roundId }, tx) > 0;
+        if (!open) return null;
+
+        int removed = c.Execute("DELETE FROM bets WHERE round_id = @roundId AND user_id = @userId", new { roundId, userId }, tx);
+        if (removed == 0)
+            c.Execute("INSERT INTO bets (round_id, user_id) VALUES (@roundId, @userId)", new { roundId, userId }, tx);
+        tx.Commit();
+        return removed == 0;
+    }
+
+    public bool HasBet(long roundId, long userId)
+    {
+        using var c = db.Open();
+        return c.ExecuteScalar<long>("SELECT COUNT(*) FROM bets WHERE round_id = @roundId AND user_id = @userId",
+            new { roundId, userId }) > 0;
+    }
+
+    /// <summary>Who placed a bet on the round (voters or not).</summary>
+    public IReadOnlySet<long> GetBettorIds(long roundId)
+    {
+        using var c = db.Open();
+        return c.Query<long>("SELECT user_id FROM bets WHERE round_id = @roundId", new { roundId }).ToHashSet();
     }
 
     public int CountVotes(long roundId)

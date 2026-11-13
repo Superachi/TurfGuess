@@ -12,6 +12,7 @@ public sealed class TestEnvironment : IDisposable
     public BotOptions Options { get; }
     public Database Database { get; }
     public RoundRepository Repo { get; }
+    public ScoreRepository Scores { get; }
     public FakeChannel Channel { get; } = new();
     public FixedSeeds Seeds { get; } = new();
     public RoundImages Images { get; }
@@ -33,8 +34,9 @@ public sealed class TestEnvironment : IDisposable
         Database = new Database(Options.Database.Path);
         Database.EnsureSchema();
         Repo = new RoundRepository(Database);
+        Scores = new ScoreRepository(Database);
         Images = new RoundImages(Options, NullLogger<RoundImages>.Instance);
-        Rounds = new RoundService(Repo, Channel, Images, Options, Seeds, Log.For<RoundService>());
+        Rounds = new RoundService(Repo, Scores, Channel, Images, Options, Seeds, Log.For<RoundService>());
         Votes = new VoteService(Repo, TimeProvider.System, Log.For<VoteService>());
     }
 
@@ -79,8 +81,9 @@ public sealed class FakeChannel : IRoundChannel
     public List<Message> Messages { get; } = [];
     public List<(long RoundId, RevealSummary Summary)> Reveals { get; } = [];
     public HashSet<long> ClosedRounds { get; } = [];
-    public List<(long RoundId, IReadOnlyList<ulong> Voters)> VoterUpdates { get; } = [];
-    public Dictionary<long, IReadOnlyList<ulong>?> ClosedWithVoters { get; } = [];
+    public List<string> WeekSummaries { get; } = [];
+    public List<(long RoundId, IReadOnlyList<Voter> Voters)> VoterUpdates { get; } = [];
+    public Dictionary<long, IReadOnlyList<Voter>?> ClosedWithVoters { get; } = [];
 
     /// <summary>When set, the next post succeeds on "Discord" but then throws, like a crash right after sending.</summary>
     public bool CrashAfterNextPost { get; set; }
@@ -97,14 +100,14 @@ public sealed class FakeChannel : IRoundChannel
         return Post(round.Id, "round");
     }
 
-    public Task CloseRoundMessageAsync(RoundRecord round, IReadOnlyList<ulong>? voters, CancellationToken ct)
+    public Task CloseRoundMessageAsync(RoundRecord round, IReadOnlyList<Voter>? voters, CancellationToken ct)
     {
         ClosedRounds.Add(round.Id);
         ClosedWithVoters[round.Id] = voters;
         return Task.CompletedTask;
     }
 
-    public Task UpdateVotersAsync(RoundRecord round, IReadOnlyList<ulong> voters, CancellationToken ct)
+    public Task UpdateVotersAsync(RoundRecord round, IReadOnlyList<Voter> voters, CancellationToken ct)
     {
         VoterUpdates.Add((round.Id, voters));
         return Task.CompletedTask;
@@ -118,6 +121,12 @@ public sealed class FakeChannel : IRoundChannel
         Assert.True(File.Exists(imagePath), "reveal image missing");
         Reveals.Add((round.Id, summary));
         return Post(round.Id, "reveal");
+    }
+
+    public Task PostWeekSummaryAsync(string text, CancellationToken ct)
+    {
+        WeekSummaries.Add(text);
+        return Task.CompletedTask;
     }
 
     private Task<ulong> Post(long roundId, string kind)

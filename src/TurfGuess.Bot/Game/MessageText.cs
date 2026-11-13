@@ -121,6 +121,19 @@ public static class MessageText
 
     public const string VotingClosed = "Voting for this round is closed.";
 
+    /// <summary>Shown on a round message after an admin cancelled the round.</summary>
+    public const string RoundCancelled = "**This round was cancelled by an admin.** Voting is closed.";
+
+    /// <summary>How far before the round was created a message may still be from it (clock differences).</summary>
+    public static readonly TimeSpan MessageAgeTolerance = TimeSpan.FromMinutes(1);
+
+    /// <summary>
+    /// Whether a message could belong to this round. Messages older than the round are leftovers from an
+    /// earlier game (for example before the database was replaced) and must not be adopted.
+    /// </summary>
+    public static bool IsFromThisRound(DateTimeOffset messageTime, RoundRecord round) =>
+        messageTime >= round.CreatedAtTime - MessageAgeTolerance;
+
     /// <summary>How many players the weekly standings in the reveal show.</summary>
     public const int StandingsShown = 3;
 

@@ -14,10 +14,10 @@ public sealed class DiscordRoundChannel(DiscordSocketClient client, BotOptions o
     /// <summary>How many recent messages recovery looks through for an already posted message.</summary>
     private const int RecoveryScanLimit = 50;
 
-    public async Task<ulong?> FindRoundMessageAsync(long roundId, CancellationToken ct)
+    public async Task<ulong?> FindRoundMessageAsync(RoundRecord round, CancellationToken ct)
     {
-        string prefix = MessageText.ButtonIdPrefix(roundId);
-        foreach (var m in await RecentOwnMessagesAsync(ct))
+        string prefix = MessageText.ButtonIdPrefix(round.Id);
+        foreach (var m in await RecentOwnMessagesAsync(round, ct))
             if (ButtonIds(m.Components).Any(id => id.StartsWith(prefix, StringComparison.Ordinal)))
                 return m.Id;
         return null;
@@ -57,10 +57,21 @@ public sealed class DiscordRoundChannel(DiscordSocketClient client, BotOptions o
             Request(ct));
     }
 
-    public async Task<ulong?> FindRevealMessageAsync(long roundId, CancellationToken ct)
+    public async Task CancelRoundMessageAsync(RoundRecord round, CancellationToken ct)
     {
-        string footer = MessageText.RevealFooter(roundId);
-        foreach (var m in await RecentOwnMessagesAsync(ct))
+        var message = await RoundMessageAsync(round, ct);
+        if (message is null) return;
+        await message.ModifyAsync(p =>
+        {
+            p.Components = Buttons(round, disabled: true);
+            p.Embed = RoundEmbed(round, MessageText.RoundCancelled, AttachedFileName(message, round));
+        }, Request(ct));
+    }
+
+    public async Task<ulong?> FindRevealMessageAsync(RoundRecord round, CancellationToken ct)
+    {
+        string footer = MessageText.RevealFooter(round.Id);
+        foreach (var m in await RecentOwnMessagesAsync(round, ct))
             if (m.Embeds.Any(e => e.Footer?.Text == footer))
                 return m.Id;
         return null;
@@ -100,11 +111,11 @@ public sealed class DiscordRoundChannel(DiscordSocketClient client, BotOptions o
                ?? throw new InvalidOperationException($"Channel {options.Discord.ChannelId} not found, or it isn't a text channel.");
     }
 
-    private async Task<IReadOnlyList<IMessage>> RecentOwnMessagesAsync(CancellationToken ct)
+    private async Task<IReadOnlyList<IMessage>> RecentOwnMessagesAsync(RoundRecord round, CancellationToken ct)
     {
         var channel = await ChannelAsync();
         var messages = await channel.GetMessagesAsync(RecoveryScanLimit, options: Request(ct)).FlattenAsync();
-        return messages.Where(m => m.Author.Id == client.CurrentUser.Id).ToList();
+        return messages.Where(m => m.Author.Id == client.CurrentUser.Id && MessageText.IsFromThisRound(m.Timestamp, round)).ToList();
     }
 
     private async Task<IUserMessage?> RoundMessageAsync(RoundRecord round, CancellationToken ct)

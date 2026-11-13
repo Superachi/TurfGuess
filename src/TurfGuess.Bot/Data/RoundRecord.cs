@@ -57,6 +57,7 @@ public sealed class RoundRecord
 
     public Side WinnerSide => SideCodec.Parse(Winner);
     public DateTimeOffset RevealAtTime => DateTimeOffset.FromUnixTimeSeconds(RevealAt);
+    public DateTimeOffset CreatedAtTime => DateTimeOffset.FromUnixTimeSeconds(CreatedAt);
 
     public string TeamName(Side side) => side == Side.Left ? LeftName : RightName;
     public string TeamEmoji(Side side) => side == Side.Left ? LeftEmoji : RightEmoji;

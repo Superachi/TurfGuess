@@ -37,8 +37,43 @@ public sealed class RoundService(
 {
     private const int MaxStepsPerAdvance = 12;
 
+    // Advancing and resetting never run at the same time.
+    private readonly SemaphoreSlim _gate = new(1, 1);
+
     /// <summary>Advances the game as far as it can at <paramref name="now"/>. Returns when to call again.</summary>
     public async Task<DateTimeOffset> AdvanceAsync(DateTimeOffset now, CancellationToken ct)
+    {
+        await _gate.WaitAsync(ct);
+        try { return await AdvanceCoreAsync(now, ct); }
+        finally { _gate.Release(); }
+    }
+
+    /// <summary>
+    /// Cancels the current round (admin reset): its message is disabled, it is never revealed or scored,
+    /// and the next <see cref="AdvanceAsync"/> starts a new round. Weekly scores are untouched.
+    /// Returns the cancelled round, or null when there was none.
+    /// </summary>
+    public async Task<RoundRecord?> ResetRoundAsync(CancellationToken ct)
+    {
+        await _gate.WaitAsync(ct);
+        try
+        {
+            var round = repo.GetActive();
+            if (round is null) return null;
+
+            repo.Abandon(round.Id);
+            logger.LogInformation("Round {RoundId}: cancelled by an admin (was {Status}, {Votes} votes).", round.Id, round.Status, repo.CountVotes(round.Id));
+            try { await channel.CancelRoundMessageAsync(round, ct); }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogWarning(ex, "Round {RoundId}: couldn't update the cancelled round's message.", round.Id);
+            }
+            return round;
+        }
+        finally { _gate.Release(); }
+    }
+
+    private async Task<DateTimeOffset> AdvanceCoreAsync(DateTimeOffset now, CancellationToken ct)
     {
         for (int step = 0; step < MaxStepsPerAdvance; step++)
         {
@@ -132,7 +167,7 @@ public sealed class RoundService(
 
     private async Task PostAsync(RoundRecord round, DateTimeOffset now, CancellationToken ct)
     {
-        ulong? messageId = await channel.FindRoundMessageAsync(round.Id, ct);
+        ulong? messageId = await channel.FindRoundMessageAsync(round, ct);
         if (messageId is null)
         {
             var (imagePath, _) = images.Ensure(round);
@@ -154,7 +189,7 @@ public sealed class RoundService(
         var votes = repo.GetVotes(round.Id);
         await channel.CloseRoundMessageAsync(round, options.Game.ShowVoteCount ? repo.GetVoters(round.Id) : null, ct);
 
-        ulong? revealId = await channel.FindRevealMessageAsync(round.Id, ct);
+        ulong? revealId = await channel.FindRevealMessageAsync(round, ct);
         if (revealId is null)
         {
             var summary = ScoreRound(round, votes);

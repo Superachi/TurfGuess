@@ -260,7 +260,7 @@ Paint should *flow* from each spawn and wrap around obstacles, not just split th
   | Pink vs Green | `#E0559A` / `#1E9A52` |
   | Orange vs Blue | `#DE6624` / `#343BC4` |
   | Yellow vs Blue | `#D4AE0A` / `#343BC4` |
-  | Purple vs Sky Blue | `#8E3CC4` / `#17A2F5` |
+  | Purple vs Sky Blue | `#8E3CC4` / `#00B4FF` |
   | Blue Purple vs Orange | `#6C3FD1` / `#DE6624` |
   | Lime Green vs Purple | `#62C024` / `#8E3CC4` |
   | Silver vs Royal Blue | `#D2D7E0` / `#5A7FEA` |

@@ -9,7 +9,7 @@ using TurfGuess.Core.Grid;
 namespace TurfGuess.Bot.Discord;
 
 /// <summary>The Discord implementation of <see cref="IRoundChannel"/>.</summary>
-public sealed class DiscordRoundChannel(DiscordSocketClient client, BotOptions options) : IRoundChannel
+public sealed class DiscordRoundChannel(DiscordSocketClient client, BotOptions options, SettingsRepository settings) : IRoundChannel
 {
     /// <summary>How many recent messages recovery looks through for an already posted message.</summary>
     private const int RecoveryScanLimit = 50;
@@ -25,7 +25,7 @@ public sealed class DiscordRoundChannel(DiscordSocketClient client, BotOptions o
 
     public async Task<ulong> PostRoundAsync(RoundRecord round, string imagePath, CancellationToken ct, ulong? replaceMessageId = null)
     {
-        var channel = await ChannelAsync();
+        var channel = await ChannelAsync(round);
         string fileName = Path.GetFileName(imagePath);
         IReadOnlyList<Voter>? voters = options.Game.ShowVoteCount || round.ShowVotes ? [] : null;
 
@@ -98,7 +98,7 @@ public sealed class DiscordRoundChannel(DiscordSocketClient client, BotOptions o
 
     public async Task<ulong> PostRevealAsync(RoundRecord round, RevealSummary summary, string imagePath, CancellationToken ct)
     {
-        var channel = await ChannelAsync();
+        var channel = await ChannelAsync(round);
         string fileName = Path.GetFileName(imagePath);
         var winnerColor = SKColor.Parse(round.WinnerSide == Side.Left ? round.LeftColor : round.RightColor);
 
@@ -130,9 +130,9 @@ public sealed class DiscordRoundChannel(DiscordSocketClient client, BotOptions o
         return message.Id;
     }
 
-    public async Task ShowBattleRevealButtonAsync(ulong messageId, RoundRecord runningBattle, CancellationToken ct)
+    public async Task ShowBattleRevealButtonAsync(ulong channelId, ulong messageId, RoundRecord runningBattle, CancellationToken ct)
     {
-        var channel = await ChannelAsync();
+        var channel = await ChannelAsync(channelId);
         if (await channel.GetMessageAsync(messageId, options: Request(ct)) is not IUserMessage message) return;
         await message.ModifyAsync(p => p.Components = new ComponentBuilder()
             .WithButton(MessageText.BattleRevealButtonLabel, MessageText.BattleRevealButtonId(runningBattle.Id), ButtonStyle.Primary)
@@ -141,22 +141,25 @@ public sealed class DiscordRoundChannel(DiscordSocketClient client, BotOptions o
 
     public async Task PostWeekSummaryAsync(string text, CancellationToken ct)
     {
-        var channel = await ChannelAsync();
+        var channel = await ChannelAsync(settings.RankedChannelId());
         await channel.SendMessageAsync(text, allowedMentions: AllowedMentions.None, options: Request(ct));
     }
 
     // ---------------------------------------------------------------------------------------
 
-    private async Task<IMessageChannel> ChannelAsync()
+    /// <summary>A round lives in the channel it was created for, so changing the ranked channel doesn't move an open round.</summary>
+    private Task<IMessageChannel> ChannelAsync(RoundRecord round) => ChannelAsync((ulong)round.ChannelId);
+
+    private async Task<IMessageChannel> ChannelAsync(ulong channelId)
     {
-        if (client.GetChannel(options.Discord.ChannelId) is IMessageChannel cached) return cached;
-        return await client.Rest.GetChannelAsync(options.Discord.ChannelId) as IMessageChannel
-               ?? throw new InvalidOperationException($"Channel {options.Discord.ChannelId} not found, or it isn't a text channel.");
+        if (client.GetChannel(channelId) is IMessageChannel cached) return cached;
+        return await client.Rest.GetChannelAsync(channelId) as IMessageChannel
+               ?? throw new InvalidOperationException($"Channel {channelId} not found, or it isn't a text channel.");
     }
 
     private async Task<IReadOnlyList<IMessage>> RecentOwnMessagesAsync(RoundRecord round, CancellationToken ct)
     {
-        var channel = await ChannelAsync();
+        var channel = await ChannelAsync(round);
         var messages = await channel.GetMessagesAsync(RecoveryScanLimit, options: Request(ct)).FlattenAsync();
         return messages.Where(m => m.Author.Id == client.CurrentUser.Id && MessageText.IsFromThisRound(m.Timestamp, round)).ToList();
     }
@@ -164,7 +167,7 @@ public sealed class DiscordRoundChannel(DiscordSocketClient client, BotOptions o
     private async Task<IUserMessage?> RoundMessageAsync(RoundRecord round, CancellationToken ct)
     {
         if (round.MessageId is not { } id) return null;
-        var channel = await ChannelAsync();
+        var channel = await ChannelAsync(round);
         return await channel.GetMessageAsync((ulong)id, options: Request(ct)) as IUserMessage;
     }
 

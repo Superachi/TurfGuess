@@ -21,8 +21,8 @@ public interface IRoundChannel
     /// </summary>
     Task<ulong> PostRoundAsync(RoundRecord round, string imagePath, CancellationToken ct, ulong? replaceMessageId = null);
 
-    /// <summary>Turns a finished Regular Battle's message into a Reveal button, because a battle is running elsewhere.</summary>
-    Task ShowBattleRevealButtonAsync(ulong messageId, RoundRecord runningBattle, CancellationToken ct);
+    /// <summary>Turns a finished Regular Battle's message (in <paramref name="channelId"/>) into a Reveal button, because a battle is running elsewhere.</summary>
+    Task ShowBattleRevealButtonAsync(ulong channelId, ulong messageId, RoundRecord runningBattle, CancellationToken ct);
 
     /// <summary>
     /// Disables the buttons and marks the round message closed. <paramref name="voters"/> is null
@@ -42,7 +42,7 @@ public interface IRoundChannel
     /// <summary>Posts the reveal (text + image). Returns the message id.</summary>
     Task<ulong> PostRevealAsync(RoundRecord round, RevealSummary summary, string imagePath, CancellationToken ct);
 
-    /// <summary>Posts the summary of a finished week (text only, nobody is pinged).</summary>
+    /// <summary>Posts the summary of a finished week in the ranked channel (text only, nobody is pinged).</summary>
     Task PostWeekSummaryAsync(string text, CancellationToken ct);
 }
 

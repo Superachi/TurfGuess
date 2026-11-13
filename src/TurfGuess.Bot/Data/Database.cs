@@ -124,6 +124,12 @@ public sealed class Database
             opted_out_at INTEGER NOT NULL
         );
 
+        -- Settings an admin changes with a command (for example the ranked channel).
+        CREATE TABLE IF NOT EXISTS settings (
+            key   TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS closed_weeks (
             week_start TEXT PRIMARY KEY
         );

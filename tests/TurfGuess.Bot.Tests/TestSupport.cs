@@ -16,6 +16,7 @@ public sealed class TestEnvironment : IDisposable
     public FakeChannel Channel { get; } = new();
     public FakeNotifier Notifier { get; } = new();
     public SubscriptionRepository Subscriptions { get; }
+    public SettingsRepository Settings { get; }
     public FixedSeeds Seeds { get; } = new();
     public RoundImages Images { get; }
     public RoundService Rounds { get; }
@@ -39,7 +40,8 @@ public sealed class TestEnvironment : IDisposable
         Scores = new ScoreRepository(Database);
         Images = new RoundImages(Options, NullLogger<RoundImages>.Instance);
         Subscriptions = new SubscriptionRepository(Database);
-        Rounds = new RoundService(Repo, Scores, Subscriptions, Notifier, Channel, Images, Options, Seeds, Log.For<RoundService>());
+        Settings = new SettingsRepository(Database, Options);
+        Rounds = new RoundService(Repo, Scores, Subscriptions, Settings, Notifier, Channel, Images, Options, Seeds, Log.For<RoundService>());
         Votes = new VoteService(Repo, Scores, Options, TimeProvider.System, Log.For<VoteService>());
     }
 
@@ -131,7 +133,7 @@ public sealed class FakeChannel : IRoundChannel
         return Post(round.Id, "round");
     }
 
-    public Task ShowBattleRevealButtonAsync(ulong messageId, RoundRecord runningBattle, CancellationToken ct) => Task.CompletedTask;
+    public Task ShowBattleRevealButtonAsync(ulong channelId, ulong messageId, RoundRecord runningBattle, CancellationToken ct) => Task.CompletedTask;
 
     public Task CloseRoundMessageAsync(RoundRecord round, IReadOnlyList<Voter>? voters, CancellationToken ct)
     {

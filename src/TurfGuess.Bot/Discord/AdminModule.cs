@@ -17,6 +17,7 @@ public sealed class AdminModule(
     RoundService rounds,
     RoundRepository repo,
     ScoreRepository scores,
+    SettingsRepository settings,
     SchedulerSignal scheduler,
     TimeProvider clock,
     ILogger<AdminModule> logger) : InteractionModuleBase<SocketInteractionContext>
@@ -97,6 +98,32 @@ public sealed class AdminModule(
             p.Content = "Cancelled. The scores are unchanged.";
             p.Components = new ComponentBuilder().Build();
         });
+
+    [SlashCommand("set-ranked-channel", "Choose the channel the daily Ranked Battle is posted in.")]
+    public async Task SetRankedChannelAsync(
+        [Summary("channel", "The channel for ranked battles")]
+        [ChannelTypes(ChannelType.Text, ChannelType.News, ChannelType.PublicThread)] IMessageChannel channel)
+    {
+        if (channel is IGuildChannel guildChannel && Context.Guild.CurrentUser.GetPermissions(guildChannel) is var perms)
+        {
+            string? missing = !perms.ViewChannel ? "View Channel"
+                : !perms.SendMessages ? "Send Messages"
+                : !perms.EmbedLinks ? "Embed Links"
+                : !perms.AttachFiles ? "Attach Files"
+                : null;
+            if (missing is not null)
+            {
+                await RespondAsync(MessageText.RankedChannelUnusable(channel.Id, missing), ephemeral: true);
+                return;
+            }
+        }
+
+        settings.SetRankedChannelId(channel.Id);
+        bool roundOpen = repo.GetActive() is not null;
+        logger.LogInformation("Admin {UserName} ({UserId}) ran /turf-admin set-ranked-channel; ranked battles now go to channel {ChannelId}.",
+            Context.User.Username, Context.User.Id, channel.Id);
+        await RespondAsync(MessageText.RankedChannelChanged(channel.Id, roundOpen), ephemeral: true);
+    }
 
     [SlashCommand("status", "Show the current round.")]
     public async Task StatusAsync()

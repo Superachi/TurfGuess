@@ -130,6 +130,37 @@ public static class MessageText
         (link is null ? "Look at the previous Regular Battle message in the channel."
                       : $"Look at the previous Regular Battle message: {link}");
 
+    /// <summary>The command list for <c>/turf help</c>. Admin commands are only listed for administrators.</summary>
+    public static string Help(bool isAdmin)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("**Turf Guess commands**");
+        sb.AppendLine("`/turf battle [show-votes]`: start a 🔫 Regular Battle in this channel (not scored)");
+        sb.AppendLine("`/turf battle-reveal`: reveal the running battle now (whoever started it, or an admin)");
+        sb.AppendLine("`/turf standings`: this week's standings");
+        sb.AppendLine("`/turf all-time`: trophies and ranked and regular battle records");
+        sb.AppendLine("`/turf subscribe`: get a private message with your result after each round");
+        sb.AppendLine("`/turf unsubscribe`: stop those private messages");
+        sb.Append("`/turf help`: show this list");
+        if (isAdmin)
+        {
+            sb.AppendLine().AppendLine().AppendLine("**Admin commands**");
+            sb.AppendLine("`/turf-admin status`: show the current ranked round");
+            sb.AppendLine("`/turf-admin reveal-now`: reveal the current ranked round now and post the next one");
+            sb.AppendLine("`/turf-admin reset-round`: cancel the current ranked round and start a new one");
+            sb.AppendLine("`/turf-admin reset-scores`: wipe all weekly scores (asks for confirmation)");
+            sb.Append("`/turf-admin set-ranked-channel`: choose the channel ranked battles are posted in");
+        }
+        return sb.ToString();
+    }
+
+    public static string RankedChannelChanged(ulong channelId, bool roundOpen) =>
+        $"⚓ Ranked Battles are now posted in <#{channelId}>." +
+        (roundOpen ? " The round that is running now stays where it is; the next one goes to the new channel." : "");
+
+    public static string RankedChannelUnusable(ulong channelId, string missing) =>
+        $"I can't use <#{channelId}>: I'm missing the {missing} permission there. Give me access and run the command again.";
+
     public const string NoBattleRunning = "There's no Regular Battle running right now.";
     public const string BattleRevealNotAllowed = "Only the player who started this Regular Battle, or an admin, can reveal it early.";
     public const string BattleRevealing = "Revealing the Regular Battle now.";
@@ -352,7 +383,7 @@ public static class MessageText
             sb.Append($"\n{(bet ? "🎲 Bet on" : "No bet")} · {(d == 0 ? "no change in points" : $"{Signed(d)} points")}");
 
         string color = w == Side.Left ? round.LeftColor : round.RightColor;
-        return new DirectMessage(RoundTitle(round), sb.ToString(), UnsubscribeFooter, color, revealMessageId, RevealLinkLabel, OptOutButton: true);
+        return new DirectMessage(RoundTitle(round), sb.ToString(), UnsubscribeFooter, color, revealMessageId, RevealLinkLabel, OptOutButton: true, LinkedChannelId: (ulong)round.ChannelId);
     }
 
     /// <summary>"🎲&lt;@id&gt; (+6)": a 🎲 for a bet, then the points gained, lost, or ~ for no change.</summary>

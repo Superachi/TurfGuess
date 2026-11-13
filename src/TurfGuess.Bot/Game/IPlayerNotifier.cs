@@ -10,6 +10,7 @@ namespace TurfGuess.Bot.Game;
 /// <param name="ColorHex">Accent colour of the card, like <c>#3366ff</c>.</param>
 /// <param name="LinkedMessageId">A message in the game channel to link to, with <paramref name="LinkLabel"/> as the link text.</param>
 /// <param name="LinkLabel">Text of the link to <paramref name="LinkedMessageId"/>.</param>
+/// <param name="LinkedChannelId">The channel that message is in. Null means the game's configured channel.</param>
 /// <param name="OptOutButton">Adds a button that lets the player stop (and later resume) these messages right here.</param>
 public sealed record DirectMessage(
     string? Title,
@@ -18,7 +19,8 @@ public sealed record DirectMessage(
     string? ColorHex = null,
     ulong? LinkedMessageId = null,
     string? LinkLabel = null,
-    bool OptOutButton = false)
+    bool OptOutButton = false,
+    ulong? LinkedChannelId = null)
 {
     public static DirectMessage Plain(string text) => new(null, text);
 }

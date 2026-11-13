@@ -9,8 +9,8 @@ using TurfGuess.Bot.Options;
 namespace TurfGuess.Bot.Discord;
 
 /// <summary>
-/// Player commands under <c>/turf</c>: start a 🔫 Regular Battle (a short round that isn't scored) and
-/// end it early, plus <c>/turf subscribe</c> and <c>/turf unsubscribe</c> (private result messages; they live here because
+/// Player commands under <c>/turf</c>: start a 🔫 Regular Battle (a short round that isn't scored) in any channel and
+/// end it early, <c>/turf help</c>, plus <c>/turf subscribe</c> and <c>/turf unsubscribe</c> (private result messages; they live here because
 /// two modules can't share the group name "turf"). Only one regular battle runs at a time. The daily ⚓ Ranked Battle is unaffected.
 /// </summary>
 [Group("turf", "Play the daily guessing game")]
@@ -30,7 +30,6 @@ public sealed class BattleModule(
     public async Task BattleAsync(
         [Summary("show-votes", "Show who voted for which team while the battle is running (default: no)")] bool showVotes = false)
     {
-        if (await WrongChannelAsync()) return;
         if (!TryBeginSetup())
         {
             await RespondAsync(MessageText.BattleSettingUp, ephemeral: true);
@@ -44,23 +43,27 @@ public sealed class BattleModule(
 
             // Today's battle message is reused (reset) instead of posting another one.
             var last = repo.GetLatestPosted(RoundKind.Regular);
-            ulong? reuse = last?.MessageId is { } id && SameLocalDay(last.CreatedAtTime, now) ? (ulong)id : null;
+            // Only when it is in this channel: a message can't be moved to another one.
+            ulong? reuse = last?.MessageId is { } id && last.ChannelId == (long)Context.Channel.Id && SameLocalDay(last.CreatedAtTime, now) ? (ulong)id : null;
 
-            var (round, started) = await rounds.StartBattleAsync(Context.User.Id, showVotes, now, default, reuse);
+            var (round, started) = await rounds.StartBattleAsync(Context.User.Id, showVotes, now, default, reuse, Context.Channel.Id);
             bool reused = started && reuse is not null && round.MessageId == (long)reuse;
             logger.LogInformation("{UserName} ({UserId}) ran /turf battle: {Result}.", Context.User.Username, Context.User.Id,
                 !started ? $"refused, round {round.Id} is still running"
                 : reused ? $"round {round.Id} started over message {reuse}" : $"round {round.Id} started");
 
             string? link = reused && Context.Guild is { } guild
-                ? $"https://discord.com/channels/{guild.Id}/{options.Discord.ChannelId}/{reuse}" : null;
+                ? $"https://discord.com/channels/{guild.Id}/{Context.Channel.Id}/{reuse}" : null;
             await FollowupAsync(reused ? MessageText.BattleReusedMessage(round, link) : MessageText.BattleStarted(round, started), ephemeral: true);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Starting a regular battle for {UserName} ({UserId}) failed.", Context.User.Username, Context.User.Id);
-            scheduler.Wake(); // a round that was created but not posted is retried by the scheduler
-            await FollowupAsync("Couldn't start the Regular Battle. Please try again in a moment.", ephemeral: true);
+            // A battle that couldn't be posted here (say, the bot can't write in this channel) is dropped, or the
+            // scheduler would retry it forever and no one could start another battle.
+            if (repo.GetActive(RoundKind.Regular) is { Status: RoundStatus.Pending } stuck) repo.Abandon(stuck.Id);
+            scheduler.Wake();
+            await FollowupAsync("Couldn't start the Regular Battle here. Check that I can post in this channel, then try again.", ephemeral: true);
         }
         finally { EndSetup(); }
     }
@@ -68,7 +71,6 @@ public sealed class BattleModule(
     [SlashCommand("battle-reveal", "Reveal the running Regular Battle now. Only the player who started it, or an admin.")]
     public async Task BattleRevealAsync()
     {
-        if (await WrongChannelAsync()) return;
 
         var round = repo.GetActive(RoundKind.Regular);
         if (round is not { Status: RoundStatus.Open })
@@ -162,7 +164,7 @@ public sealed class BattleModule(
         await FollowupAsync(MessageText.BattleSettingUp, ephemeral: true);
         try
         {
-            var (round, started) = await rounds.StartBattleAsync(Context.User.Id, showVotes, clock.GetUtcNow(), default, messageId);
+            var (round, started) = await rounds.StartBattleAsync(Context.User.Id, showVotes, clock.GetUtcNow(), default, messageId, Context.Channel.Id);
             logger.LogInformation("{UserName} ({UserId}) pressed Reset: {Result}.", Context.User.Username, Context.User.Id,
                 started ? $"round {round.Id} started over message {messageId}" : $"refused, round {round.Id} is still running");
             if (!started) await ShowRevealInsteadAsync(messageId, round);
@@ -184,7 +186,7 @@ public sealed class BattleModule(
 
     private async Task ShowRevealInsteadAsync(ulong messageId, RoundRecord running)
     {
-        try { await channelPosts.ShowBattleRevealButtonAsync(messageId, running, default); }
+        try { await channelPosts.ShowBattleRevealButtonAsync(Context.Channel.Id, messageId, running, default); }
         catch (Exception ex) { logger.LogWarning(ex, "Couldn't swap the Reset button for Reveal on message {MessageId}.", messageId); }
         var text = MessageText.BattleAlreadyRunning(running);
         if (Context.Interaction.HasResponded) await FollowupAsync(text, ephemeral: true);
@@ -202,12 +204,11 @@ public sealed class BattleModule(
         return TimeZoneInfo.ConvertTime(a, zone).Date == TimeZoneInfo.ConvertTime(b, zone).Date;
     }
 
-    /// <summary>Battles are posted in the game's channel, so the commands only work there.</summary>
-    private async Task<bool> WrongChannelAsync()
+    [SlashCommand("help", "List the commands you can use (only you see it).")]
+    public async Task HelpAsync()
     {
-        if (Context.Channel.Id == options.Discord.ChannelId) return false;
-        await RespondAsync($"Regular Battles are played in <#{options.Discord.ChannelId}>. Use this command there.", ephemeral: true);
-        return true;
+        bool isAdmin = Context.User is IGuildUser { GuildPermissions.Administrator: true };
+        await RespondAsync(MessageText.Help(isAdmin), ephemeral: true);
     }
 
     [SlashCommand("standings", "Show this week's standings (only you see it).")]

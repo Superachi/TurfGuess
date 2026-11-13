@@ -30,6 +30,7 @@ public sealed class RoundService(
     RoundRepository repo,
     ScoreRepository scores,
     SubscriptionRepository subscriptions,
+    SettingsRepository settings,
     IPlayerNotifier notifier,
     IRoundChannel channel,
     RoundImages images,
@@ -63,9 +64,11 @@ public sealed class RoundService(
 
     /// <summary>
     /// Starts a regular battle (🔫) and posts it. Only one can run at a time: when one is already
-    /// going, nothing is created and that battle is returned with Started = false.
+    /// going, nothing is created and that battle is returned with Started = false. The battle is posted in
+    /// <paramref name="channelId"/> (default: the configured game channel).
     /// </summary>
-    public async Task<(RoundRecord Round, bool Started)> StartBattleAsync(ulong userId, bool showVotes, DateTimeOffset now, CancellationToken ct, ulong? replaceMessageId = null)
+    public async Task<(RoundRecord Round, bool Started)> StartBattleAsync(ulong userId, bool showVotes, DateTimeOffset now, CancellationToken ct,
+        ulong? replaceMessageId = null, ulong? channelId = null)
     {
         await _gate.WaitAsync(ct);
         try
@@ -73,7 +76,7 @@ public sealed class RoundService(
             var running = repo.GetActive(RoundKind.Regular);
             if (running is not null) return (running, false);
 
-            var created = CreateRound(now, RoundKind.Regular, (long)userId, showVotes);
+            var created = CreateRound(now, RoundKind.Regular, channelId ?? options.Discord.ChannelId, (long)userId, showVotes);
             logger.LogInformation("Round {RoundId}: regular battle started by {UserId}{Public}.",
                 created.Id, userId, showVotes ? " with public votes" : "");
 
@@ -121,7 +124,7 @@ public sealed class RoundService(
             if (round is null)
             {
                 if (kind == RoundKind.Regular) return DateTimeOffset.MaxValue;
-                CreateRound(now, RoundKind.Ranked);
+                CreateRound(now, RoundKind.Ranked, settings.RankedChannelId());
                 continue;
             }
 
@@ -154,7 +157,7 @@ public sealed class RoundService(
         return round is { Status: RoundStatus.Open } && repo.SetRevealAt(round.Id, now.ToUnixTimeSeconds());
     }
 
-    private RoundRecord CreateRound(DateTimeOffset now, RoundKind kind, long startedBy = 0, bool showVotes = false)
+    private RoundRecord CreateRound(DateTimeOffset now, RoundKind kind, ulong channelId, long startedBy = 0, bool showVotes = false)
     {
         ulong seed = seeds.NextSeed();
         var generated = RoundGenerator.Generate(seed, options.Generator, regular: kind == RoundKind.Regular);
@@ -167,7 +170,7 @@ public sealed class RoundService(
 
         var record = new RoundRecord
         {
-            ChannelId = (long)options.Discord.ChannelId,
+            ChannelId = (long)channelId,
             Status = RoundStatus.Pending,
             Kind = kind,
             ShowVotes = showVotes,
@@ -227,7 +230,7 @@ public sealed class RoundService(
             }
             logger.LogInformation(
                 "Round {RoundId}: posted in channel {ChannelId} (message {MessageId}), {Left} vs {Right}. Voting is open until {RevealAt}.",
-                round.Id, options.Discord.ChannelId, messageId, round.LeftName, round.RightName, LocalTime(round.RevealAtTime));
+                round.Id, round.ChannelId, messageId, round.LeftName, round.RightName, LocalTime(round.RevealAtTime));
         }
         else
         {

@@ -233,7 +233,7 @@ There are two kinds of round:
 - **⚓ Ranked Battle** is the daily round. It is scored and counts towards the weekly standings. Difficulty is shown with 🔥.
 - **🔫 Regular Battle** is started by any player with a command. It lasts 15 minutes (`Game:BattleLength`), is never scored, never touches the weekly standings, and has no Bet button. Difficulty is shown with 🐟, but only once the battle is over. Regular battles also lean less towards hard rounds than ranked ones. A regular battle runs next to the ranked round, and only one can run at a time.
 
-Both commands only work in the game's channel.
+Both commands work in any channel the bot can post in; the battle is posted in the channel where the command is run. Ranked Battles go to the ranked channel (see `/turf-admin set-ranked-channel` below).
 
 | Command | What it does |
 |---|---|
@@ -266,6 +266,7 @@ These slash commands are only visible to server administrators. Replies are only
 | `/turf-admin status` | Shows the current round: its number, status, colors, reveal time and how many have voted |
 | `/turf-admin reveal-now` | Reveals the current round right away and posts the next one. Useful for testing without waiting a day. |
 | `/turf-admin reset-round` | Cancels the current round (its message is disabled, its votes are dropped, nothing is revealed or scored) and posts a new one straight away. Weekly scores are kept. |
+| `/turf-admin set-ranked-channel` | Chooses the channel the daily Ranked Battle (and the weekly summary) is posted in. It is stored in the database and replaces `Discord:ChannelId`, which stays the default until you set one. The round that is open now stays in its old channel; the next one goes to the new one. The bot must be able to view the channel, send messages, embed links and attach files there. |
 | `/turf-admin reset-scores` | Wipes all weekly points, wins, finished weeks and the trophy tally, after a confirmation. Rounds are kept. |
 
 ### Preview the messages without Discord

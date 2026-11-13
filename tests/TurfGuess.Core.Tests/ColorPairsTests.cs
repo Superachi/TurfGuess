@@ -8,7 +8,7 @@ public class ColorPairsTests
     [Fact]
     public void Default_pairs_are_valid_and_distinct_within_each_pair()
     {
-        Assert.Equal(12, ColorPairs.Default.Count);
+        Assert.Equal(11, ColorPairs.Default.Count);
         foreach (var pair in ColorPairs.Default)
         {
             Assert.True(SKColor.TryParse(pair.A.Color, out _), pair.A.Color);

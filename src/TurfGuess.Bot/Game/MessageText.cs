@@ -312,40 +312,47 @@ public static class MessageText
     public const string SubscribeNoDms =
         "🔔 You're subscribed, but I couldn't send you a message. Allow direct messages from server members " +
         "(Server Settings → Privacy Settings), or the results can't reach you.";
-    public const string AlreadySubscribed = "You're already subscribed. Use `/turf unsubscribe` to stop the messages.";
-    public const string Unsubscribed = "🔕 You're unsubscribed. No more result messages.";
-    public const string NotSubscribed = "You weren't subscribed.";
+    public const string AlreadySubscribed = "You're already getting result messages (that's the default). Use `/turf unsubscribe` to stop them.";
+    public const string Unsubscribed = "🔕 You're unsubscribed. No more result messages. Use `/turf subscribe` to get them again.";
+    public const string NotSubscribed = "You were already unsubscribed.";
 
-    /// <summary>The first direct message after subscribing, to check that messages get through.</summary>
-    public const string SubscribeTestMessage = "🔔 You're subscribed to round results. This is where they'll show up.";
+    /// <summary>The first direct message after subscribing again, to check that messages get through.</summary>
+    public const string SubscribeTestMessage = "🔔 You're subscribed to round results again. This is where they'll show up.";
 
-    /// <summary>Small print (Discord subtext) at the end of every result message.</summary>
-    public const string UnsubscribeFooter = "-# To stop these messages, use /turf unsubscribe in the server.";
+    /// <summary>Footer of every result message.</summary>
+    public const string UnsubscribeFooter = "To stop these messages, press the button below or use /turf unsubscribe in the server.";
+
+    /// <summary>Footer of a result message after the player pressed its button to stop the messages.</summary>
+    public const string OptedOutFooter = "You won't get these messages anymore. To get them again, press the button below or use /turf subscribe in the server.";
+
+    public const string OptOutButtonId = "dm:optout";
+    public const string OptInButtonId = "dm:optin";
+    public const string OptOutButtonLabel = "Stop these messages";
+    public const string OptInButtonLabel = "Turn them back on";
+    public const string OptOutButtonEmoji = "🔕";
+    public const string OptInButtonEmoji = "🔔";
+
+    public const string RevealLinkLabel = "Go to the result in the server";
 
     /// <summary>
-    /// The private result message for one player. Self-contained, since the round message may have
-    /// changed or been deleted by the time it's read. <paramref name="delta"/> is null when the round isn't scored.
+    /// The private result card for one player: a title, right or wrong, who won, and for scored rounds the
+    /// bet and points. Self-contained apart from the link to the reveal message, which is added by the
+    /// notifier. <paramref name="delta"/> is null when the round isn't scored.
     /// </summary>
-    public static string RevealPing(RoundRecord round, Side picked, bool correct, bool bet, int? delta)
+    public static DirectMessage RevealPing(RoundRecord round, bool correct, bool bet, int? delta, ulong revealMessageId)
     {
         var w = round.WinnerSide;
-        var l = Side.Left;
-        var r = Side.Right;
+        var o = w.Opposite();
 
         var sb = new StringBuilder();
-        sb.Append($"{KindName(round.Kind)} · Round #{round.DisplayNumber}\n");
         sb.Append(correct ? "✅ **You guessed right!**\n" : "❌ **You guessed wrong.**\n");
-        sb.Append($"{round.TeamEmoji(w)} **{round.TeamName(w)}** won. ");
-        sb.Append($"{round.TeamEmoji(l)} {round.TeamName(l)} {Pct(round.ShareLeft)} · ");
-        sb.Append($"{round.TeamEmoji(r)} {round.TeamName(r)} {Pct(round.ShareRight)} · ");
-        sb.Append($"{Pct(round.Unpainted)} unpainted\n");
-        sb.Append($"You picked {round.TeamEmoji(picked)} {round.TeamName(picked)}");
+        sb.Append($"{round.TeamEmoji(w)} **{round.TeamName(w)} won with {Pct(round.WinnerShare)}** ");
+        sb.Append($"vs. {round.TeamEmoji(o)} {round.TeamName(o)} {Pct(o == Side.Left ? round.ShareLeft : round.ShareRight)}");
         if (delta is { } d)
-            sb.Append($" · {(bet ? "🎲 bet on" : "no bet")} · {(d == 0 ? "no change in points" : $"{Signed(d)} points")}");
-        else
-            sb.Append(" · no points awarded");
-        sb.Append($"\n{UnsubscribeFooter}");
-        return sb.ToString();
+            sb.Append($"\n{(bet ? "🎲 Bet on" : "No bet")} · {(d == 0 ? "no change in points" : $"{Signed(d)} points")}");
+
+        string color = w == Side.Left ? round.LeftColor : round.RightColor;
+        return new DirectMessage(RoundTitle(round), sb.ToString(), UnsubscribeFooter, color, revealMessageId, RevealLinkLabel, OptOutButton: true);
     }
 
     /// <summary>"🎲&lt;@id&gt; (+6)": a 🎲 for a bet, then the points gained, lost, or ~ for no change.</summary>
@@ -370,6 +377,51 @@ public static class MessageText
             string trophy = leaders.Contains(e) ? "🏆 " : "";
             sb.Append($"\n{i + 1}. {trophy}<@{e.UserId}> {Plural(e.Points, "pt")} · {Plural(e.Wins, "win")}");
         }
+        return sb.ToString();
+    }
+
+    /// <summary>Most characters of a standings list; Discord allows 2000 per message.</summary>
+    private const int ListBudget = 1900;
+
+    /// <summary>The current week's standings for <c>/turf standings</c>, as many players as fit in one message.</summary>
+    public static string WeeklyStandings(string weekStart, IReadOnlyList<StandingEntry> standings)
+    {
+        string title = $"📊 **Weekly standings · Week {Weekly.WeekNumber(weekStart)}**";
+        if (standings.Count == 0) return $"{title}{'\n'}Nobody has scored yet this week.";
+
+        var leaders = Weekly.WeekWinners(standings);
+        var lines = standings.Select((e, i) =>
+            $"{i + 1}. {(leaders.Contains(e) ? "🏆 " : "")}<@{e.UserId}> {Plural(e.Points, "pt")} · {Plural(e.Wins, "win")}").ToList();
+        return Standings(title, lines);
+    }
+
+    /// <summary>The all-time standings for <c>/turf all-time</c>: trophies and the ranked and regular win/loss record.</summary>
+    public static string AllTimeStandings(IReadOnlyList<AllTimeEntry> entries)
+    {
+        const string title = "🏛️ **All-time standings**";
+        if (entries.Count == 0) return $"{title}{'\n'}No round has been revealed yet.";
+
+        var lines = entries.Select((e, i) =>
+            $"{i + 1}. <@{e.UserId}> 🏆 {e.Trophies} · {RankedEmoji} {Record(e.RankedWins, e.RankedLosses)} · {RegularEmoji} {Record(e.RegularWins, e.RegularLosses)}").ToList();
+        return Standings(title, lines) + "\n-# 🏆 weekly trophies · wins–losses (win rate) in guesses";
+    }
+
+    /// <summary>"6W–2L (75%)", or "–" for a player who never played that kind.</summary>
+    public static string Record(int wins, int losses) =>
+        wins + losses == 0 ? "–" : $"{wins}W–{losses}L ({100 * wins / (wins + losses)}%)";
+
+    /// <summary>A title and as many lines as fit; whoever is left out is counted.</summary>
+    private static string Standings(string title, IReadOnlyList<string> lines)
+    {
+        var sb = new StringBuilder(title);
+        int shown = 0;
+        foreach (var line in lines)
+        {
+            if (sb.Length + 1 + line.Length > ListBudget) break;
+            sb.Append('\n').Append(line);
+            shown++;
+        }
+        if (shown < lines.Count) sb.Append($"\n…and {lines.Count - shown} more");
         return sb.ToString();
     }
 

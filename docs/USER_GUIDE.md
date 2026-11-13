@@ -246,8 +246,10 @@ The reveal lists who guessed right and wrong, with no points and no standings.
 
 | Command | What it does |
 |---|---|
-| `/turf subscribe` | After every round (ranked or regular) you voted in, the bot sends you a private DM with the essentials: right or wrong, the paint result, your pick, whether you bet and your points. The message stands on its own, so it still makes sense if the round message is later changed or deleted. The bot sends a test DM right away and warns you if it can't reach you (allow direct messages from server members). |
-| `/turf unsubscribe` | Stops the messages. |
+| `/turf standings` | Shows this week's standings (only you see it). |
+| `/turf all-time` | Shows every player's weekly trophies and their ranked and regular battle record: wins–losses and win rate (only you see it). |
+| `/turf subscribe` | Result DMs are on by default; use this to turn them back on after opting out. After every round (ranked or regular) you voted in, the bot sends you a private DM with the essentials: right or wrong, the paint result, your pick, whether you bet and your points. The message stands on its own, so it still makes sense if the round message is later changed or deleted. When you subscribe again, the bot sends a test DM right away and warns you if it can't reach you (allow direct messages from server members). |
+| `/turf unsubscribe` | Opts you out of the messages. |
 
 A reveal never waits on these: players who can't be reached are logged and skipped.
 

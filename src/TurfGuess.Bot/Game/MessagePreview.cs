@@ -17,6 +17,7 @@ namespace TurfGuess.Bot.Game;
 public static partial class MessagePreview
 {
     private const long SampleRoundId = 12;
+    private const ulong SampleRevealMessageId = 1234567890;
 
     // Ranked rounds and regular battles are counted separately, so the two sample numbers differ.
     private const long SampleRankedNumber = 5;
@@ -182,21 +183,40 @@ public static partial class MessagePreview
 
         Section(sb, "13. Direct messages to subscribers");
         sb.AppendLine("Right after subscribing:");
-        sb.AppendLine(MessageText.SubscribeTestMessage);
+        sb.AppendLine(MessageText.SubscribeTestMessage + "   (plain text)");
         sb.AppendLine();
-        sb.AppendLine("Ranked round, guessed right with a bet:");
-        sb.AppendLine(Show(MessageText.RevealPing(round, winner, correct: true, bet: true, winners[0].Delta)));
-        sb.AppendLine();
+        sb.AppendLine("Ranked round, guessed right with a bet (card in the winner's color):");
+        Card(sb, MessageText.RevealPing(round, correct: true, bet: true, winners[0].Delta, SampleRevealMessageId), Show);
         sb.AppendLine("Ranked round, guessed wrong with a bet:");
-        sb.AppendLine(Show(MessageText.RevealPing(round, winner.Opposite(), correct: false, bet: true, losers[1].Delta)));
-        sb.AppendLine();
+        Card(sb, MessageText.RevealPing(round, correct: false, bet: true, losers[1].Delta, SampleRevealMessageId), Show);
         sb.AppendLine("Ranked round, guessed wrong without a bet:");
-        sb.AppendLine(Show(MessageText.RevealPing(round, winner.Opposite(), correct: false, bet: false, losers[0].Delta)));
-        sb.AppendLine();
+        Card(sb, MessageText.RevealPing(round, correct: false, bet: false, losers[0].Delta, SampleRevealMessageId), Show);
         sb.AppendLine("Regular battle, guessed right:");
-        sb.AppendLine(Show(MessageText.RevealPing(battle, winner, correct: true, bet: false, delta: null)));
+        Card(sb, MessageText.RevealPing(battle, correct: true, bet: false, delta: null, SampleRevealMessageId), Show);
+
+        Section(sb, "14. /turf standings and /turf all-time (only the caller sees these replies)");
+        sb.AppendLine(Show(MessageText.WeeklyStandings("2026-11-02", standings)));
+        sb.AppendLine();
+        sb.AppendLine(Show(MessageText.AllTimeStandings(
+        [
+            new AllTimeEntry(ids[0], 3, 21, 9, 6, 2),
+            new AllTimeEntry(ids[1], 1, 18, 12, 0, 0),
+            new AllTimeEntry(ids[2], 0, 4, 6, 9, 3),
+        ])));
+        sb.AppendLine();
 
         return sb.ToString();
+    }
+
+    /// <summary>Shows a direct message card; the link is drawn as the notifier adds it (the real URL needs the server id).</summary>
+    private static void Card(StringBuilder sb, DirectMessage card, Func<string, string> show)
+    {
+        string body = show(card.Description) + (card.LinkedMessageId is null ? "" : $"\n[{card.LinkLabel}](link to message {card.LinkedMessageId})");
+        sb.AppendLine($"│ **{card.Title}**   (color {card.ColorHex})");
+        foreach (var line in body.Split('\n')) sb.AppendLine($"│ {line}");
+        sb.AppendLine($"│ {card.Footer}");
+        if (card.OptOutButton) sb.AppendLine($"│ [ {MessageText.OptOutButtonEmoji} {MessageText.OptOutButtonLabel} ]   (after pressing: footer \"{MessageText.OptedOutFooter}\" and [ {MessageText.OptInButtonEmoji} {MessageText.OptInButtonLabel} ])");
+        sb.AppendLine();
     }
 
     private static void Section(StringBuilder sb, string title)

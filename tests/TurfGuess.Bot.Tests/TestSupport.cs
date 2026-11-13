@@ -81,10 +81,16 @@ public sealed class FakeNotifier : IPlayerNotifier
     public List<(ulong UserId, string Text)> Sent { get; } = [];
     public HashSet<ulong> Unreachable { get; } = [];
 
-    public Task SendDirectAsync(ulong userId, string text, CancellationToken ct)
+    /// <summary>The cards as sent, by user, for tests that look at the colour or link.</summary>
+    public List<(ulong UserId, DirectMessage Message)> Cards { get; } = [];
+
+    public Task SendDirectAsync(ulong userId, DirectMessage message, CancellationToken ct)
     {
         if (Unreachable.Contains(userId)) throw new InvalidOperationException("Cannot send messages to this user.");
-        Sent.Add((userId, text));
+        Cards.Add((userId, message));
+        // Text is title, body, link and footer in reading order, so tests can check what the player sees.
+        var parts = new[] { message.Title, message.Description, message.LinkedMessageId is { } id ? $"[{message.LinkLabel}](message {id})" : null, message.Footer };
+        Sent.Add((userId, string.Join('\n', parts.Where(p => p is not null))));
         return Task.CompletedTask;
     }
 }

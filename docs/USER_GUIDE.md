@@ -231,7 +231,7 @@ The answer is in the log from the moment a round is created, so don't share the 
 There are two kinds of round:
 
 - **⚓ Ranked Battle** is the daily round. It is scored and counts towards the weekly standings. Difficulty is shown with 🔥.
-- **🔫 Regular Battle** is started by any player with a command. It lasts 15 minutes (`Game:BattleLength`), is never scored, never touches the weekly standings, and has no Bet button. Difficulty is shown with 🐟. A regular battle runs next to the ranked round, and only one can run at a time.
+- **🔫 Regular Battle** is started by any player with a command. It lasts 15 minutes (`Game:BattleLength`), is never scored, never touches the weekly standings, and has no Bet button. Difficulty is shown with 🐟, but only once the battle is over. Regular battles also lean less towards hard rounds than ranked ones. A regular battle runs next to the ranked round, and only one can run at a time.
 
 Both commands only work in the game's channel.
 

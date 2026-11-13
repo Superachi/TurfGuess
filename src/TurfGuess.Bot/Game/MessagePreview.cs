@@ -161,7 +161,7 @@ public static partial class MessagePreview
         sb.AppendLine();
 
         Section(sb, "10. Regular Battle reveal (no points, no weekly standings, no pings)");
-        Embed(sb, null, Show(MessageText.Reveal(battle, battleSummary, options.Game.MaxListedWinners)),
+        Embed(sb, null, Show(MessageText.Reveal(battle, battleSummary, options.Game.MaxListedWinners, difficulty: options.Generator.Difficulty)),
             $"reveal_{battle.Id}.png", MessageText.RevealFooter(battle));
         sb.AppendLine($"Buttons: [ {MessageText.BattleResetButtonEmoji} {MessageText.BattleResetButtonLabel} ]  (the reveal is written over the battle's own message)");
         sb.AppendLine();

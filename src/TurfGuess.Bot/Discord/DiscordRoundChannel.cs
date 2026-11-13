@@ -103,7 +103,7 @@ public sealed class DiscordRoundChannel(DiscordSocketClient client, BotOptions o
         var winnerColor = SKColor.Parse(round.WinnerSide == Side.Left ? round.LeftColor : round.RightColor);
 
         var embed = new EmbedBuilder()
-            .WithDescription(MessageText.Reveal(round, summary, options.Game.MaxListedWinners))
+            .WithDescription(MessageText.Reveal(round, summary, options.Game.MaxListedWinners, difficulty: options.Generator.Difficulty))
             .WithColor(new Color(winnerColor.Red, winnerColor.Green, winnerColor.Blue))
             .WithImageUrl(MessageText.AttachmentUrl(fileName))
             .WithFooter(MessageText.RevealFooter(round))

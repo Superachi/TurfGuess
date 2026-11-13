@@ -315,6 +315,9 @@ public static class MessageText
     /// <summary>The first direct message after subscribing, to check that messages get through.</summary>
     public const string SubscribeTestMessage = "🔔 You're subscribed to round results. This is where they'll show up.";
 
+    /// <summary>Small print (Discord subtext) at the end of every result message.</summary>
+    public const string UnsubscribeFooter = "-# To stop these messages, use /turf unsubscribe in the server.";
+
     /// <summary>
     /// The private result message for one player. Self-contained, since the round message may have
     /// changed or been deleted by the time it's read. <paramref name="delta"/> is null when the round isn't scored.
@@ -337,6 +340,7 @@ public static class MessageText
             sb.Append($" · {(bet ? "🎲 bet on" : "no bet")} · {(d == 0 ? "no change in points" : $"{Signed(d)} points")}");
         else
             sb.Append(" · no points awarded");
+        sb.Append($"\n{UnsubscribeFooter}");
         return sb.ToString();
     }
 

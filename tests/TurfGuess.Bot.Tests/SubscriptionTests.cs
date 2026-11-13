@@ -50,6 +50,7 @@ public class SubscriptionTests
         Assert.Equal([1UL, 2UL], env.Notifier.Sent.Select(s => s.UserId).Order());
         var ann = env.Notifier.Sent.Single(s => s.UserId == 1).Text;
         Assert.Contains("You guessed right!", ann);
+        Assert.EndsWith(MessageText.UnsubscribeFooter, ann);
         Assert.Contains("🎲 bet on", ann);
         Assert.Contains($"+{2 * points} points", ann);
         Assert.Contains($"Round #{round.DisplayNumber}", ann);

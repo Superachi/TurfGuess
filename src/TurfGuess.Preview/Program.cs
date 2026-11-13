@@ -7,7 +7,7 @@ using TurfGuess.Core.Render;
 using TurfGuess.Core.Scoring;
 
 // Usage: dotnet run --project src/TurfGuess.Preview -- [--count 12] [--seed 42] [--out preview] [--ink Flat|Shaded|Marbled] [--outline None|Outside|Inside]
-//        [--ppc 16] [--symmetry Rotate|Mirror] [--no-reveal] [--columns 4] [--radius 0.75] [--inner-radius 0.5]
+//        [--ppc 16] [--symmetry Rotate|Mirror] [--no-reveal] [--blind] [--columns 4] [--radius 0.75] [--inner-radius 0.5]
 //        [--neglect-variance 0.6] [--stray-ink 0.4] [--tilt 20] [--raid-trails 4] [--min-share 50.3] [--max-share 52.3]
 //        dotnet run --project src/TurfGuess.Preview -- --pairs [--seed 42]
 //          [--pairs-file pairs.json] [--pairs-out name.png] [--pairs-full]
@@ -18,7 +18,8 @@ int count = args_.Int("count", 12);
 ulong baseSeed = (ulong)args_.Long("seed", 42);
 string outDir = Path.GetFullPath(args_.Str("out", "preview"));
 int columns = args_.Int("columns", 4);
-bool reveal = !args_.Flag("no-reveal");
+bool blind = args_.Flag("blind"); // hide the winner and shares from the console and captions; answers go to answers.txt
+bool reveal = !args_.Flag("no-reveal") && !blind;
 
 var options = new GeneratorOptions();
 options.Paint.PixelsPerCell = args_.Int("ppc", options.Paint.PixelsPerCell);
@@ -64,7 +65,10 @@ if (args_.Flag("pairs"))
 
 Directory.CreateDirectory(outDir);
 Console.WriteLine($"Writing {count} rounds to {outDir}");
-Console.WriteLine($"{"seed",6} {"try",3} {"winner",-10} {"target",7} {"actual",7} {"L cov",6} {"R cov",6} {"unp",6} {"dil",3} {"rank",4} {"ms",6}");
+Console.WriteLine(blind
+    ? $"{"seed",6} {"try",3} {"unp",6} {"dil",3} {"rank",4} {"ms",6}"
+    : $"{"seed",6} {"try",3} {"winner",-10} {"target",7} {"actual",7} {"L cov",6} {"R cov",6} {"unp",6} {"dil",3} {"rank",4} {"ms",6}");
+var answers = new List<string>();
 
 var thumbs = new List<(SKBitmap Image, string Label)>();
 for (int i = 0; i < count; i++)
@@ -88,6 +92,16 @@ for (int i = 0; i < count; i++)
 
     var s = round.Score;
     var winnerName = s.Winner == Side.Left ? style.Left.Name : style.Right.Name;
+    if (blind)
+    {
+        Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
+            $"{seed,6} {round.Attempts,3} {s.UnpaintedShare,6:P1} {Diligent(round),3} {s.Rank(options.Difficulty),4} {genMs,6}"));
+        answers.Add(string.Create(CultureInfo.InvariantCulture,
+            $"#{seed}  {style.Left.Name} (left) vs {style.Right.Name} (right): {winnerName} wins, {s.WinnerShare:P2}, rank {s.Rank(options.Difficulty)}"));
+        thumbs.Add((MapRenderer.RenderRound(round, style), $"#{seed}  {style.Left.Name} vs {style.Right.Name}"));
+        continue;
+    }
+
     Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
         $"{seed,6} {round.Attempts,3} {winnerName,-10} {round.TargetWinnerShare,7:P2} {s.WinnerShare,7:P2} {s.CoverageLeft,6:P1} {s.CoverageRight,6:P1} {s.UnpaintedShare,6:P1} {Diligent(round),3} {s.Rank(options.Difficulty),4} {genMs,6}"));
 
@@ -97,6 +111,11 @@ for (int i = 0; i < count; i++)
 WriteContactSheet(thumbs, columns, Path.Combine(outDir, "contact_sheet.png"));
 foreach (var t in thumbs) t.Image.Dispose();
 Console.WriteLine($"Contact sheet: {Path.Combine(outDir, "contact_sheet.png")}");
+if (blind)
+{
+    File.WriteAllLines(Path.Combine(outDir, "answers.txt"), answers);
+    Console.WriteLine($"Answers (spoilers): {Path.Combine(outDir, "answers.txt")}");
+}
 
 static void WriteContactSheet(List<(SKBitmap Image, string Label)> items, int columns, string path)
 {

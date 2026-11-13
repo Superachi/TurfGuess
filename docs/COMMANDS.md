@@ -24,16 +24,19 @@ Replies to all of these are ephemeral: only you see them.
 
 ## Result messages (`/turf subscribe`)
 
-By default the bot DMs you a short, self-contained summary after every round you voted in (opt out with `/turf unsubscribe`), so it still makes sense if the round message is later edited or deleted:
+By default the bot DMs you a small card after every round you voted in (opt out with `/turf unsubscribe`). It is colored like the winning team and links to the result in the server:
 
 ```
 ⚓ Ranked Battle · Round #12
 ✅ You guessed right!
-🔴 Reds won. 🔴 Reds 41.2% · 🔵 Blues 38.0% · 20.8% unpainted
-You picked 🔴 Reds · 🎲 bet on · +6 points
+🔴 Reds won with 41.2% vs. 🔵 Blues 38.0%
+🎲 Bet on · +6 points
+[Go to the result in the server]
+---
+To stop these messages, use /turf unsubscribe in the server.
 ```
 
-Ranked rounds show whether you bet and the points you gained or lost (a bet that lost nothing, or a wrong guess without a bet, shows "no change in points"). Regular battles end with "no points awarded" instead.
+Ranked rounds also show whether you bet and the points you gained or lost (a bet that lost nothing, or a wrong guess without a bet, shows "no change in points"). Regular battles are not scored, so they have no points line.
 
 ### Events that send you a DM
 

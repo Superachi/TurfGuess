@@ -258,7 +258,7 @@ public sealed class RoundService(
         }
 
         repo.MarkDone(round.Id, (long)revealId.Value);
-        await NotifySubscribersAsync(round, votes, ct);
+        await NotifySubscribersAsync(round, votes, revealId.Value, ct);
         await PostFinishedWeeksAsync(round, ct);
     }
 
@@ -295,7 +295,7 @@ public sealed class RoundService(
 
         LogRevealStats(round, votes, revealId.Value);
         repo.MarkDone(round.Id, (long)revealId.Value);
-        await NotifySubscribersAsync(round, votes, ct);
+        await NotifySubscribersAsync(round, votes, revealId.Value, ct);
     }
 
     /// <summary>
@@ -303,7 +303,7 @@ public sealed class RoundService(
     /// repeated step never sends twice; a crash in between loses the pings rather than doubling them. A
     /// player who can't be reached is logged and skipped; it never holds up the game.
     /// </summary>
-    private async Task NotifySubscribersAsync(RoundRecord round, IReadOnlyList<VoteRecord> votes, CancellationToken ct)
+    private async Task NotifySubscribersAsync(RoundRecord round, IReadOnlyList<VoteRecord> votes, ulong revealMessageId, CancellationToken ct)
     {
         var subscribed = subscriptions.SubscribedAmong(votes.Select(v => v.UserId).ToList());
         if (subscribed.Count == 0) return;
@@ -315,11 +315,11 @@ public sealed class RoundService(
             ct.ThrowIfCancellationRequested();
             results.TryGetValue(vote.UserId, out var result);
             bool correct = vote.ChoiceSide == round.WinnerSide;
-            string text = MessageText.RevealPing(round, vote.ChoiceSide, correct, result is { Bet: not 0 },
-                result is null ? null : (int)result.Delta);
+            var message = MessageText.RevealPing(round, correct, result is { Bet: not 0 },
+                result is null ? null : (int)result.Delta, revealMessageId);
             try
             {
-                await notifier.SendDirectAsync((ulong)vote.UserId, text, ct);
+                await notifier.SendDirectAsync((ulong)vote.UserId, message, ct);
                 sent++;
             }
             catch (Exception ex) when (ex is not OperationCanceledException)

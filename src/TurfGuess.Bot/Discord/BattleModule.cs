@@ -224,7 +224,7 @@ public sealed class BattleModule(
 
         // Check right away that messages get through, so a closed DM isn't discovered after the next reveal.
         string reply = MessageText.SubscribeConfirmation;
-        try { await notifier.SendDirectAsync(Context.User.Id, MessageText.SubscribeTestMessage, default); }
+        try { await notifier.SendDirectAsync(Context.User.Id, DirectMessage.Plain(MessageText.SubscribeTestMessage), default); }
         catch (Exception ex)
         {
             logger.LogWarning("Couldn't send a test message to new subscriber {UserId}: {Reason}", Context.User.Id, ex.Message);

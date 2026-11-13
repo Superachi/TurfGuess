@@ -54,10 +54,13 @@ public class SubscriptionTests
         var ann = env.Notifier.Sent.Single(s => s.UserId == 1).Text;
         Assert.Contains("You guessed right!", ann);
         Assert.EndsWith(MessageText.UnsubscribeFooter, ann);
-        Assert.Contains("🎲 bet on", ann);
+        Assert.Contains("🎲 Bet on", ann);
         Assert.Contains($"+{2 * points} points", ann);
-        Assert.Contains($"Round #{round.DisplayNumber}", ann);
-        Assert.Contains(round.TeamName(winner), ann);
+        Assert.StartsWith($"{MessageText.RoundTitle(round)}{'\n'}", ann);
+        Assert.Contains($"{round.TeamName(winner)} won with {TurfGuess.Core.Util.Percent.Share(round.WinnerShare)}", ann);
+        var card = env.Notifier.Cards.Single(s => s.UserId == 1).Message;
+        Assert.Equal((ulong)env.Repo.Get(round.Id)!.RevealMessageId!.Value, card.LinkedMessageId);
+        Assert.Equal(winner == Side.Left ? round.LeftColor : round.RightColor, card.ColorHex);
         var bo = env.Notifier.Sent.Single(s => s.UserId == 2).Text;
         Assert.Contains("You guessed wrong.", bo);
         Assert.Contains("no change in points", bo);
@@ -77,8 +80,8 @@ public class SubscriptionTests
         Assert.Equal(1UL, userId);
         Assert.Contains("Regular Battle", text);
         Assert.Contains("You guessed wrong.", text);
-        Assert.Contains("no points awarded", text);
-        Assert.DoesNotContain("bet", text);
+        Assert.DoesNotContain("points", text);
+        Assert.DoesNotContain("bet", text, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

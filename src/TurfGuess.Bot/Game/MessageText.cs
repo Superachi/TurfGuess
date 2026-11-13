@@ -319,33 +319,30 @@ public static class MessageText
     /// <summary>The first direct message after subscribing again, to check that messages get through.</summary>
     public const string SubscribeTestMessage = "🔔 You're subscribed to round results again. This is where they'll show up.";
 
-    /// <summary>Small print (Discord subtext) at the end of every result message.</summary>
-    public const string UnsubscribeFooter = "-# To stop these messages, use /turf unsubscribe in the server.";
+    /// <summary>Footer of every result message.</summary>
+    public const string UnsubscribeFooter = "To stop these messages, use /turf unsubscribe in the server.";
+
+    public const string RevealLinkLabel = "Go to the result in the server";
 
     /// <summary>
-    /// The private result message for one player. Self-contained, since the round message may have
-    /// changed or been deleted by the time it's read. <paramref name="delta"/> is null when the round isn't scored.
+    /// The private result card for one player: a title, right or wrong, who won, and for scored rounds the
+    /// bet and points. Self-contained apart from the link to the reveal message, which is added by the
+    /// notifier. <paramref name="delta"/> is null when the round isn't scored.
     /// </summary>
-    public static string RevealPing(RoundRecord round, Side picked, bool correct, bool bet, int? delta)
+    public static DirectMessage RevealPing(RoundRecord round, bool correct, bool bet, int? delta, ulong revealMessageId)
     {
         var w = round.WinnerSide;
-        var l = Side.Left;
-        var r = Side.Right;
+        var o = w.Opposite();
 
         var sb = new StringBuilder();
-        sb.Append($"{KindName(round.Kind)} · Round #{round.DisplayNumber}\n");
         sb.Append(correct ? "✅ **You guessed right!**\n" : "❌ **You guessed wrong.**\n");
-        sb.Append($"{round.TeamEmoji(w)} **{round.TeamName(w)}** won. ");
-        sb.Append($"{round.TeamEmoji(l)} {round.TeamName(l)} {Pct(round.ShareLeft)} · ");
-        sb.Append($"{round.TeamEmoji(r)} {round.TeamName(r)} {Pct(round.ShareRight)} · ");
-        sb.Append($"{Pct(round.Unpainted)} unpainted\n");
-        sb.Append($"You picked {round.TeamEmoji(picked)} {round.TeamName(picked)}");
+        sb.Append($"{round.TeamEmoji(w)} **{round.TeamName(w)} won with {Pct(round.WinnerShare)}** ");
+        sb.Append($"vs. {round.TeamEmoji(o)} {round.TeamName(o)} {Pct(o == Side.Left ? round.ShareLeft : round.ShareRight)}");
         if (delta is { } d)
-            sb.Append($" · {(bet ? "🎲 bet on" : "no bet")} · {(d == 0 ? "no change in points" : $"{Signed(d)} points")}");
-        else
-            sb.Append(" · no points awarded");
-        sb.Append($"\n{UnsubscribeFooter}");
-        return sb.ToString();
+            sb.Append($"\n{(bet ? "🎲 Bet on" : "No bet")} · {(d == 0 ? "no change in points" : $"{Signed(d)} points")}");
+
+        string color = w == Side.Left ? round.LeftColor : round.RightColor;
+        return new DirectMessage(RoundTitle(round), sb.ToString(), UnsubscribeFooter, color, revealMessageId, RevealLinkLabel);
     }
 
     /// <summary>"🎲&lt;@id&gt; (+6)": a 🎲 for a bet, then the points gained, lost, or ~ for no change.</summary>

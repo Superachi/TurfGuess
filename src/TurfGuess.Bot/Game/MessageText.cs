@@ -115,6 +115,8 @@ public static class MessageText
     public static string BattleRevealButtonId(long roundId) => $"battle-reveal:{roundId}";
     public static string BattleResetButtonId(long roundId) => $"battle-reset:{roundId}";
     public const string BattleRevealButtonLabel = "Reveal";
+    public const string BattleSettingUpLabel = "Setting up…";
+    public const string BattleSettingUp = "⏳ BATTLE TIME! Inklings are currently participating in battle. Please take cover and wait for the match to be over.";
     public const string BattleResetButtonLabel = "Reset";
     public const string BattleResetButtonEmoji = "🔁";
     public const string BattleResetting = "Setting up a fresh Regular Battle…";
@@ -298,6 +300,47 @@ public static class MessageText
         }
 
         sb.Append(footer);
+        return sb.ToString();
+    }
+
+    public const string SubscribeConfirmation =
+        "🔔 You're subscribed. After every round you voted in, I'll send you a private message with the result.";
+    public const string SubscribeNoDms =
+        "🔔 You're subscribed, but I couldn't send you a message. Allow direct messages from server members " +
+        "(Server Settings → Privacy Settings), or the results can't reach you.";
+    public const string AlreadySubscribed = "You're already subscribed. Use `/turf unsubscribe` to stop the messages.";
+    public const string Unsubscribed = "🔕 You're unsubscribed. No more result messages.";
+    public const string NotSubscribed = "You weren't subscribed.";
+
+    /// <summary>The first direct message after subscribing, to check that messages get through.</summary>
+    public const string SubscribeTestMessage = "🔔 You're subscribed to round results. This is where they'll show up.";
+
+    /// <summary>Small print (Discord subtext) at the end of every result message.</summary>
+    public const string UnsubscribeFooter = "-# To stop these messages, use /turf unsubscribe in the server.";
+
+    /// <summary>
+    /// The private result message for one player. Self-contained, since the round message may have
+    /// changed or been deleted by the time it's read. <paramref name="delta"/> is null when the round isn't scored.
+    /// </summary>
+    public static string RevealPing(RoundRecord round, Side picked, bool correct, bool bet, int? delta)
+    {
+        var w = round.WinnerSide;
+        var l = Side.Left;
+        var r = Side.Right;
+
+        var sb = new StringBuilder();
+        sb.Append($"{KindName(round.Kind)} · Round #{round.DisplayNumber}\n");
+        sb.Append(correct ? "✅ **You guessed right!**\n" : "❌ **You guessed wrong.**\n");
+        sb.Append($"{round.TeamEmoji(w)} **{round.TeamName(w)}** won. ");
+        sb.Append($"{round.TeamEmoji(l)} {round.TeamName(l)} {Pct(round.ShareLeft)} · ");
+        sb.Append($"{round.TeamEmoji(r)} {round.TeamName(r)} {Pct(round.ShareRight)} · ");
+        sb.Append($"{Pct(round.Unpainted)} unpainted\n");
+        sb.Append($"You picked {round.TeamEmoji(picked)} {round.TeamName(picked)}");
+        if (delta is { } d)
+            sb.Append($" · {(bet ? "🎲 bet on" : "no bet")} · {(d == 0 ? "no change in points" : $"{Signed(d)} points")}");
+        else
+            sb.Append(" · no points awarded");
+        sb.Append($"\n{UnsubscribeFooter}");
         return sb.ToString();
     }
 

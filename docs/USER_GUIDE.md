@@ -242,6 +242,15 @@ Both commands only work in the game's channel.
 
 The reveal lists who guessed right and wrong, with no points and no standings.
 
+**Result messages:** any player can run these in any channel.
+
+| Command | What it does |
+|---|---|
+| `/turf subscribe` | After every round (ranked or regular) you voted in, the bot sends you a private DM with the essentials: right or wrong, the paint result, your pick, whether you bet and your points. The message stands on its own, so it still makes sense if the round message is later changed or deleted. The bot sends a test DM right away and warns you if it can't reach you (allow direct messages from server members). |
+| `/turf unsubscribe` | Stops the messages. |
+
+A reveal never waits on these: players who can't be reached are logged and skipped.
+
 To keep the channel tidy, a Regular Battle lives in one message. While it runs, the message has a **Reveal** button (same permission as `/turf battle-reveal`). The reveal is written over the same message, which then shows a **Reset** button; pressing it replaces the message with a fresh battle. If another battle is already running when Reset is pressed, the button turns into a Reveal button for that battle.
 
 **Auto-bet:** a player with 0 points this week is bet in automatically the first time they vote in a ranked round, since they have nothing to lose. They can press Bet to switch it off.

@@ -10,7 +10,8 @@ namespace TurfGuess.Bot.Discord;
 
 /// <summary>
 /// Player commands under <c>/turf</c>: start a 🔫 Regular Battle (a short round that isn't scored) and
-/// end it early. Only one regular battle runs at a time. The daily ⚓ Ranked Battle is unaffected.
+/// end it early, plus <c>/turf subscribe</c> and <c>/turf unsubscribe</c> (private result messages; they live here because
+/// two modules can't share the group name "turf"). Only one regular battle runs at a time. The daily ⚓ Ranked Battle is unaffected.
 /// </summary>
 [Group("turf", "Play the daily guessing game")]
 public sealed class BattleModule(
@@ -18,6 +19,8 @@ public sealed class BattleModule(
     RoundRepository repo,
     IRoundChannel channelPosts,
     SchedulerSignal scheduler,
+    SubscriptionRepository subscriptions,
+    IPlayerNotifier notifier,
     TimeProvider clock,
     BotOptions options,
     ILogger<BattleModule> logger) : InteractionModuleBase<SocketInteractionContext>
@@ -204,5 +207,36 @@ public sealed class BattleModule(
         if (Context.Channel.Id == options.Discord.ChannelId) return false;
         await RespondAsync($"Regular Battles are played in <#{options.Discord.ChannelId}>. Use this command there.", ephemeral: true);
         return true;
+    }
+
+    [SlashCommand("subscribe", "Get a private message with your result after every round you voted in.")]
+    public async Task SubscribeAsync()
+    {
+        if (!subscriptions.Subscribe((long)Context.User.Id, clock.GetUtcNow().ToUnixTimeSeconds()))
+        {
+            await RespondAsync(MessageText.AlreadySubscribed, ephemeral: true);
+            return;
+        }
+
+        logger.LogInformation("{UserName} ({UserId}) subscribed to result messages.", Context.User.Username, Context.User.Id);
+        await DeferAsync(ephemeral: true);
+
+        // Check right away that messages get through, so a closed DM isn't discovered after the next reveal.
+        string reply = MessageText.SubscribeConfirmation;
+        try { await notifier.SendDirectAsync(Context.User.Id, MessageText.SubscribeTestMessage, default); }
+        catch (Exception ex)
+        {
+            logger.LogWarning("Couldn't send a test message to new subscriber {UserId}: {Reason}", Context.User.Id, ex.Message);
+            reply = MessageText.SubscribeNoDms;
+        }
+        await FollowupAsync(reply, ephemeral: true);
+    }
+
+    [SlashCommand("unsubscribe", "Stop the private result messages.")]
+    public async Task UnsubscribeAsync()
+    {
+        bool was = subscriptions.Unsubscribe((long)Context.User.Id);
+        if (was) logger.LogInformation("{UserName} ({UserId}) unsubscribed from result messages.", Context.User.Username, Context.User.Id);
+        await RespondAsync(was ? MessageText.Unsubscribed : MessageText.NotSubscribed, ephemeral: true);
     }
 }

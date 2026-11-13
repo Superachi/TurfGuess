@@ -102,7 +102,7 @@ public class MessageTextTests
         round.WinnerShare = 0.5130; // A rank = 3 points
         var text = MessageText.RoundDescription(round, [new Voter(1, true), new Voter(2, false), new Voter(3, true)], closed: false);
 
-        Assert.Contains("Rank A | 🔥🔥🔥\nWorth 3 points · bet: win +6 / lose −3\nResults <t:", text);
+        Assert.Contains("**Rank A** · 3🔥\nWorth 3 points · bet: win +6 / lose −3\nResults <t:", text);
         Assert.Contains("**3 players have voted:** 🎲<@1>, <@2>, 🎲<@3>", text);
 
         round.WinnerShare = 0.5210; // C rank = 1 point
@@ -147,11 +147,11 @@ public class MessageTextTests
     }
 
     [Theory]
-    [InlineData(0.5050, "Rank X | 🔥🔥🔥🔥🔥")]
-    [InlineData(0.5090, "Rank S | 🔥🔥🔥🔥")]
-    [InlineData(0.5130, "Rank A | 🔥🔥🔥")]
-    [InlineData(0.5170, "Rank B | 🔥🔥")]
-    [InlineData(0.5210, "Rank C | 🔥")]
+    [InlineData(0.5050, "**Rank X** · 5🔥")]
+    [InlineData(0.5090, "**Rank S** · 4🔥")]
+    [InlineData(0.5130, "**Rank A** · 3🔥")]
+    [InlineData(0.5170, "**Rank B** · 2🔥")]
+    [InlineData(0.5210, "**Rank C** · 1🔥")]
     public void Round_description_shows_the_difficulty_rank_open_and_closed(double winnerShare, string expected)
     {
         var round = Round();

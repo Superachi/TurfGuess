@@ -23,8 +23,8 @@ public static class MessageText
     public static string KindName(RoundKind kind) =>
         kind == RoundKind.Regular ? $"{RegularEmoji} Regular Battle" : $"{RankedEmoji} Ranked Battle";
 
-    public static string RoundTitle(string gameName, RoundRecord round) =>
-        $"{gameName} · {KindName(round.Kind)} · Round #{round.DisplayNumber}";
+    public static string RoundTitle(RoundRecord round) =>
+        $"{KindName(round.Kind)} · Round #{round.DisplayNumber}";
 
     /// <summary>Footer on the round message.</summary>
     public static string RoundFooter(RoundRecord round) =>
@@ -98,13 +98,13 @@ public static class MessageText
         var rank = Difficulty.RankFor(round.WinnerShare, difficulty ?? new DifficultyOptions());
         int count = (int)rank + 1; // C = 1 … X = 5
         string icon = round.Kind == RoundKind.Regular ? "🐟" : "🔥";
-        return $"Rank {rank} | {string.Concat(Enumerable.Repeat(icon, count))}";
+        return $"**Rank {rank}** · {count}{icon}";
     }
 
     /// <summary>What a regular battle is: unscored, who started it, and whether votes are public.</summary>
     public static string BattleLine(RoundRecord round) =>
-        $"{RegularEmoji} Regular Battle · no points, doesn't count towards the weekly score" +
-        (round.ShowVotes ? " · votes are public" : "") +
+        "Just for fun: no points!" +
+        (round.ShowVotes ? "\nVotes are public" : "\nVotes are hidden") +
         (round.StartedBy != 0 ? $"\nStarted by <@{round.StartedBy}>" : "");
 
     /// <summary>Reply to /turf battle (only the caller sees it).</summary>

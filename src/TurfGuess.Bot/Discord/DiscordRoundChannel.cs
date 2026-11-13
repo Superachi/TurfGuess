@@ -176,10 +176,11 @@ public sealed class DiscordRoundChannel(DiscordSocketClient client, BotOptions o
     /// now-unreferenced attachment a second time above the embed.
     /// </summary>
     private Embed RoundEmbed(RoundRecord round, string description, string fileName) => new EmbedBuilder()
-        .WithTitle(MessageText.RoundTitle(options.Game.Name, round))
+        .WithTitle(MessageText.RoundTitle(round))
         .WithDescription(description)
         .WithImageUrl(MessageText.AttachmentUrl(fileName))
         .WithFooter(MessageText.RoundFooter(round))
+        .WithTimestamp(round.RevealAtTime) // shown in the footer in each viewer's own time zone
         .Build();
 
     /// <summary>The file name of the image attached to the round message (kept on edits).</summary>

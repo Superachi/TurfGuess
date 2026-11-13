@@ -72,7 +72,7 @@ public static partial class MessagePreview
         sb.AppendLine();
 
         Section(sb, "1. Round message (posted at the round time)");
-        Embed(sb, MessageText.RoundTitle(options.Game.Name, round),
+        Embed(sb, MessageText.RoundTitle(round),
             Show(MessageText.RoundDescription(round, options.Game.ShowVoteCount ? [] : null, closed: false, difficulty: options.Generator.Difficulty)),
             $"round_{round.Id}.png", MessageText.RoundFooter(round));
         sb.AppendLine($"Buttons: {buttons(false)}");
@@ -99,7 +99,7 @@ public static partial class MessagePreview
         sb.AppendLine();
 
         Section(sb, "5. Round message after the reveal");
-        Embed(sb, MessageText.RoundTitle(options.Game.Name, round),
+        Embed(sb, MessageText.RoundTitle(round),
             Show(MessageText.RoundDescription(round, options.Game.ShowVoteCount ? voters : null, closed: true, difficulty: options.Generator.Difficulty)),
             $"round_{round.Id}.png", MessageText.RoundFooter(round));
         sb.AppendLine($"Buttons: {buttons(true)}");
@@ -142,7 +142,7 @@ public static partial class MessagePreview
         sb.AppendLine();
 
         Section(sb, "9. Regular Battle message (15 minutes, not scored, no Bet button)");
-        Embed(sb, MessageText.RoundTitle(options.Game.Name, battle),
+        Embed(sb, MessageText.RoundTitle(battle),
             Show(MessageText.RoundDescription(battle, options.Game.ShowVoteCount ? voters.Select(v => v with { Bet = false }).ToList() : null,
                 closed: false, difficulty: options.Generator.Difficulty)),
             $"round_{battle.Id}.png", MessageText.RoundFooter(battle));
@@ -150,7 +150,7 @@ public static partial class MessagePreview
         sb.AppendLine();
 
         Section(sb, "9b. Regular Battle with show-votes (who voted for which team)");
-        Embed(sb, MessageText.RoundTitle(options.Game.Name, publicBattle),
+        Embed(sb, MessageText.RoundTitle(publicBattle),
             Show(MessageText.RoundDescription(publicBattle, battleVoters, closed: false, difficulty: options.Generator.Difficulty)),
             $"round_{battle.Id}.png", MessageText.RoundFooter(publicBattle));
         sb.AppendLine($"Buttons: {battleButtons}");

@@ -196,8 +196,8 @@ public class BattleTests
     [Fact]
     public void Titles_and_footers_tell_the_two_kinds_apart()
     {
-        Assert.Equal("Turf Guess · ⚓ Ranked Battle · Round #13", MessageText.RoundTitle("Turf Guess", Round(RoundKind.Ranked)));
-        Assert.Equal("Turf Guess · 🔫 Regular Battle · Round #13", MessageText.RoundTitle("Turf Guess", Round(RoundKind.Regular)));
+        Assert.Equal("⚓ Ranked Battle · Round #13", MessageText.RoundTitle(Round(RoundKind.Ranked)));
+        Assert.Equal("🔫 Regular Battle · Round #13", MessageText.RoundTitle(Round(RoundKind.Regular)));
         Assert.Equal("Round #13 · Results", MessageText.RevealFooter(Round(RoundKind.Ranked))); // recovery relies on this text
         Assert.Equal("Regular Battle #13 · Results", MessageText.RevealFooter(Round(RoundKind.Regular)));
     }
@@ -217,10 +217,9 @@ public class BattleTests
     public void Battle_message_says_there_are_no_points_and_offers_no_bet()
     {
         string text = MessageText.RoundDescription(Round(RoundKind.Regular), [], closed: false);
-        Assert.Contains("no points", text);
-        Assert.Contains("Started by <@99>", text);
+        Assert.Contains("Just for fun: no points!\nVotes are hidden\nStarted by <@99>", text);
         Assert.DoesNotContain("bet:", text);
-        Assert.DoesNotContain("votes are public", text);
+        Assert.DoesNotContain("Votes are public", text);
     }
 
     [Fact]
@@ -229,7 +228,7 @@ public class BattleTests
         var voters = new[] { new Voter(1, false, Side.Left), new Voter(2, false, Side.Right), new Voter(3, false, Side.Left) };
 
         string open = MessageText.RoundDescription(Round(RoundKind.Regular, showVotes: true), voters, closed: false);
-        Assert.Contains("votes are public", open);
+        Assert.Contains("Votes are public", open);
         Assert.Contains("🔴 **Reds** (2): <@1>, <@3>", open);
         Assert.Contains("🔵 **Blues** (1): <@2>", open);
 

@@ -13,8 +13,8 @@ public class MessagePreviewTests
     {
         string text = MessagePreview.Render(Options(), 42, Now, raw: false);
 
-        Assert.Contains("Turf Guess · ⚓ Ranked Battle · Round #5", text);
-        Assert.Contains("Turf Guess · 🔫 Regular Battle · Round #3", text);
+        Assert.Contains("⚓ Ranked Battle · Round #5", text);
+        Assert.Contains("🔫 Regular Battle · Round #3", text);
         Assert.Contains("🐟", text);
         Assert.Contains("Which team do you think painted more? Cast your vote!", text);
         Assert.Contains("You voted", text);

@@ -93,6 +93,26 @@ public sealed class ScoreRepository(Database db)
         tx.Commit();
     }
 
+    /// <summary>How many round results and finished weeks are stored (for the confirmation of a wipe).</summary>
+    public (int Results, int Players, int Weeks) Counts()
+    {
+        using var c = db.Open();
+        return (c.ExecuteScalar<int>("SELECT COUNT(*) FROM round_results"),
+                c.ExecuteScalar<int>("SELECT COUNT(DISTINCT user_id) FROM round_results"),
+                c.ExecuteScalar<int>("SELECT COUNT(*) FROM closed_weeks"));
+    }
+
+    /// <summary>Deletes all weekly points, wins, finished weeks and the trophy tally. Rounds and votes are kept.</summary>
+    public void WipeAll()
+    {
+        using var c = db.Open();
+        using var tx = c.BeginTransaction();
+        c.Execute("DELETE FROM round_results", transaction: tx);
+        c.Execute("DELETE FROM closed_weeks", transaction: tx);
+        c.Execute("DELETE FROM weekly_winners", transaction: tx);
+        tx.Commit();
+    }
+
     /// <summary>How many weeks a player has won. Tallied for later; not shown anywhere yet.</summary>
     public int TrophyCount(ulong userId)
     {

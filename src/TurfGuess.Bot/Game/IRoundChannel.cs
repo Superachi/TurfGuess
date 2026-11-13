@@ -9,8 +9,11 @@ namespace TurfGuess.Bot.Game;
 /// </summary>
 public interface IRoundChannel
 {
-    /// <summary>Looks for an already posted message for this round (by its button ids). Returns the message id.</summary>
-    Task<ulong?> FindRoundMessageAsync(long roundId, CancellationToken ct);
+    /// <summary>
+    /// Looks for an already posted message for this round (by its button ids). Only messages from
+    /// after the round was created count, so leftovers of an earlier game are ignored. Returns the message id.
+    /// </summary>
+    Task<ulong?> FindRoundMessageAsync(RoundRecord round, CancellationToken ct);
 
     /// <summary>Posts the round image with the two vote buttons. Returns the message id.</summary>
     Task<ulong> PostRoundAsync(RoundRecord round, string imagePath, CancellationToken ct);
@@ -24,8 +27,11 @@ public interface IRoundChannel
     /// <summary>Updates the list of who has voted on the round message (names and bets only, never their choice).</summary>
     Task UpdateVotersAsync(RoundRecord round, IReadOnlyList<Voter> voters, CancellationToken ct);
 
-    /// <summary>Looks for an already posted reveal for this round. Returns the message id.</summary>
-    Task<ulong?> FindRevealMessageAsync(long roundId, CancellationToken ct);
+    /// <summary>Looks for an already posted reveal for this round (same age rule as above). Returns the message id.</summary>
+    Task<ulong?> FindRevealMessageAsync(RoundRecord round, CancellationToken ct);
+
+    /// <summary>Disables the buttons of a round that an admin cancelled and says so on the message.</summary>
+    Task CancelRoundMessageAsync(RoundRecord round, CancellationToken ct);
 
     /// <summary>Posts the reveal (text + image). Returns the message id.</summary>
     Task<ulong> PostRevealAsync(RoundRecord round, RevealSummary summary, string imagePath, CancellationToken ct);

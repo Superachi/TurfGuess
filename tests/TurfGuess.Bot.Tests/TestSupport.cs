@@ -91,8 +91,8 @@ public sealed class FakeChannel : IRoundChannel
     public int RoundPosts => Messages.Count(m => m.Kind == "round");
     public int RevealPosts => Messages.Count(m => m.Kind == "reveal");
 
-    public Task<ulong?> FindRoundMessageAsync(long roundId, CancellationToken ct) =>
-        Task.FromResult(Messages.FirstOrDefault(m => m.RoundId == roundId && m.Kind == "round")?.Id);
+    public Task<ulong?> FindRoundMessageAsync(RoundRecord round, CancellationToken ct) =>
+        Task.FromResult(Messages.FirstOrDefault(m => m.RoundId == round.Id && m.Kind == "round")?.Id);
 
     public Task<ulong> PostRoundAsync(RoundRecord round, string imagePath, CancellationToken ct)
     {
@@ -113,8 +113,16 @@ public sealed class FakeChannel : IRoundChannel
         return Task.CompletedTask;
     }
 
-    public Task<ulong?> FindRevealMessageAsync(long roundId, CancellationToken ct) =>
-        Task.FromResult(Messages.FirstOrDefault(m => m.RoundId == roundId && m.Kind == "reveal")?.Id);
+    public Task<ulong?> FindRevealMessageAsync(RoundRecord round, CancellationToken ct) =>
+        Task.FromResult(Messages.FirstOrDefault(m => m.RoundId == round.Id && m.Kind == "reveal")?.Id);
+
+    public HashSet<long> CancelledRounds { get; } = [];
+
+    public Task CancelRoundMessageAsync(RoundRecord round, CancellationToken ct)
+    {
+        CancelledRounds.Add(round.Id);
+        return Task.CompletedTask;
+    }
 
     public Task<ulong> PostRevealAsync(RoundRecord round, RevealSummary summary, string imagePath, CancellationToken ct)
     {

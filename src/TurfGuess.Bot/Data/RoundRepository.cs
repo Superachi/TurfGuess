@@ -80,6 +80,16 @@ public sealed class RoundRepository(Database db)
             new { id, revealMessageId });
     }
 
+    /// <summary>
+    /// Ends the round without a reveal (admin reset). It becomes Done, so its buttons stop working and
+    /// a new round is created next. Its id is never reused, and nothing is scored for it.
+    /// </summary>
+    public bool Abandon(long id)
+    {
+        using var c = db.Open();
+        return c.Execute("UPDATE rounds SET status = 'Done' WHERE id = @id AND status <> 'Done'", new { id }) > 0;
+    }
+
     /// <summary>Moves an open round's reveal time (admin "reveal now").</summary>
     public bool SetRevealAt(long id, long revealAt)
     {

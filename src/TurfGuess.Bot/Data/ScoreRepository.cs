@@ -103,6 +103,20 @@ public sealed class ScoreRepository(Database db)
                 (int)x.RegularWins, (int)x.RegularLosses)).ToList();
     }
 
+    /// <summary>The latest user name each of the given players voted under (players without one are left out).</summary>
+    public IReadOnlyDictionary<ulong, string> LatestNames(IEnumerable<ulong> userIds)
+    {
+        var ids = userIds.Select(id => (long)id).Distinct().ToList();
+        if (ids.Count == 0) return new Dictionary<ulong, string>();
+        using var c = db.Open();
+        var names = new Dictionary<ulong, string>();
+        // Oldest first, so the last row per player wins.
+        foreach (var (userId, name) in c.Query<(long UserId, string Name)>(
+                     "SELECT user_id AS UserId, user_name AS Name FROM votes WHERE user_name <> '' AND user_id IN @ids ORDER BY voted_at, rowid", new { ids }))
+            names[(ulong)userId] = name;
+        return names;
+    }
+
     /// <summary>Weeks before <paramref name="weekStart"/> that have results but no summary yet, oldest first.</summary>
     public IReadOnlyList<string> UnclosedWeeksBefore(string weekStart)
     {

@@ -8,8 +8,8 @@ Everything a player can do, by slash command and by button. Admin commands (`/tu
 |---|---|---|---|
 | `/turf battle [show-votes:true]` | Game channel only | Anyone | Starts a 🔫 Regular Battle: a short round (`Game:BattleLength`, 15 minutes by default) that is never scored. With `show-votes`, the message lists who voted for which team and voters are told their vote is public. Only one battle runs at a time; while one is open the command just says so. If today's battle message already exists, it is reset into the new battle instead of posting another message, and you get a private link to it. |
 | `/turf battle-reveal` | Game channel only | The player who started the battle, or an admin | Reveals the running Regular Battle now instead of waiting for the timer. |
-| `/turf standings` | Any channel | Anyone | Shows this week's standings: place, points and wins, with 🏆 for the leader(s). |
-| `/turf all-time` | Any channel | Anyone | Shows everyone who has played: weekly 🏆 trophies, and the ⚓ ranked and 🔫 regular battle record as wins–losses and win rate. Counts every revealed round, a win being a correct guess. |
+| `/turf standings` | Any channel | Anyone | Shows this week's standings as a table: place, name, points and wins, with `*` marking the leader(s). |
+| `/turf all-time` | Any channel | Anyone | Shows everyone who has played as a table: weekly trophies, and the ranked and regular battle record as wins-losses and win rate. Names are the latest user name the player voted under, cut to 24 characters. Counts every revealed round, a win being a correct guess. |
 | `/turf subscribe` | Any channel | Anyone | Turns the result DMs back on after you opted out. They are on by default (see [below](#result-messages-turf-subscribe)). The bot sends a test DM straight away and warns you if it can't reach you. |
 | `/turf unsubscribe` | Any channel | Anyone | Opts you out of the result DMs. |
 

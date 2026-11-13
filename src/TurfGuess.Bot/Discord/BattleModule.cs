@@ -214,12 +214,18 @@ public sealed class BattleModule(
     public async Task StandingsAsync()
     {
         string week = Weekly.WeekStart(clock.GetUtcNow(), options.Game.ParsedTimeZone);
-        await RespondAsync(MessageText.WeeklyStandings(week, scores.Standings(week)), ephemeral: true, allowedMentions: AllowedMentions.None);
+        var standings = scores.Standings(week);
+        var names = scores.LatestNames(standings.Select(s => s.UserId));
+        await RespondAsync(MessageText.WeeklyStandings(week, standings, names), ephemeral: true, allowedMentions: AllowedMentions.None);
     }
 
     [SlashCommand("all-time", "Show everyone's weekly trophies and ranked and regular battle record (only you see it).")]
-    public async Task AllTimeAsync() =>
-        await RespondAsync(MessageText.AllTimeStandings(scores.AllTime()), ephemeral: true, allowedMentions: AllowedMentions.None);
+    public async Task AllTimeAsync()
+    {
+        var entries = scores.AllTime();
+        var names = scores.LatestNames(entries.Select(e => e.UserId));
+        await RespondAsync(MessageText.AllTimeStandings(entries, names), ephemeral: true, allowedMentions: AllowedMentions.None);
+    }
 
     [SlashCommand("subscribe", "Get a private message with your result after every round you voted in.")]
     public async Task SubscribeAsync()

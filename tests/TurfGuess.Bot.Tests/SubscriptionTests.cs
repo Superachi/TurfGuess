@@ -61,6 +61,7 @@ public class SubscriptionTests
         var card = env.Notifier.Cards.Single(s => s.UserId == 1).Message;
         Assert.Equal((ulong)env.Repo.Get(round.Id)!.RevealMessageId!.Value, card.LinkedMessageId);
         Assert.Equal(winner == Side.Left ? round.LeftColor : round.RightColor, card.ColorHex);
+        Assert.True(card.OptOutButton);
         var bo = env.Notifier.Sent.Single(s => s.UserId == 2).Text;
         Assert.Contains("You guessed wrong.", bo);
         Assert.Contains("no change in points", bo);

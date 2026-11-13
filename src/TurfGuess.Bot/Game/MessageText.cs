@@ -320,7 +320,17 @@ public static class MessageText
     public const string SubscribeTestMessage = "🔔 You're subscribed to round results again. This is where they'll show up.";
 
     /// <summary>Footer of every result message.</summary>
-    public const string UnsubscribeFooter = "To stop these messages, use /turf unsubscribe in the server.";
+    public const string UnsubscribeFooter = "To stop these messages, press the button below or use /turf unsubscribe in the server.";
+
+    /// <summary>Footer of a result message after the player pressed its button to stop the messages.</summary>
+    public const string OptedOutFooter = "You won't get these messages anymore. To get them again, press the button below or use /turf subscribe in the server.";
+
+    public const string OptOutButtonId = "dm:optout";
+    public const string OptInButtonId = "dm:optin";
+    public const string OptOutButtonLabel = "Stop these messages";
+    public const string OptInButtonLabel = "Turn them back on";
+    public const string OptOutButtonEmoji = "🔕";
+    public const string OptInButtonEmoji = "🔔";
 
     public const string RevealLinkLabel = "Go to the result in the server";
 
@@ -342,7 +352,7 @@ public static class MessageText
             sb.Append($"\n{(bet ? "🎲 Bet on" : "No bet")} · {(d == 0 ? "no change in points" : $"{Signed(d)} points")}");
 
         string color = w == Side.Left ? round.LeftColor : round.RightColor;
-        return new DirectMessage(RoundTitle(round), sb.ToString(), UnsubscribeFooter, color, revealMessageId, RevealLinkLabel);
+        return new DirectMessage(RoundTitle(round), sb.ToString(), UnsubscribeFooter, color, revealMessageId, RevealLinkLabel, OptOutButton: true);
     }
 
     /// <summary>"🎲&lt;@id&gt; (+6)": a 🎲 for a bet, then the points gained, lost, or ~ for no change.</summary>

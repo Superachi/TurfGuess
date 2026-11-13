@@ -29,8 +29,21 @@ public sealed class DiscordPlayerNotifier(DiscordSocketClient client, BotOptions
         if (message.Footer is not null) embed.WithFooter(message.Footer);
         if (message.ColorHex is not null && SKColor.TryParse(message.ColorHex, out var c))
             embed.WithColor(new Color(c.Red, c.Green, c.Blue));
-        await user.SendMessageAsync(embed: embed.Build(), allowedMentions: AllowedMentions.None, options: request);
+        await user.SendMessageAsync(embed: embed.Build(), allowedMentions: AllowedMentions.None, options: request,
+            components: message.OptOutButton ? OptButton(subscribed: true) : null);
     }
+
+    /// <summary>
+    /// The button under a result message: stop the messages while they are on, turn them back on once stopped.
+    /// Routed by its custom id, so it keeps working after a restart.
+    /// </summary>
+    public static MessageComponent OptButton(bool subscribed) => new ComponentBuilder()
+        .WithButton(
+            subscribed ? MessageText.OptOutButtonLabel : MessageText.OptInButtonLabel,
+            subscribed ? MessageText.OptOutButtonId : MessageText.OptInButtonId,
+            subscribed ? ButtonStyle.Secondary : ButtonStyle.Success,
+            emote: new Emoji(subscribed ? MessageText.OptOutButtonEmoji : MessageText.OptInButtonEmoji))
+        .Build();
 
     /// <summary>A jump link to a message in the game channel, or null when the channel isn't in a server.</summary>
     private async Task<string?> MessageUrlAsync(ulong messageId)

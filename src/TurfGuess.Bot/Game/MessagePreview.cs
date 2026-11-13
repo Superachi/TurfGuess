@@ -215,6 +215,7 @@ public static partial class MessagePreview
         sb.AppendLine($"│ **{card.Title}**   (color {card.ColorHex})");
         foreach (var line in body.Split('\n')) sb.AppendLine($"│ {line}");
         sb.AppendLine($"│ {card.Footer}");
+        if (card.OptOutButton) sb.AppendLine($"│ [ {MessageText.OptOutButtonEmoji} {MessageText.OptOutButtonLabel} ]   (after pressing: footer \"{MessageText.OptedOutFooter}\" and [ {MessageText.OptInButtonEmoji} {MessageText.OptInButtonLabel} ])");
         sb.AppendLine();
     }
 

@@ -35,7 +35,8 @@ By default the bot DMs you a small card after every round you voted in (opt out 
 🎲 Bet on · +6 points
 [Go to the result in the server]
 ---
-To stop these messages, use /turf unsubscribe in the server.
+To stop these messages, press the button below or use /turf unsubscribe in the server.
+[ 🔕 Stop these messages ]
 ```
 
 Ranked rounds also show whether you bet and the points you gained or lost (a bet that lost nothing, or a wrong guess without a bet, shows "no change in points"). Regular battles are not scored, so they have no points line.

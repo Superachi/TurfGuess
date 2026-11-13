@@ -252,4 +252,35 @@ public sealed class BattleModule(
         if (was) logger.LogInformation("{UserName} ({UserId}) unsubscribed from result messages.", Context.User.Username, Context.User.Id);
         await RespondAsync(was ? MessageText.Unsubscribed : MessageText.NotSubscribed, ephemeral: true);
     }
+
+    /// <summary>The button under a result DM. Works from the DM itself, so the player doesn't need to open the server.</summary>
+    [ComponentInteraction(MessageText.OptOutButtonId, ignoreGroupNames: true)]
+    public async Task OptOutFromMessageAsync()
+    {
+        if (subscriptions.Unsubscribe((long)Context.User.Id, clock.GetUtcNow().ToUnixTimeSeconds()))
+            logger.LogInformation("{UserName} ({UserId}) unsubscribed from result messages with the button.", Context.User.Username, Context.User.Id);
+        await ShowOptStateAsync(subscribed: false);
+    }
+
+    [ComponentInteraction(MessageText.OptInButtonId, ignoreGroupNames: true)]
+    public async Task OptInFromMessageAsync()
+    {
+        if (subscriptions.Subscribe((long)Context.User.Id))
+            logger.LogInformation("{UserName} ({UserId}) subscribed to result messages with the button.", Context.User.Username, Context.User.Id);
+        await ShowOptStateAsync(subscribed: true);
+    }
+
+    /// <summary>Rewrites the result message to match: new footer, and the button that undoes the change.</summary>
+    private async Task ShowOptStateAsync(bool subscribed)
+    {
+        var component = (SocketMessageComponent)Context.Interaction;
+        var embed = component.Message.Embeds.FirstOrDefault()?.ToEmbedBuilder()
+            .WithFooter(subscribed ? MessageText.UnsubscribeFooter : MessageText.OptedOutFooter)
+            .Build();
+        await component.UpdateAsync(p =>
+        {
+            if (embed is not null) p.Embed = embed;
+            p.Components = DiscordPlayerNotifier.OptButton(subscribed);
+        });
+    }
 }

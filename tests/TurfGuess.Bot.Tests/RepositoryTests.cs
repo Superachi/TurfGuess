@@ -92,10 +92,10 @@ public class RepositoryTests
         env.Repo.TryUpsertVote(id, 3, "carol", Side.Left, 11);
         env.Repo.TryUpsertVote(id, 1, "Alice", Side.Left, 12);
         env.Repo.TryUpsertVote(id, 2, "bob", Side.Right, 13);
-        Assert.Equal(new ulong[] { 1, 2, 3 }, env.Repo.GetVoterIds(id));
+        Assert.Equal(new ulong[] { 1, 2, 3 }, env.Repo.GetVoters(id).Select(v => v.Id));
 
         env.Repo.TryUpsertVote(id, 1, "Alice", Side.Right, 20); // change: newest voted_at
-        Assert.Equal(new ulong[] { 1, 2, 3 }, env.Repo.GetVoterIds(id));
+        Assert.Equal(new ulong[] { 1, 2, 3 }, env.Repo.GetVoters(id).Select(v => v.Id));
     }
 
     [Fact]

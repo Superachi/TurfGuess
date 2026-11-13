@@ -45,7 +45,7 @@ public sealed class VoteCountService : BackgroundService
                 {
                     var round = _repo.Get(roundId);
                     if (round is not { Status: RoundStatus.Open }) continue;
-                    await _channel.UpdateVotersAsync(round, _repo.GetVoterIds(roundId), stoppingToken);
+                    await _channel.UpdateVotersAsync(round, _repo.GetVoters(roundId), stoppingToken);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {

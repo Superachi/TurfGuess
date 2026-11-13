@@ -19,17 +19,25 @@ public interface IRoundChannel
     /// Disables the buttons and marks the round message closed. <paramref name="voters"/> is null
     /// when the voter list is turned off. Must be safe to call twice.
     /// </summary>
-    Task CloseRoundMessageAsync(RoundRecord round, IReadOnlyList<ulong>? voters, CancellationToken ct);
+    Task CloseRoundMessageAsync(RoundRecord round, IReadOnlyList<Voter>? voters, CancellationToken ct);
 
-    /// <summary>Updates the list of who has voted on the round message (names only, never their choice).</summary>
-    Task UpdateVotersAsync(RoundRecord round, IReadOnlyList<ulong> voters, CancellationToken ct);
+    /// <summary>Updates the list of who has voted on the round message (names and bets only, never their choice).</summary>
+    Task UpdateVotersAsync(RoundRecord round, IReadOnlyList<Voter> voters, CancellationToken ct);
 
     /// <summary>Looks for an already posted reveal for this round. Returns the message id.</summary>
     Task<ulong?> FindRevealMessageAsync(long roundId, CancellationToken ct);
 
     /// <summary>Posts the reveal (text + image). Returns the message id.</summary>
     Task<ulong> PostRevealAsync(RoundRecord round, RevealSummary summary, string imagePath, CancellationToken ct);
+
+    /// <summary>Posts the summary of a finished week (text only, nobody is pinged).</summary>
+    Task PostWeekSummaryAsync(string text, CancellationToken ct);
 }
 
 /// <summary>Vote results for a reveal.</summary>
-public sealed record RevealSummary(int LeftVotes, int RightVotes, IReadOnlyList<ulong> CorrectGuessers);
+public sealed record RevealSummary(
+    int LeftVotes,
+    int RightVotes,
+    IReadOnlyList<PlayerOutcome> Winners,
+    IReadOnlyList<PlayerOutcome> Losers,
+    IReadOnlyList<StandingEntry> Standings);

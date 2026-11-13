@@ -36,6 +36,9 @@ public static class Difficulty
         };
     }
 
+    /// <summary>Points a round of this rank is worth: C = 1 … X = 5.</summary>
+    public static int Points(this DifficultyRank rank) => (int)rank + 1;
+
     /// <summary>The rank for the default difficulty range.</summary>
     public static DifficultyRank RankFor(double winnerShare) => RankFor(winnerShare, new DifficultyOptions());
 

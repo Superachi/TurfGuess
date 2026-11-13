@@ -40,17 +40,26 @@ public static partial class MessagePreview
             Unpainted = generated.Score.UnpaintedShare,
         };
 
-        // Sample votes: 11 players, 7 of them right.
+        // Sample votes: 11 players, 7 of them right. Players 1, 3 and 9 are betting.
         var winner = round.WinnerSide;
-        var voters = Enumerable.Range(1, 11).Select(i => 100_000_000_000_000_000UL + (ulong)i).ToList();
-        var correct = voters.Take(7).ToList();
-        var summary = winner == Side.Left
-            ? new RevealSummary(LeftVotes: 7, RightVotes: 4, correct)
-            : new RevealSummary(LeftVotes: 4, RightVotes: 7, correct);
+        int points = MessageText.PointsFor(round, options.Generator.Difficulty);
+        var ids = Enumerable.Range(1, 11).Select(i => 100_000_000_000_000_000UL + (ulong)i).ToList();
+        var bettors = new[] { 0, 2, 8 };
+        var voters = ids.Select((id, i) => new Voter(id, bettors.Contains(i))).ToList();
+        PlayerOutcome Outcome(int i, bool correct) =>
+            new(ids[i], bettors.Contains(i), Weekly.RawDelta(points, correct, bettors.Contains(i)));
+        var winners = Enumerable.Range(0, 7).Select(i => Outcome(i, true)).ToList();
+        var losers = Enumerable.Range(7, 4).Select(i => Outcome(i, false)).ToList();
+        var standings = new List<StandingEntry>
+        {
+            new(ids[0], 14, 5), new(ids[1], 11, 4), new(ids[2], 11, 3), new(ids[3], 9, 5),
+        };
+        var summary = new RevealSummary(winner == Side.Left ? 7 : 4, winner == Side.Left ? 4 : 7, winners, losers, standings);
 
         string Show(string text) => raw ? text : Humanize(text, options.Game.ParsedTimeZone, now);
         string buttons(bool disabled) =>
-            $"[ {round.LeftEmoji} {round.LeftName} ]  [ {round.RightEmoji} {round.RightName} ]" + (disabled ? "  (disabled)" : "");
+            $"[ {round.LeftEmoji} {round.LeftName} ]  [ {round.RightEmoji} {round.RightName} ]  [ {MessageText.BetButtonEmoji} {MessageText.BetButtonLabel} ]" +
+            (disabled ? "  (disabled)" : "");
 
         var sb = new StringBuilder();
         sb.AppendLine($"Sample round: seed {seed}, {round.LeftName} vs {round.RightName}, {round.TeamName(winner)} wins with " +
@@ -67,6 +76,13 @@ public static partial class MessagePreview
 
         Section(sb, "2. Vote confirmation (only the voter sees this)");
         sb.AppendLine(Show(MessageText.VoteAccepted(round, Side.Left)));
+        sb.AppendLine(Show(MessageText.VoteAccepted(round, Side.Left, bet: true, difficulty: options.Generator.Difficulty)));
+        sb.AppendLine();
+
+        Section(sb, "2b. Pressing the Bet button (only the player sees this)");
+        sb.AppendLine(Show(MessageText.BetToggled(round, bet: true, hasVoted: true, options.Generator.Difficulty)));
+        sb.AppendLine(Show(MessageText.BetToggled(round, bet: true, hasVoted: false, options.Generator.Difficulty)));
+        sb.AppendLine(Show(MessageText.BetToggled(round, bet: false, hasVoted: true, options.Generator.Difficulty)));
         sb.AppendLine();
 
         Section(sb, "3. Round message, live voter list (edited at most every " +
@@ -88,6 +104,10 @@ public static partial class MessagePreview
         Section(sb, $"6. Reveal (embed in {round.TeamName(winner)}'s color {(winner == Side.Left ? round.LeftColor : round.RightColor)}, no pings)");
         Embed(sb, null, Show(MessageText.Reveal(round, summary, options.Game.MaxListedWinners)),
             $"reveal_{round.Id}.png", MessageText.RevealFooter(round.Id));
+        sb.AppendLine();
+
+        Section(sb, "7. Weekly summary (posted after the first reveal of a new week, no pings)");
+        sb.AppendLine(Show(MessageText.WeekSummary("2026-11-02", [standings[0]]) ?? ""));
 
         return sb.ToString();
     }

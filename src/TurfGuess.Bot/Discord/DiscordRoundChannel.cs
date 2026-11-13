@@ -27,7 +27,7 @@ public sealed class DiscordRoundChannel(DiscordSocketClient client, BotOptions o
     {
         var channel = await ChannelAsync();
         string fileName = Path.GetFileName(imagePath);
-        IReadOnlyList<ulong>? voters = options.Game.ShowVoteCount ? [] : null;
+        IReadOnlyList<Voter>? voters = options.Game.ShowVoteCount ? [] : null;
 
         var embed = RoundEmbed(round, MessageText.RoundDescription(round, voters, closed: false, difficulty: options.Generator.Difficulty), fileName);
 
@@ -37,7 +37,7 @@ public sealed class DiscordRoundChannel(DiscordSocketClient client, BotOptions o
         return message.Id;
     }
 
-    public async Task CloseRoundMessageAsync(RoundRecord round, IReadOnlyList<ulong>? voters, CancellationToken ct)
+    public async Task CloseRoundMessageAsync(RoundRecord round, IReadOnlyList<Voter>? voters, CancellationToken ct)
     {
         var message = await RoundMessageAsync(round, ct);
         if (message is null) return;
@@ -48,7 +48,7 @@ public sealed class DiscordRoundChannel(DiscordSocketClient client, BotOptions o
         }, Request(ct));
     }
 
-    public async Task UpdateVotersAsync(RoundRecord round, IReadOnlyList<ulong> voters, CancellationToken ct)
+    public async Task UpdateVotersAsync(RoundRecord round, IReadOnlyList<Voter> voters, CancellationToken ct)
     {
         var message = await RoundMessageAsync(round, ct);
         if (message is null) return;
@@ -83,6 +83,12 @@ public sealed class DiscordRoundChannel(DiscordSocketClient client, BotOptions o
         // Mentions are disabled, so the correct guessers are named without being pinged.
         var message = await channel.SendFileAsync(file, embed: embed, allowedMentions: AllowedMentions.None, options: Request(ct));
         return message.Id;
+    }
+
+    public async Task PostWeekSummaryAsync(string text, CancellationToken ct)
+    {
+        var channel = await ChannelAsync();
+        await channel.SendMessageAsync(text, allowedMentions: AllowedMentions.None, options: Request(ct));
     }
 
     // ---------------------------------------------------------------------------------------
@@ -131,6 +137,8 @@ public sealed class DiscordRoundChannel(DiscordSocketClient client, BotOptions o
             emote: new Emoji(round.LeftEmoji), disabled: disabled)
         .WithButton(round.RightName, MessageText.ButtonId(round.Id, Side.Right), ButtonStyle.Secondary,
             emote: new Emoji(round.RightEmoji), disabled: disabled)
+        .WithButton(MessageText.BetButtonLabel, MessageText.BetButtonId(round.Id), ButtonStyle.Primary,
+            emote: new Emoji(MessageText.BetButtonEmoji), disabled: disabled)
         .Build();
 
     private static IEnumerable<string> ButtonIds(IEnumerable<IMessageComponent> components)

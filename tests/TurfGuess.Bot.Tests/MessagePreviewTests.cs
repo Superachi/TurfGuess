@@ -16,7 +16,7 @@ public class MessagePreviewTests
         Assert.Contains("Turf Guess · Round #12", text);
         Assert.Contains("Which team do you think painted more? Cast your vote!", text);
         Assert.Contains("You voted", text);
-        Assert.Contains("**11 players have voted:** @Player1, @Player2", text);
+        Assert.Contains("**11 players have voted:** 🎲@Player1, @Player2, 🎲@Player3", text);
         Assert.Contains(MessageText.VotingClosed, text);
         Assert.Contains("(disabled)", text);
         Assert.Contains("wins!", text);

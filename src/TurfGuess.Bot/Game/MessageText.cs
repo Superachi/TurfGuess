@@ -34,6 +34,11 @@ public static class MessageText
 
     public static string ButtonIdPrefix(long roundId) => $"vote:{roundId}:";
 
+    public static string BetButtonId(long roundId) => $"bet:{roundId}";
+
+    public const string BetButtonLabel = "Bet";
+    public const string BetButtonEmoji = "🎲";
+
     /// <summary>Discord's limit for an embed description.</summary>
     public const int EmbedDescriptionLimit = 4096;
 
@@ -41,24 +46,18 @@ public static class MessageText
     public const int MaxListedVoters = 50;
 
     /// <summary>
-    /// The round message. <paramref name="voters"/> are the players who voted, in display order,
-    /// or null to leave the voter line out (Game:ShowVoteCount off). Only who voted, never what.
+    /// The round message. <paramref name="voters"/> are the players who voted, in display order
+    /// (a 🎲 marks those betting), or null to leave the voter line out (Game:ShowVoteCount off).
+    /// Only who voted and who bets, never what they picked.
     /// </summary>
-    public static string RoundDescription(RoundRecord round, IReadOnlyList<ulong>? voters, bool closed,
+    public static string RoundDescription(RoundRecord round, IReadOnlyList<Voter>? voters, bool closed,
         int maxListed = MaxListedVoters, int limit = EmbedDescriptionLimit, DifficultyOptions? difficulty = null)
     {
         var sb = new StringBuilder();
-        if (closed)
-        {
-            sb.Append("**Voting is closed.** The results are below.\n");
-            sb.Append(DifficultyLine(round, difficulty));
-        }
-        else
-        {
-            sb.Append("Which team do you think painted more? Cast your vote!\n");
-            sb.Append(DifficultyLine(round, difficulty)).Append('\n');
-            sb.Append($"Results <t:{round.RevealAt}:R> (<t:{round.RevealAt}:f>).");
-        }
+        sb.Append(closed ? "**Voting is closed.** The results are below.\n\n" : "Which team do you think painted more? Cast your vote!\n\n");
+        sb.Append(DifficultyLine(round, difficulty)).Append('\n');
+        sb.Append(PointsLine(round, difficulty));
+        if (!closed) sb.Append($"\nResults <t:{round.RevealAt}:R> (<t:{round.RevealAt}:f>).");
 
         if (voters is null) return sb.ToString();
 
@@ -70,7 +69,7 @@ public static class MessageText
         }
 
         sb.Append(voters.Count == 1 ? "**1 player has voted:** " : $"**{voters.Count} players have voted:** ");
-        AppendMentions(sb, voters, maxListed, limit);
+        AppendList(sb, voters.Select(v => (v.Bet ? "🎲" : "") + $"<@{v.Id}>").ToList(), maxListed, limit - sb.Length);
         return sb.ToString();
     }
 
@@ -82,18 +81,54 @@ public static class MessageText
     {
         var rank = Difficulty.RankFor(round.WinnerShare, difficulty ?? new DifficultyOptions());
         int flames = (int)rank + 1; // C = 1 … X = 5
-        return $"{rank}-rank difficulty {string.Concat(Enumerable.Repeat("🔥", flames))}";
+        return $"Rank {rank} | {string.Concat(Enumerable.Repeat("🔥", flames))}";
     }
 
-    public static string VoteAccepted(RoundRecord round, Side side) =>
-        $"You voted {round.TeamEmoji(side)} **{round.TeamName(side)}**. You can change your vote until the reveal.";
+    /// <summary>What the round is worth, and what a bet would win or lose.</summary>
+    public static string PointsLine(RoundRecord round, DifficultyOptions? difficulty = null)
+    {
+        int points = PointsFor(round, difficulty);
+        return $"Worth {Plural(points, "point")} · bet: win +{2 * points} / lose −{points}";
+    }
+
+    public static int PointsFor(RoundRecord round, DifficultyOptions? difficulty = null) =>
+        Difficulty.RankFor(round.WinnerShare, difficulty ?? new DifficultyOptions()).Points();
+
+    private static string Plural(int n, string noun) => n == 1 ? $"{n} {noun}" : $"{n} {noun}s";
+
+    /// <summary>Only the voter sees this. <paramref name="bet"/> says whether their bet is on.</summary>
+    public static string VoteAccepted(RoundRecord round, Side side, bool bet = false, DifficultyOptions? difficulty = null)
+    {
+        string text = $"You voted {round.TeamEmoji(side)} **{round.TeamName(side)}**. You can change your vote until the reveal.";
+        if (bet)
+        {
+            int points = PointsFor(round, difficulty);
+            text += $"\n🎲 Your bet is on: win +{2 * points} / lose −{points}.";
+        }
+        return text;
+    }
+
+    /// <summary>Only the player sees this, after pressing Bet.</summary>
+    public static string BetToggled(RoundRecord round, bool bet, bool hasVoted, DifficultyOptions? difficulty = null)
+    {
+        int points = PointsFor(round, difficulty);
+        if (!bet) return $"🎲 Your bet is off. A correct guess still earns +{points}, and a wrong one costs nothing.";
+
+        string text = $"🎲 Your bet is on: win +{2 * points} / lose −{points} (your score can't drop below 0). Press Bet again to turn it off before the reveal.";
+        if (!hasVoted) text += "\nA bet only counts if you vote for a team too.";
+        return text;
+    }
 
     public const string VotingClosed = "Voting for this round is closed.";
 
+    /// <summary>How many players the weekly standings in the reveal show.</summary>
+    public const int StandingsShown = 3;
+
     /// <summary>
-    /// The reveal text: winner, coverage, vote counts and the correct guessers as mentions
-    /// (sent with mentions disabled, so nobody is pinged). The list is cut off at
-    /// <paramref name="maxListed"/> names and kept within <paramref name="limit"/> characters.
+    /// The reveal text: winner, coverage, vote counts, who guessed right and wrong with their points
+    /// (🎲 marks a bet), and the top of the weekly standings. Players are mentions (sent with mentions
+    /// disabled, so nobody is pinged). Each list is cut off at <paramref name="maxListed"/> names and
+    /// the whole text is kept within <paramref name="limit"/> characters.
     /// </summary>
     public static string Reveal(RoundRecord round, RevealSummary s, int maxListed, int limit = DiscordMessageLimit)
     {
@@ -108,38 +143,96 @@ public static class MessageText
         sb.Append($"{Pct(round.Unpainted)} unpainted\n");
         sb.Append($"Votes: {round.TeamEmoji(l)} {s.LeftVotes} · {round.TeamEmoji(r)} {s.RightVotes}\n\n");
 
-        if (s.CorrectGuessers.Count == 0)
+        string standings = StandingsText(s.Standings);
+
+        if (s.Winners.Count == 0 && s.Losers.Count == 0)
         {
-            sb.Append(s.LeftVotes + s.RightVotes == 0 ? "Nobody voted this round." : "Nobody guessed right this round.");
-            return sb.ToString();
+            sb.Append("Nobody voted this round.");
+        }
+        else
+        {
+            if (s.Winners.Count == 0)
+            {
+                sb.Append("Nobody guessed right this round.");
+            }
+            else
+            {
+                string label = $"**Winners ({s.Winners.Count}):** ";
+                int room = limit - sb.Length - standings.Length - label.Length;
+                if (s.Losers.Count > 0) room = (room - 40) / 2; // leave the losers their half
+                sb.Append(label);
+                AppendList(sb, s.Winners.Select(Outcome).ToList(), maxListed, room);
+            }
+
+            if (s.Losers.Count > 0)
+            {
+                if (s.Winners.Count > 0) sb.Append('\n');
+                sb.Append($"**Losers ({s.Losers.Count}):** ");
+                AppendList(sb, s.Losers.Select(Outcome).ToList(), maxListed, limit - sb.Length - standings.Length);
+            }
         }
 
-        sb.Append($"**Correct guessers ({s.CorrectGuessers.Count}):** ");
-        AppendMentions(sb, s.CorrectGuessers, maxListed, limit);
+        sb.Append(standings);
         return sb.ToString();
     }
 
+    /// <summary>"🎲&lt;@id&gt; (+6)": a 🎲 for a bet, then the points gained, lost, or ~ for no change.</summary>
+    private static string Outcome(PlayerOutcome o) => (o.Bet ? "🎲" : "") + $"<@{o.UserId}> ({Signed(o.Delta)})";
+
+    private static string Signed(int delta) => delta switch
+    {
+        > 0 => $"+{delta}",
+        < 0 => $"−{-delta}",
+        _ => "~",
+    };
+
+    /// <summary>The top of the weekly standings, with a blank line before it. Empty when nobody has scored.</summary>
+    private static string StandingsText(IReadOnlyList<StandingEntry> standings)
+    {
+        if (standings.Count == 0) return "";
+        var leaders = Weekly.WeekWinners(standings);
+        var sb = new StringBuilder("\n\n**Weekly standings**");
+        for (int i = 0; i < Math.Min(standings.Count, StandingsShown); i++)
+        {
+            var e = standings[i];
+            string trophy = leaders.Contains(e) ? "🏆 " : "";
+            sb.Append($"\n{i + 1}. {trophy}<@{e.UserId}> {Plural(e.Points, "pt")} · {Plural(e.Wins, "win")}");
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>The message after the first reveal of a new week. Null when nobody scored that week.</summary>
+    public static string? WeekSummary(string weekStart, IReadOnlyList<StandingEntry> winners)
+    {
+        if (winners.Count == 0) return null;
+        var top = winners[0];
+        string names = string.Join(", ", winners.Select(x => $"<@{x.UserId}>"));
+        string verb = winners.Count == 1 ? "wins" : "win";
+        return $"🏁 **Week {Weekly.WeekNumber(weekStart)} is over!**\n" +
+               $"🏆 {names} {verb} with {Plural(top.Points, "pt")} and {Plural(top.Wins, "win")}.\n" +
+               "A new week starts now.";
+    }
+
     /// <summary>
-    /// Appends players as mentions (the bot sends them with mentions disabled, so nobody is pinged),
-    /// at most <paramref name="maxListed"/> of them and keeping the whole text within
-    /// <paramref name="limit"/> characters. Anyone left out is counted: "…and N more".
+    /// Appends items joined by commas, at most <paramref name="maxListed"/> of them and within
+    /// <paramref name="budget"/> characters. Anyone left out is counted: "…and N more".
     /// </summary>
-    private static void AppendMentions(StringBuilder sb, IReadOnlyList<ulong> ids, int maxListed, int limit)
+    private static void AppendList(StringBuilder sb, IReadOnlyList<string> items, int maxListed, int budget)
     {
         int listed = 0;
-        int budget = limit - sb.Length - 30; // room for "…and N more"
+        budget -= 30; // room for "…and N more"
         var names = new StringBuilder();
-        foreach (var id in ids)
+        foreach (var item in items)
         {
             if (listed >= maxListed) break;
-            string part = (listed == 0 ? "" : ", ") + $"<@{id}>";
+            string part = (listed == 0 ? "" : ", ") + item;
             if (names.Length + part.Length > budget) break;
             names.Append(part);
             listed++;
         }
 
         sb.Append(names);
-        int rest = ids.Count - listed;
+        int rest = items.Count - listed;
         if (rest > 0) sb.Append(listed == 0 ? $"{rest} players" : $" …and {rest} more");
     }
 

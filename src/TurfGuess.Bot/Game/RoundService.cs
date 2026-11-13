@@ -28,6 +28,7 @@ public sealed class RandomSeedSource : ISeedSource
 /// </summary>
 public sealed class RoundService(
     RoundRepository repo,
+    ScoreRepository scores,
     IRoundChannel channel,
     RoundImages images,
     BotOptions options,
@@ -151,16 +152,12 @@ public sealed class RoundService(
     private async Task RevealAsync(RoundRecord round, CancellationToken ct)
     {
         var votes = repo.GetVotes(round.Id);
-        await channel.CloseRoundMessageAsync(round, options.Game.ShowVoteCount ? repo.GetVoterIds(round.Id) : null, ct);
+        await channel.CloseRoundMessageAsync(round, options.Game.ShowVoteCount ? repo.GetVoters(round.Id) : null, ct);
 
         ulong? revealId = await channel.FindRevealMessageAsync(round.Id, ct);
         if (revealId is null)
         {
-            var winner = round.WinnerSide;
-            var summary = new RevealSummary(
-                LeftVotes: votes.Count(v => v.ChoiceSide == Side.Left),
-                RightVotes: votes.Count(v => v.ChoiceSide == Side.Right),
-                CorrectGuessers: votes.Where(v => v.ChoiceSide == winner).Select(v => (ulong)v.UserId).ToList());
+            var summary = ScoreRound(round, votes);
 
             var (_, revealPath) = images.Ensure(round);
             revealId = await channel.PostRevealAsync(round, summary, revealPath, ct);
@@ -173,6 +170,63 @@ public sealed class RoundService(
         }
 
         repo.MarkDone(round.Id, (long)revealId.Value);
+        await PostFinishedWeeksAsync(round, ct);
+    }
+
+    /// <summary>The week a round counts for: the week of its reveal time, in the game's time zone.</summary>
+    private string WeekOf(RoundRecord round) => Weekly.WeekStart(round.RevealAtTime, options.Game.ParsedTimeZone);
+
+    /// <summary>
+    /// Works out each voter's points for the round and stores them (once; repeating is harmless),
+    /// then builds the reveal numbers. Voters are listed by name, a bet only counts for a voter.
+    /// </summary>
+    private RevealSummary ScoreRound(RoundRecord round, IReadOnlyList<VoteRecord> votes)
+    {
+        var winner = round.WinnerSide;
+        var bettors = repo.GetBettorIds(round.Id);
+        var ordered = votes.OrderBy(v => v.UserName, StringComparer.OrdinalIgnoreCase).ThenBy(v => v.UserId).ToList();
+        string week = WeekOf(round);
+
+        var results = scores.ScoreRound(round.Id, week, MessageText.PointsFor(round, options.Generator.Difficulty),
+            ordered.Select(v => new ScoringVote(v.UserId, v.ChoiceSide == winner, bettors.Contains(v.UserId))).ToList())
+            .ToDictionary(r => r.UserId);
+
+        var outcomes = ordered.Select(v => (Vote: v, Result: results[v.UserId]))
+            .Select(x => (x.Result.Correct != 0, new PlayerOutcome((ulong)x.Vote.UserId, x.Result.Bet != 0, (int)x.Result.Delta)))
+            .ToList();
+
+        return new RevealSummary(
+            LeftVotes: votes.Count(v => v.ChoiceSide == Side.Left),
+            RightVotes: votes.Count(v => v.ChoiceSide == Side.Right),
+            Winners: outcomes.Where(o => o.Item1).Select(o => o.Item2).ToList(),
+            Losers: outcomes.Where(o => !o.Item1).Select(o => o.Item2).ToList(),
+            Standings: scores.Standings(week));
+    }
+
+    /// <summary>
+    /// After the first reveal of a new week, posts the summary of each earlier week that has scores
+    /// and none yet, and records its winners. A failure is logged and retried at the next reveal;
+    /// it never holds up the game.
+    /// </summary>
+    private async Task PostFinishedWeeksAsync(RoundRecord round, CancellationToken ct)
+    {
+        foreach (var week in scores.UnclosedWeeksBefore(WeekOf(round)))
+        {
+            try
+            {
+                var winners = Weekly.WeekWinners(scores.Standings(week));
+                string? text = MessageText.WeekSummary(week, winners);
+                if (text is not null) await channel.PostWeekSummaryAsync(text, ct);
+                scores.CloseWeek(week, winners);
+                logger.LogInformation("Week of {Week}: finished, winners: {Winners}.", week,
+                    winners.Count == 0 ? "nobody scored" : string.Join(", ", winners.Select(w => $"{w.UserId} ({w.Points} pts, {w.Wins} wins)")));
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogWarning(ex, "Posting the summary of the week of {Week} failed; it will be retried after the next reveal.", week);
+                return;
+            }
+        }
     }
 
     private const int MaxNamesInLog = 50;

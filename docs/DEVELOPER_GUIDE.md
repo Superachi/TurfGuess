@@ -338,6 +338,7 @@ All options are mutable classes, so the bot can bind them from `appsettings.json
 | `DiligentSpawnChance` | 0.3 | 0–1 | Per round: chance both teams painted their own spawn area diligently (otherwise neither did) |
 | `SpawnNeglectVariance` | 0.6 | 0–1 | Each team's spawn neglect `n` is multiplied by its own random factor in `[1 − v, 1 + v]`, independent of the winner, so the spawns can be very differently bare |
 | `StrayInkChance` | 0.4 | 0–1 | Per team and round: chance of a trail or bomb splotches deep in the other team's half, broken up by noise (0 = off) |
+| `RaidTrailsPerTeam` | 4 | 0–12 | Long, curving, broken-up trails each team runs through the other team's turf, starting on its own side of the front (0 = none) |
 | `FrontTiltMaxDegrees` | 20 | 0–60 | Largest tilt of the front line away from vertical; each round picks an angle in `[−max, +max]` (0 = vertical) |
 | `PixelsPerCell` | 16 | 2–64 | Mask and image resolution |
 | `CornerRadius` | 0.75 | 0–<1 | Outer corner radius, in cells |

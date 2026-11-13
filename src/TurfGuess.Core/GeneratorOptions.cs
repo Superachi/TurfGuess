@@ -26,6 +26,7 @@ public sealed class GeneratorOptions
         if (Paint.DiligentSpawnChance is < 0 or > 1) errors.Add("Paint.DiligentSpawnChance must be in [0, 1].");
         if (Paint.SpawnNeglectVariance is < 0 or > 1) errors.Add("Paint.SpawnNeglectVariance must be in [0, 1].");
         if (Paint.StrayInkChance is < 0 or > 1) errors.Add("Paint.StrayInkChance must be in [0, 1].");
+        if (Paint.RaidTrailsPerTeam is < 0 or > 12) errors.Add("Paint.RaidTrailsPerTeam must be in [0, 12].");
         if (Paint.FrontTiltMaxDegrees is < 0 or > 60) errors.Add("Paint.FrontTiltMaxDegrees must be in [0, 60].");
         if (Paint.CornerRadius is < 0 or >= 1) errors.Add("Paint.CornerRadius must be in [0, 1).");
         if (Paint.InnerCornerRadius is < 0 or >= 1) errors.Add("Paint.InnerCornerRadius must be in [0, 1).");
@@ -83,6 +84,12 @@ public sealed class PaintOptions
     /// (a player running through) or some splotches (bombs). The two teams roll independently.
     /// </summary>
     public double StrayInkChance { get; set; } = 0.4;
+
+    /// <summary>
+    /// Long, curving, broken-up trails each team runs through the other team's turf, starting at
+    /// its own side of the front line, like players running through the enemy half. 0 = none.
+    /// </summary>
+    public int RaidTrailsPerTeam { get; set; } = 4;
 
     /// <summary>
     /// Largest tilt of the front line away from vertical, in degrees. Each round picks an angle in

@@ -133,6 +133,34 @@ public class SpawnPaintTests
     }
 
     [Fact]
+    public void Raid_trails_keep_targets_exact_and_change_the_paint()
+    {
+        for (ulong seed = 1; seed <= 4; seed++)
+        {
+            var off = Options(0);
+            off.Paint.RaidTrailsPerTeam = 0;
+            var on = Options(0);
+            on.Paint.RaidTrailsPerTeam = 4;
+            var a = RoundGenerator.Generate(seed, off);
+            var b = RoundGenerator.Generate(seed, on);
+            Assert.InRange(Math.Abs(b.Score.WinnerShare - b.TargetWinnerShare), 0, 1.0 / b.Score.PaintedPixels);
+            bool differs = false;
+            for (int y = 0; y < a.Paint.Height && !differs; y++)
+                for (int x = 0; x < a.Paint.Width; x++)
+                    if (a.Paint[x, y] != b.Paint[x, y]) { differs = true; break; }
+            Assert.True(differs, $"seed {seed}: raid trails should change the paint");
+        }
+    }
+
+    [Fact]
+    public void Invalid_raid_trail_count_is_rejected()
+    {
+        var o = Options(0);
+        o.Paint.RaidTrailsPerTeam = 99;
+        Assert.Throws<ArgumentException>(() => RoundGenerator.Generate(1, o));
+    }
+
+    [Fact]
     public void Invalid_stray_chance_is_rejected()
     {
         var o = Options(0);

@@ -24,6 +24,10 @@ public sealed class GeneratorOptions
         if (Paint.UnpaintedMin < 0 || Paint.UnpaintedMax >= 0.5 || Paint.UnpaintedMin > Paint.UnpaintedMax) errors.Add("Paint.UnpaintedMin/Max must satisfy 0 <= min <= max < 0.5.");
         if (Paint.PixelsPerCell is < 2 or > 64) errors.Add("Paint.PixelsPerCell must be in [2, 64].");
         if (Paint.DiligentSpawnChance is < 0 or > 1) errors.Add("Paint.DiligentSpawnChance must be in [0, 1].");
+        if (Paint.SpawnNeglectVariance is < 0 or > 1) errors.Add("Paint.SpawnNeglectVariance must be in [0, 1].");
+        if (Paint.StrayInkChance is < 0 or > 1) errors.Add("Paint.StrayInkChance must be in [0, 1].");
+        if (Paint.RaidTrailsPerTeam is < 0 or > 12) errors.Add("Paint.RaidTrailsPerTeam must be in [0, 12].");
+        if (Paint.FrontTiltMaxDegrees is < 0 or > 60) errors.Add("Paint.FrontTiltMaxDegrees must be in [0, 60].");
         if (Paint.CornerRadius is < 0 or >= 1) errors.Add("Paint.CornerRadius must be in [0, 1).");
         if (Paint.InnerCornerRadius is < 0 or >= 1) errors.Add("Paint.InnerCornerRadius must be in [0, 1).");
 
@@ -68,6 +72,30 @@ public sealed class PaintOptions
     /// Diligent teams leave far less unpainted floor near its spawn.
     /// </summary>
     public double DiligentSpawnChance { get; set; } = 0.3;
+
+    /// <summary>
+    /// How much each team's spawn neglect varies independently, as a fraction: each team's neglect is
+    /// multiplied by a random factor in [1 − v, 1 + v]. 0 = both spawns equally bare.
+    /// </summary>
+    public double SpawnNeglectVariance { get; set; } = 0.6;
+
+    /// <summary>
+    /// Chance, per team and round, of stray ink deep in the other team's territory: either a trail
+    /// (a player running through) or some splotches (bombs). The two teams roll independently.
+    /// </summary>
+    public double StrayInkChance { get; set; } = 0.4;
+
+    /// <summary>
+    /// Long, curving, broken-up trails each team runs through the other team's turf, starting at
+    /// its own side of the front line, like players running through the enemy half. 0 = none.
+    /// </summary>
+    public int RaidTrailsPerTeam { get; set; } = 4;
+
+    /// <summary>
+    /// Largest tilt of the front line away from vertical, in degrees. Each round picks an angle in
+    /// [−max, +max]. 0 = always vertical.
+    /// </summary>
+    public double FrontTiltMaxDegrees { get; set; } = 20;
 
     /// <summary>Mask and render resolution.</summary>
     public int PixelsPerCell { get; set; } = 16;

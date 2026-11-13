@@ -29,7 +29,7 @@ public sealed class DiscordRoundChannel(DiscordSocketClient client, BotOptions o
         string fileName = Path.GetFileName(imagePath);
         IReadOnlyList<ulong>? voters = options.Game.ShowVoteCount ? [] : null;
 
-        var embed = RoundEmbed(round, MessageText.RoundDescription(round, voters, closed: false), fileName);
+        var embed = RoundEmbed(round, MessageText.RoundDescription(round, voters, closed: false, difficulty: options.Generator.Difficulty), fileName);
 
         using var file = new FileAttachment(imagePath, fileName);
         var message = await channel.SendFileAsync(file, embed: embed, components: Buttons(round, disabled: false),
@@ -44,7 +44,7 @@ public sealed class DiscordRoundChannel(DiscordSocketClient client, BotOptions o
         await message.ModifyAsync(p =>
         {
             p.Components = Buttons(round, disabled: true);
-            p.Embed = RoundEmbed(round, MessageText.RoundDescription(round, voters, closed: true), AttachedFileName(message, round));
+            p.Embed = RoundEmbed(round, MessageText.RoundDescription(round, voters, closed: true, difficulty: options.Generator.Difficulty), AttachedFileName(message, round));
         }, Request(ct));
     }
 
@@ -53,7 +53,7 @@ public sealed class DiscordRoundChannel(DiscordSocketClient client, BotOptions o
         var message = await RoundMessageAsync(round, ct);
         if (message is null) return;
         await message.ModifyAsync(
-            p => p.Embed = RoundEmbed(round, MessageText.RoundDescription(round, voters, closed: false), AttachedFileName(message, round)),
+            p => p.Embed = RoundEmbed(round, MessageText.RoundDescription(round, voters, closed: false, difficulty: options.Generator.Difficulty), AttachedFileName(message, round)),
             Request(ct));
     }
 

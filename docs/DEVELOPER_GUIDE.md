@@ -177,7 +177,7 @@ Radii are in cells and must be **below 1**. An opening with radius *r* removes f
 | `UnpaintedShare` | `U / floor` | Shown at the reveal |
 | `Winner` | `L > R ? Left : Right` | Ties are impossible because `MinWinnerShare > 50` |
 
-`Difficulty.RankFor(winnerShare)` (`Scoring/DifficultyRank.cs`) turns `WinnerShare` into a rank shown in the round message: X under 50.7%, S under 51.1%, A under 51.5%, B under 51.9%, otherwise C. The bands are fixed 0.4-point steps over the default 50.3–52.3% range, not derived from the configured range, so a rank always means the same split.
+`Difficulty.RankFor(winnerShare, range)` (`Scoring/DifficultyRank.cs`) turns `WinnerShare` into a rank shown in the round message. The configured `Difficulty` range `[MinWinnerShare, MaxWinnerShare]` is cut into five equal bands: X is the closest fifth, then S, A, B, and C is the widest fifth. Each rank therefore comes up about one round in five whatever the range is. With the default 50.3–52.3% range that is X under 50.7%, S under 51.1%, A under 51.5%, B under 51.9%, otherwise C. A range with min equal to max always ranks A.
 
 ### Stage 4: rendering (`Render/MapRenderer.cs`)
 
@@ -336,6 +336,10 @@ All options are mutable classes, so the bot can bind them from `appsettings.json
 | `UnpaintedMin` / `UnpaintedMax` | 0.03 / 0.10 | 0 ≤ min ≤ max < 0.5 | Unpainted share of the floor, picked per round |
 | `Splatter` | true | | Splats in the fight zone and sputters at the unpainted border near spawns |
 | `DiligentSpawnChance` | 0.3 | 0–1 | Per round: chance both teams painted their own spawn area diligently (otherwise neither did) |
+| `SpawnNeglectVariance` | 0.6 | 0–1 | Each team's spawn neglect `n` is multiplied by its own random factor in `[1 − v, 1 + v]`, independent of the winner, so the spawns can be very differently bare |
+| `StrayInkChance` | 0.4 | 0–1 | Per team and round: chance of a trail or bomb splotches deep in the other team's half, broken up by noise (0 = off) |
+| `RaidTrailsPerTeam` | 4 | 0–12 | Long, curving, broken-up trails each team runs through the other team's turf, starting on its own side of the front (0 = none) |
+| `FrontTiltMaxDegrees` | 20 | 0–60 | Largest tilt of the front line away from vertical; each round picks an angle in `[−max, +max]` (0 = vertical) |
 | `PixelsPerCell` | 16 | 2–64 | Mask and image resolution |
 | `CornerRadius` | 0.75 | 0–<1 | Outer corner radius, in cells |
 | `InnerCornerRadius` | 0.5 | 0–<1 | Inner corner radius, in cells |

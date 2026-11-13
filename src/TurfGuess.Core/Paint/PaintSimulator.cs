@@ -35,6 +35,9 @@ public static class PaintSimulator
     private const double SpawnSplatBand = 0.25;        // how far into the unpainted area (in units of the key)
     private const double SpawnSplatMinCloseness = 0.4; // only near a spawn, not in far corners
 
+    // Extra score (in the fight band) for the team that neglected its spawn more: it painted the middle.
+    private const double MiddleEdge = 0.15;
+
     // Fight zone: around the front line both colors interleave in blotches.
     private const double FightFrequency = 0.35;  // per cell
     private const double FightAmplitude = 0.9;
@@ -49,6 +52,19 @@ public static class PaintSimulator
     // Splat stamps.
     private const double SplatStrength = 8.0;
     private const double SplatCandidateBand = 0.5;
+    private const double StrayBreakupFrequency = 0.6; // per cell, blotch size of the holes in stray ink
+    private const double StrayBreakupCut = 0.15;      // noise above this leaves a hole (higher = more solid)
+    private const double RaidStartBand = 1.0;         // raid trails start this close to the front line (score units), on their own side
+    private const double RaidCurveMin = 0.015;        // heading drift per step (radians), so trails bend
+    private const double RaidCurveMax = 0.035;
+    private const double RaidWidthMin = 0.45;         // raid trail base radius range, in cells (wide spread = thickness variance)
+    private const double RaidWidthMax = 0.95;
+    private const double RaidTaper = 0.5;             // a raid trail thins by this fraction by its end
+    private const double RaidEndCut = -0.1;           // break-up cut at the end of a raid trail (lower = more holes)
+    private const int RaidAttemptsPerTrail = 6;      // tries per wanted trail before giving up
+    private const double RaidPull = 0.01;             // how strongly a raid trail leans toward the enemy spawn
+    private readonly record struct PointD(double X, double Y);
+    private const double StrayMinDepth = 0.6;      // stray ink starts at least this far past the front, in the other team's half
 
     public static PaintResult? Paint(GameMap map, PaintOptions options, Side winner, double winnerShare, double unpaintedShare, ulong seed)
     {
@@ -120,8 +136,11 @@ public static class PaintSimulator
         // so the winner can't be read off which side has the barer spawn.
         bool diligentLeft = diligence.Chance(options.DiligentSpawnChance);
         bool diligentRight = diligentLeft;
-        double neglectLeft = diligentLeft ? DiligentNeglect : SpawnNeglect;
-        double neglectRight = diligentRight ? DiligentNeglect : SpawnNeglect;
+        // On top of that, each team's neglect is scaled by its own random factor, independent of who
+        // wins, so the two spawns can be very differently bare and players have to judge each one.
+        double variance = options.SpawnNeglectVariance;
+        double neglectLeft = (diligentLeft ? DiligentNeglect : SpawnNeglect) * diligence.Range(1 - variance, 1 + variance);
+        double neglectRight = (diligentRight ? DiligentNeglect : SpawnNeglect) * diligence.Range(1 - variance, 1 + variance);
 
         var holes = new GradientNoise(Rng.Derive(seed, 2));
         var borderJitter = new GradientNoise(Rng.Derive(seed, 8));
@@ -181,12 +200,29 @@ public static class PaintSimulator
         var jitter = new GradientNoise(Rng.Derive(seed, 3));
         var grain = new GradientNoise(Rng.Derive(seed, 4));
         var score = new float[nFloor];
+
+        // Tilt: a gentle slope along y turns the front from vertical to a random angle. Near the
+        // middle the log-ratio changes by about 2/(D+1) per cell (D = distance to the middle), so
+        // a slope of tan(angle) times that moves the front sideways by tan(angle) per cell of y.
+        double tilt = 0, tiltCenterY = ph / (2.0 * p);
+        if (options.FrontTiltMaxDegrees > 0)
+        {
+            double angle = new Rng(Rng.Derive(seed, 13)).Range(-options.FrontTiltMaxDegrees, options.FrontTiltMaxDegrees) * Math.PI / 180;
+            double sum = 0; int n = 0;
+            for (int i = 0; i < nFloor; i++)
+            {
+                if (Math.Abs(Math.Log(dr[i] + 1.0) - Math.Log(dl[i] + 1.0)) < 0.05) { sum += dl[i]; n++; }
+            }
+            double mid = n > 0 ? sum / n : maxMin;
+            tilt = Math.Tan(angle) * 2.0 / (mid + 1.0);
+        }
+
         for (int i = 0; i < nFloor; i++)
         {
             if (!isPainted[i]) continue;
             int pi = floorPixels[i];
             double gx = (pi % pw + 0.5) / p, gy = (pi / pw + 0.5) / p;
-            double s = Math.Log(dr[i] + 1.0) - Math.Log(dl[i] + 1.0)
+            double s = Math.Log(dr[i] + 1.0) - Math.Log(dl[i] + 1.0) + tilt * (gy - tiltCenterY)
                 + JitterAmplitude * jitter.Fbm(gx * JitterFrequency, gy * JitterFrequency, 3)
                 + GrainAmplitude * grain.Sample(gx * GrainFrequency, gy * GrainFrequency);
             score[i] = (float)s;
@@ -200,6 +236,10 @@ public static class PaintSimulator
         // 5b. Fight zone. Find where the front line will roughly be for this margin, then add
         //     blotchy noise that fades out away from it, so both colors interleave there.
         float front = Threshold(score, isPainted, nLeft);
+        //     The team that neglected its spawn more rushed forward, so it gets a slight edge in this band
+        //     (positive score = left). The quantile below keeps the shares exact; the edge only moves
+        //     paint around.
+        double middleEdge = MiddleEdge * Math.Clamp(neglectLeft - neglectRight, -1, 1);
         var fight = new GradientNoise(Rng.Derive(seed, 6));
         for (int i = 0; i < nFloor; i++)
         {
@@ -208,11 +248,21 @@ public static class PaintSimulator
             if (z is > 4 or < -4) continue;
             int pi = floorPixels[i];
             double gx = (pi % pw + 0.5) / p, gy = (pi / pw + 0.5) / p;
-            score[i] += (float)(FightAmplitude * Math.Exp(-z * z) * fight.Fbm(gx * FightFrequency, gy * FightFrequency, 3));
+            score[i] += (float)(Math.Exp(-z * z) * (FightAmplitude * fight.Fbm(gx * FightFrequency, gy * FightFrequency, 3) + middleEdge));
         }
 
         if (options.Splatter)
             ApplySplats(new Rng(Rng.Derive(seed, 5)), score, isPainted, floorPixels, pixelToFloor, pw, ph, p, front);
+
+        if (options.RaidTrailsPerTeam > 0)
+        {
+            PointD Centre(Side side) { var r = map.Spawn(side); return new PointD((r.X + r.W / 2.0) * p, (r.Y + r.H / 2.0) * p); }
+            ApplyRaidTrails(new Rng(Rng.Derive(seed, 14)), new GradientNoise(Rng.Derive(seed, 12)), options.RaidTrailsPerTeam,
+                Centre(Side.Left), Centre(Side.Right), score, isPainted, floorPixels, pixelToFloor, pw, ph, p, front);
+        }
+
+        if (options.StrayInkChance > 0)
+            ApplyStrayInk(new Rng(Rng.Derive(seed, 11)), new GradientNoise(Rng.Derive(seed, 12)), options.StrayInkChance, score, isPainted, floorPixels, pixelToFloor, pw, ph, p, front);
 
         // 6. Quantile threshold: exactly nLeft painted pixels go to the left team.
         var keys = new float[nPainted];
@@ -366,6 +416,154 @@ public static class PaintSimulator
                 if (isPainted[fi]) score[fi] = splatValue;
             });
         }
+    }
+
+    /// <summary>
+    /// Stray ink deep in the other team's territory: a trail (a player running through) or splotches
+    /// (bombs). Each team rolls independently, so either, both or neither may have some. Stamped
+    /// pixels are forced to that team's side; the final quantile keeps the shares exact.
+    /// </summary>
+    private static void ApplyStrayInk(Rng rng, GradientNoise breakup, double chance, float[] score, bool[] isPainted, List<int> floorPixels,
+        int[] pixelToFloor, int pw, int ph, int p, float front)
+    {
+        foreach (var side in new[] { Side.Left, Side.Right })
+        {
+            if (!rng.Chance(chance)) continue;
+
+            // Positive score = left, so left ink goes where the score is far below the front.
+            double sign = side == Side.Left ? 1 : -1;
+            var cut = new[] { StrayBreakupCut };
+            var paint = BrokenInk(breakup, score, isPainted, floorPixels, pw, p, (float)(front + sign * SplatStrength), cut);
+
+            bool trail = rng.Chance(0.5);
+            int count = trail ? rng.Next(1, 3) : rng.Next(1, 4);
+            for (int n = 0; n < count; n++)
+            {
+                int start = -1;
+                for (int t = 0; t < 120; t++)
+                {
+                    int i = rng.Next(0, floorPixels.Count);
+                    if (isPainted[i] && (front - score[i]) * sign > StrayMinDepth)
+                    {
+                        start = floorPixels[i];
+                        break;
+                    }
+                }
+                if (start < 0) continue;
+                double x = start % pw, y = start / pw;
+
+                if (!trail)
+                {
+                    StampSplat(rng, x, y, rng.Range(0.9, 1.8) * p, 4, 9, pw, ph, pixelToFloor, paint);
+                    continue;
+                }
+
+                WalkTrail(rng, x, y, rng.Range(0, 2 * Math.PI), rng.Range(0.55, 0.85) * p, (int)(rng.Range(6, 14) / 0.3),
+                    0, 0.35, double.NaN, double.NaN, 0, null, 0, pw, ph, p, pixelToFloor, paint);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Raid trails: each team sends <paramref name="perTeam"/> long, curving trails from its own side of
+    /// the front line through the other team's turf, like players running through the enemy half.
+    /// Stamped pixels are forced to the raiding team's side; the quantile keeps the shares exact.
+    /// </summary>
+    private static void ApplyRaidTrails(Rng rng, GradientNoise breakup, int perTeam, PointD leftSpawn, PointD rightSpawn,
+        float[] score, bool[] isPainted, List<int> floorPixels, int[] pixelToFloor, int pw, int ph, int p, float front)
+    {
+        foreach (var side in new[] { Side.Left, Side.Right })
+        {
+            double sign = side == Side.Left ? 1 : -1;
+            var target = side == Side.Left ? rightSpawn : leftSpawn;
+            var cut = new[] { StrayBreakupCut };
+            var paint = BrokenInk(breakup, score, isPainted, floorPixels, pw, p, (float)(front + sign * SplatStrength), cut);
+
+            // Keep trying until the team has `perTeam` real trails: a start can fail to be found, and a
+            // trail can run into a wall straight away.
+            int made = 0;
+            for (int attempt = 0; made < perTeam && attempt < perTeam * RaidAttemptsPerTrail; attempt++)
+            {
+                // Start on the team's own side, close to the front line.
+                int start = -1;
+                for (int t = 0; t < 200; t++)
+                {
+                    int i = rng.Next(0, floorPixels.Count);
+                    double d = (score[i] - front) * sign;
+                    if (isPainted[i] && d > 0 && d < RaidStartBand)
+                    {
+                        start = floorPixels[i];
+                        break;
+                    }
+                }
+                if (start < 0) continue;
+                double x = start % pw, y = start / pw;
+
+                double heading = Math.Atan2(target.Y - y, target.X - x) + rng.Range(-0.5, 0.5);
+                double curve = rng.Range(RaidCurveMin, RaidCurveMax) * (rng.Chance(0.5) ? 1 : -1);
+                int steps = (int)(rng.Range(16, 28) / 0.3);
+                int walked = WalkTrail(rng, x, y, heading, rng.Range(RaidWidthMin, RaidWidthMax) * p, steps,
+                    curve, 0.08, target.X, target.Y, RaidTaper, cut, RaidEndCut, pw, ph, p, pixelToFloor, paint);
+                if (walked >= steps / 2) made++;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Ink for <paramref name="value"/>: blotchy noise punches holes in it, so it interleaves with the
+    /// surrounding color like the fight zone instead of being a solid stamp.
+    /// </summary>
+    private static Action<int> BrokenInk(GradientNoise breakup, float[] score, bool[] isPainted, List<int> floorPixels, int pw, int p, float value, double[] cut) =>
+        fi =>
+        {
+            if (!isPainted[fi]) return;
+            int pi = floorPixels[fi];
+            double gx = (pi % pw + 0.5) / p, gy = (pi / pw + 0.5) / p;
+            if (breakup.Fbm(gx * StrayBreakupFrequency, gy * StrayBreakupFrequency, 3) > cut[0]) return;
+            score[fi] = value;
+        };
+
+    /// <summary>
+    /// A line of overlapping blobs. The heading drifts by <paramref name="curve"/> radians per step plus
+    /// <paramref name="wobble"/> of random jitter, is gently pulled toward (<paramref name="targetX"/>,
+    /// <paramref name="targetY"/>) when given, and turns away from walls and the void.
+    /// </summary>
+    private static int WalkTrail(Rng rng, double x, double y, double heading, double width, int steps, double curve, double wobble,
+        double targetX, double targetY, double taper, double[]? cut, double endCut, int pw, int ph, int p, int[] pixelToFloor, Action<int> paint)
+    {
+        double stepLen = 0.3 * p;
+        double baseWidth = width, thickness = 1; // thickness: slow random walk, so the line swells and thins
+        for (int s = 0; s < steps; s++)
+        {
+            // Further along, the trail thins by up to `taper` and, if `cut` is given, breaks up more.
+            double t = steps > 1 ? (double)s / (steps - 1) : 0;
+            thickness = Math.Clamp(thickness + rng.Range(-0.12, 0.12), 0.55, 1.5);
+            width = baseWidth * thickness * (1 - taper * t);
+            if (cut != null) cut[0] = StrayBreakupCut + (endCut - StrayBreakupCut) * t;
+
+            heading += curve + rng.Range(-wobble, wobble);
+            if (!double.IsNaN(targetX))
+            {
+                double diff = Math.Atan2(targetY - y, targetX - x) - heading;
+                diff = Math.Atan2(Math.Sin(diff), Math.Cos(diff)); // wrap to [-π, π]
+                heading += RaidPull * diff;
+            }
+
+            double nx = x + Math.Cos(heading) * stepLen, ny = y + Math.Sin(heading) * stepLen;
+            for (int tries = 0; tries < 8 && !IsFloor(nx, ny); tries++)
+            {
+                heading += rng.Range(0.6, 1.4) * (rng.Chance(0.5) ? 1 : -1);
+                nx = x + Math.Cos(heading) * stepLen;
+                ny = y + Math.Sin(heading) * stepLen;
+            }
+            if (!IsFloor(nx, ny)) return s;
+            x = nx; y = ny;
+            StampSplat(rng, x, y, width, 0, 1, pw, ph, pixelToFloor, paint);
+        }
+        return steps;
+
+        bool IsFloor(double fx, double fy) =>
+            fx >= 0 && fy >= 0 && fx < pw && fy < ph && pixelToFloor[(int)fy * pw + (int)fx] >= 0;
     }
 
     /// <summary>

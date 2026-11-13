@@ -13,27 +13,32 @@ public enum DifficultyRank
 public static class Difficulty
 {
     /// <summary>
-    /// Upper bounds of the winner's share of the painted floor (exclusive) for X, S, A and B.
-    /// Anything at or above the last bound is C. Equal 0.4-point bands over the default
-    /// 50.3–52.3% range, so with the default settings each rank comes up about one round in five.
-    /// Fixed rather than derived from the configured range, so a rank always means the same split.
+    /// The rank for a winner share of the painted floor, as a fraction (0.5–1). The configured
+    /// [MinWinnerShare, MaxWinnerShare] range is cut into five equal bands, X (closest) to C
+    /// (widest), so each rank comes up about one round in five whatever the range is. With the
+    /// default 50.3–52.3% range the bands are 0.4 points wide.
     /// </summary>
-    private static readonly (double MaxShare, DifficultyRank Rank)[] Bands =
-    [
-        (0.507, DifficultyRank.X),
-        (0.511, DifficultyRank.S),
-        (0.515, DifficultyRank.A),
-        (0.519, DifficultyRank.B),
-    ];
-
-    /// <summary>The rank for a winner share of the painted floor, as a fraction (0.5–1).</summary>
-    public static DifficultyRank RankFor(double winnerShare)
+    public static DifficultyRank RankFor(double winnerShare, DifficultyOptions range)
     {
-        foreach (var (max, rank) in Bands)
-            if (winnerShare < max) return rank;
-        return DifficultyRank.C;
+        double min = range.MinWinnerShare / 100.0, max = range.MaxWinnerShare / 100.0;
+        if (max <= min) return DifficultyRank.A; // a single fixed margin: the middle rank
+
+        // 0 = closest possible, 1 = widest; rounded so a share exactly on a band edge isn't pushed
+        // to the wrong side by floating-point error.
+        double t = Math.Round((winnerShare - min) / (max - min), 9);
+        return t switch
+        {
+            < 0.2 => DifficultyRank.X,
+            < 0.4 => DifficultyRank.S,
+            < 0.6 => DifficultyRank.A,
+            < 0.8 => DifficultyRank.B,
+            _ => DifficultyRank.C,
+        };
     }
 
+    /// <summary>The rank for the default difficulty range.</summary>
+    public static DifficultyRank RankFor(double winnerShare) => RankFor(winnerShare, new DifficultyOptions());
+
     /// <summary>The rank of a counted round.</summary>
-    public static DifficultyRank Rank(this ScoreResult score) => RankFor(score.WinnerShare);
+    public static DifficultyRank Rank(this ScoreResult score, DifficultyOptions range) => RankFor(score.WinnerShare, range);
 }

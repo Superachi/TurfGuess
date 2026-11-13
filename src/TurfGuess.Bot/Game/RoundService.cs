@@ -201,7 +201,9 @@ public sealed class RoundService(
             .ToString("yyyy-MM-dd HH:mm zzz", System.Globalization.CultureInfo.InvariantCulture);
 
     private static string Pct(double share, int decimals = 1) =>
-        (share * 100).ToString("F" + decimals, System.Globalization.CultureInfo.InvariantCulture) + "%";
+        decimals == 1
+            ? TurfGuess.Core.Util.Percent.Share(share)
+            : (share * 100).ToString("F" + decimals, System.Globalization.CultureInfo.InvariantCulture) + "%";
 
     private async Task PostAsync(RoundRecord round, DateTimeOffset now, CancellationToken ct)
     {

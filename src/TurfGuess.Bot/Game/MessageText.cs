@@ -24,15 +24,15 @@ public static class MessageText
         kind == RoundKind.Regular ? $"{RegularEmoji} Regular Battle" : $"{RankedEmoji} Ranked Battle";
 
     public static string RoundTitle(string gameName, RoundRecord round) =>
-        $"{gameName} · {KindName(round.Kind)} · Round #{round.Id}";
+        $"{gameName} · {KindName(round.Kind)} · Round #{round.DisplayNumber}";
 
     /// <summary>Footer on the round message.</summary>
     public static string RoundFooter(RoundRecord round) =>
-        round.Kind == RoundKind.Regular ? $"Regular Battle #{round.Id}" : $"Round #{round.Id}";
+        round.Kind == RoundKind.Regular ? $"Regular Battle #{round.DisplayNumber}" : $"Round #{round.DisplayNumber}";
 
     /// <summary>Footer on the reveal; recovery finds an already posted reveal by this exact text.</summary>
     public static string RevealFooter(RoundRecord round) =>
-        round.Kind == RoundKind.Regular ? $"Regular Battle #{round.Id} · Results" : $"Round #{round.Id} · Results";
+        round.Kind == RoundKind.Regular ? $"Regular Battle #{round.DisplayNumber} · Results" : $"Round #{round.DisplayNumber} · Results";
 
     /// <summary>
     /// How an embed refers to an image attached to the same message. Every embed, including the
@@ -346,5 +346,5 @@ public static class MessageText
         if (rest > 0) sb.Append(listed == 0 ? $"{rest} players" : $" …and {rest} more");
     }
 
-    private static string Pct(double share) => (share * 100).ToString("0.0", CultureInfo.InvariantCulture) + "%";
+    private static string Pct(double share) => TurfGuess.Core.Util.Percent.Share(share);
 }

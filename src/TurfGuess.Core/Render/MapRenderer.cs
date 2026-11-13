@@ -454,9 +454,9 @@ public static class MapRenderer
         using var lp = new SKPaint { Color = leftColor, IsAntialias = true };
         using var rp = new SKPaint { Color = rightColor, IsAntialias = true };
         using var up = new SKPaint { Color = new SKColor(170, 174, 184), IsAntialias = true };
-        canvas.DrawText($"{style.Left.Name} {score.CoverageLeft:P1}", bar.Left, labelY, SKTextAlign.Left, labelFont, lp);
-        canvas.DrawText($"{score.UnpaintedShare:P1} unpainted", bar.MidX, labelY, SKTextAlign.Center, labelFont, up);
-        canvas.DrawText($"{style.Right.Name} {score.CoverageRight:P1}", bar.Right, labelY, SKTextAlign.Right, labelFont, rp);
+        canvas.DrawText($"{style.Left.Name} {Percent.Share(score.CoverageLeft)}", bar.Left, labelY, SKTextAlign.Left, labelFont, lp);
+        canvas.DrawText($"{Percent.Share(score.UnpaintedShare)} unpainted", bar.MidX, labelY, SKTextAlign.Center, labelFont, up);
+        canvas.DrawText($"{style.Right.Name} {Percent.Share(score.CoverageRight)}", bar.Right, labelY, SKTextAlign.Right, labelFont, rp);
     }
 
     // ---------------------------------------------------------------------------------------

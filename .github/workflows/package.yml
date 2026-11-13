@@ -15,15 +15,24 @@ on:
         type: boolean
         default: true
 
+permissions:
+  contents: read
+
+concurrency:
+  group: package-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
   DOTNET_NOLOGO: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
   RUNTIME: ${{ inputs.runtime || 'linux-x64' }}
-  SELF_CONTAINED: ${{ inputs.self_contained == false && 'false' || 'true' }}
+  SELF_CONTAINED: ${{ github.event_name == 'workflow_dispatch' && !inputs.self_contained && 'false' || 'true' }}
 
 jobs:
   package:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # only used by the release step on tags
     steps:
       - uses: actions/checkout@v4
 
@@ -47,19 +56,35 @@ jobs:
           -p:DebugType=None -p:DebugSymbols=false
           -o publish
 
-      - name: Zip
+      - name: Name & zip
         id: zip
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          sudo apt-get install -y -qq zip >/dev/null
-          VERSION="${GITHUB_REF_NAME//\//-}-${GITHUB_SHA::7}"
-          NAME="TurfGuess-${VERSION}-${RUNTIME}.zip"
-          (cd publish && zip -qr "../$NAME" .)
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            VERSION="$GITHUB_REF_NAME"
+          elif [[ -n "$PR_NUMBER" ]]; then
+            VERSION="pr-${PR_NUMBER}-${PR_SHA::7}"
+          else
+            VERSION="${GITHUB_REF_NAME//\//-}-${GITHUB_SHA::7}"
+          fi
+          NAME="TurfGuess-${VERSION}-${RUNTIME}"
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
-          unzip -l "$NAME" | tail -n 5
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            (cd publish && zip -qr "../$NAME.zip" .)
+            unzip -l "$NAME.zip" | tail -n 5
+          fi
 
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.zip.outputs.name }}
-          path: ${{ steps.zip.outputs.name }}
+          path: publish
           if-no-files-found: error
           retention-days: 30
+
+      - name: Create release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" "${{ steps.zip.outputs.name }}.zip" --generate-notes

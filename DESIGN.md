@@ -196,6 +196,7 @@ Paint should *flow* from each spawn and wrap around obstacles, not just split th
    - **Independent neglect variance.** On top of that, each team's neglect is scaled by its own random factor in `[1 − v, 1 + v]` (`SpawnNeglectVariance`, default 0.6), independent of the winner, so the two spawns can be very differently bare.
    - **Middle edge.** The team that neglected its spawn more gets a slight edge in the fight band (`MiddleEdge`, 0.15): it rushed forward. Shares stay exact because of the quantile.
    - **Stray ink.** Each team independently has a `StrayInkChance` (0.4) of leaving either 1–2 wandering trails or 1–3 bomb splotches deep in the other team's half. Blotchy noise punches holes in the ink so it interleaves with the surrounding color, like the fight zone. Shares stay exact because of the quantile.
+   - **Infiltrators.** Each team independently (`InfiltratorChancePerTeam`, 0.5) may have sneaked past the front: a thin trail creeps toward the enemy spawn and ends in a blotchy scribbled patch in the enemy base (a second sneak with `InfiltratorExtraChance`). The patch is forced painted before the unpainted mask is fixed, then takes the sneak's color; shares stay exact because of the quantile.
    - **Raid trails.** Each team sends `RaidTrailsPerTeam` (4) long, curving trails from its own side of the front line through the other team's turf toward the enemy spawn, like players running through the enemy half. Trails vary in thickness, thin out by half along their length, and break up more toward the end. A team retries until it has the wanted number of trails. Shares stay exact because of the quantile.
    - **Front tilt** (step 5). A gentle slope along y is added to the ownership score, so the front line tilts by a random angle in `[−FrontTiltMaxDegrees, +FrontTiltMaxDegrees]` instead of being vertical. The slope is scaled by the map's middle distance so the angle is close to the requested one. Shares stay exact because of the quantile.
    - A short **spawn trail** right around each pad (cost-distance < 2.5, with a ragged edge) is always painted.
@@ -382,6 +383,8 @@ Streaks, accuracy and the leaderboard can be computed from `votes` joined with `
       "SpawnNeglectVariance": 0.6, // each team's spawn neglect is scaled by a random factor in [1-v, 1+v]
       "StrayInkChance": 0.4,    // per team and round: a trail or bomb splotches deep in the other team's half
       "RaidTrailsPerTeam": 4,   // long curving trails each team runs through the other team's turf (0 = none)
+      "InfiltratorChancePerTeam": 0.5, // per team and round: a sneak paints a patch of the enemy base (0 = off)
+      "InfiltratorExtraChance": 0.3,   // chance an infiltrating team sent a second sneak
       "FrontTiltMaxDegrees": 20, // front line tilts by a random angle in [-max, +max] away from vertical (0 = vertical)
       "PixelsPerCell": 16,      // mask and render resolution
       "CornerRadius": 0.75,     // outer corners of the outline, in cells, like CSS border-radius (0 = sharp, < 1)

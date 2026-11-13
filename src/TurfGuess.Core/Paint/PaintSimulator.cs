@@ -63,6 +63,11 @@ public static class PaintSimulator
     private const double RaidEndCut = -0.1;           // break-up cut at the end of a raid trail (lower = more holes)
     private const int RaidAttemptsPerTrail = 6;      // tries per wanted trail before giving up
     private const double RaidPull = 0.01;             // how strongly a raid trail leans toward the enemy spawn
+    private const double InfiltratorMaxDepth = 1.6;    // sneaks start this far (score units) past the front, in the enemy half, at most
+    private const double InfiltratorMinDepth = 0.3;
+    private const double InfiltratorApproachPull = 0.04; // how strongly the approach bends toward the enemy base
+    private const double InfiltratorPatchWobble = 1.3;   // heading jitter while scribbling in the base (high = a blotchy patch)
+    private const double InfiltratorHoleCut = 0.45;      // break-up cut inside the patch (higher = more solid)
     private readonly record struct PointD(double X, double Y);
     private const double StrayMinDepth = 0.6;      // stray ink starts at least this far past the front, in the other team's half
 
@@ -173,6 +178,17 @@ public static class PaintSimulator
                 + BorderGrainAmplitude * borderGrain.Sample(gx * BorderGrainFrequency, gy * BorderGrainFrequency));
         }
 
+        // 4a. Infiltrators: a sneaking player slips past the front and paints part of the enemy base.
+        //     The patch is forced painted here (the base is otherwise mostly bare) and takes the
+        //     infiltrator's color further down.
+        sbyte[]? infiltrated = null;
+        if (options.InfiltratorChancePerTeam > 0)
+        {
+            PointD Centre(Side side) { var r = map.Spawn(side); return new PointD((r.X + r.W / 2.0) * p, (r.Y + r.H / 2.0) * p); }
+            infiltrated = new sbyte[nFloor];
+            ApplyInfiltrators(new Rng(Rng.Derive(seed, 15)), options, Centre(Side.Left), Centre(Side.Right), dl, dr, u, infiltrated, floorPixels, pixelToFloor, pw, ph, p);
+        }
+
         int nUnpainted = (int)Math.Round(unpaintedShare * nFloor);
 
         // 4b. Sputters near spawns: estimate the unpainted border, then stamp paint splats just
@@ -263,6 +279,19 @@ public static class PaintSimulator
 
         if (options.StrayInkChance > 0)
             ApplyStrayInk(new Rng(Rng.Derive(seed, 11)), new GradientNoise(Rng.Derive(seed, 12)), options.StrayInkChance, score, isPainted, floorPixels, pixelToFloor, pw, ph, p, front);
+
+        if (infiltrated != null)
+        {
+            var holeNoise = new GradientNoise(Rng.Derive(seed, 16));
+            for (int i = 0; i < nFloor; i++)
+            {
+                if (infiltrated[i] == 0 || !isPainted[i]) continue;
+                int pi = floorPixels[i];
+                double gx = (pi % pw + 0.5) / p, gy = (pi / pw + 0.5) / p;
+                if (holeNoise.Fbm(gx * StrayBreakupFrequency, gy * StrayBreakupFrequency, 3) > InfiltratorHoleCut) continue; // a few gaps, so it isn't a solid stamp
+                score[i] = (float)(front + infiltrated[i] * SplatStrength);
+            }
+        }
 
         // 6. Quantile threshold: exactly nLeft painted pixels go to the left team.
         var keys = new float[nPainted];
@@ -503,8 +532,58 @@ public static class PaintSimulator
                 double curve = rng.Range(RaidCurveMin, RaidCurveMax) * (rng.Chance(0.5) ? 1 : -1);
                 int steps = (int)(rng.Range(16, 28) / 0.3);
                 int walked = WalkTrail(rng, x, y, heading, rng.Range(RaidWidthMin, RaidWidthMax) * p, steps,
-                    curve, 0.08, target.X, target.Y, RaidTaper, cut, RaidEndCut, pw, ph, p, pixelToFloor, paint);
+                    curve, 0.08, target.X, target.Y, RaidTaper, cut, RaidEndCut, pw, ph, p, pixelToFloor, paint).Steps;
                 if (walked >= steps / 2) made++;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Infiltrators: each team rolls independently to send one or more sneaks past the front line.
+    /// A sneak creeps toward the enemy spawn along a thin trail, then scribbles a blotchy patch of its
+    /// color in the enemy base. The patch is forced painted in <paramref name="u"/> and recorded in
+    /// <paramref name="infiltrated"/> (+1 = left, −1 = right) so it can take that color later.
+    /// </summary>
+    private static void ApplyInfiltrators(Rng rng, PaintOptions options, PointD leftSpawn, PointD rightSpawn, List<float> dl, List<float> dr,
+        float[] u, sbyte[] infiltrated, List<int> floorPixels, int[] pixelToFloor, int pw, int ph, int p)
+    {
+        foreach (var side in new[] { Side.Left, Side.Right })
+        {
+            if (!rng.Chance(options.InfiltratorChancePerTeam)) continue;
+            sbyte sign = (sbyte)(side == Side.Left ? 1 : -1);
+            var target = side == Side.Left ? rightSpawn : leftSpawn;
+
+            // Sometimes two players sneak around.
+            int sneaks = 1 + (rng.Chance(options.InfiltratorExtraChance) ? 1 : 0);
+            for (int n = 0; n < sneaks; n++)
+            {
+                // Start just inside enemy turf: score sign*(ln dR − ln dL) is negative there.
+                int start = -1;
+                for (int t = 0; t < 400; t++)
+                {
+                    int i = rng.Next(0, floorPixels.Count);
+                    double depth = -sign * (Math.Log(dr[i] + 1.0) - Math.Log(dl[i] + 1.0));
+                    if (depth > InfiltratorMinDepth && depth < InfiltratorMaxDepth)
+                    {
+                        start = floorPixels[i];
+                        break;
+                    }
+                }
+                if (start < 0) continue;
+                double x = start % pw, y = start / pw;
+
+                void Paint(int fi) { infiltrated[fi] = sign; u[fi] = float.NegativeInfinity; }
+
+                // Approach: a thin, curving trail toward the enemy base.
+                double heading = Math.Atan2(target.Y - y, target.X - x) + rng.Range(-0.6, 0.6);
+                double dist = Math.Sqrt((target.X - x) * (target.X - x) + (target.Y - y) * (target.Y - y));
+                int steps = Math.Max(8, (int)(dist * rng.Range(0.5, 0.75) / (0.3 * p)));
+                var approach = WalkTrail(rng, x, y, heading, rng.Range(0.4, 0.6) * p, steps,
+                    rng.Range(-0.03, 0.03), 0.12, target.X, target.Y, 0, null, 0, pw, ph, p, pixelToFloor, Paint);
+
+                // Base patch: a short, very wobbly walk that scribbles a blotch around where it ended up.
+                WalkTrail(rng, approach.X, approach.Y, rng.Range(0, 2 * Math.PI), rng.Range(0.9, 1.5) * p, (int)(rng.Range(8, 16) / 0.3),
+                    0, InfiltratorPatchWobble, target.X, target.Y, 0.3, null, 0, pw, ph, p, pixelToFloor, Paint);
             }
         }
     }
@@ -528,7 +607,7 @@ public static class PaintSimulator
     /// <paramref name="wobble"/> of random jitter, is gently pulled toward (<paramref name="targetX"/>,
     /// <paramref name="targetY"/>) when given, and turns away from walls and the void.
     /// </summary>
-    private static int WalkTrail(Rng rng, double x, double y, double heading, double width, int steps, double curve, double wobble,
+    private static (int Steps, double X, double Y) WalkTrail(Rng rng, double x, double y, double heading, double width, int steps, double curve, double wobble,
         double targetX, double targetY, double taper, double[]? cut, double endCut, int pw, int ph, int p, int[] pixelToFloor, Action<int> paint)
     {
         double stepLen = 0.3 * p;
@@ -556,11 +635,11 @@ public static class PaintSimulator
                 nx = x + Math.Cos(heading) * stepLen;
                 ny = y + Math.Sin(heading) * stepLen;
             }
-            if (!IsFloor(nx, ny)) return s;
+            if (!IsFloor(nx, ny)) return (s, x, y);
             x = nx; y = ny;
             StampSplat(rng, x, y, width, 0, 1, pw, ph, pixelToFloor, paint);
         }
-        return steps;
+        return (steps, x, y);
 
         bool IsFloor(double fx, double fy) =>
             fx >= 0 && fy >= 0 && fx < pw && fy < ph && pixelToFloor[(int)fy * pw + (int)fx] >= 0;

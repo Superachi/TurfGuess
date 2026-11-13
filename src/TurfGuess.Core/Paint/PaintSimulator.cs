@@ -54,6 +54,11 @@ public static class PaintSimulator
     private const double SplatCandidateBand = 0.5;
     private const double StrayBreakupFrequency = 0.6; // per cell, blotch size of the holes in stray ink
     private const double StrayBreakupCut = 0.15;      // noise above this leaves a hole (higher = more solid)
+    private const double ChaosFrequency = 0.16;       // per cell, blotch size of the swapped ink
+    private const double ChaosGrainFrequency = 0.9;   // per cell, roughness of the blotch edges
+    private const double ChaosGrainAmplitude = 0.12;
+    private const double ChaosCutMax = 0.6;           // noise cut-off at intensity 0 (barely any blotches)
+    private const double ChaosCutMin = 0.12;          // noise cut-off at intensity 1 (a lot of the arena)
     private const double RaidStartBand = 1.0;         // raid trails start this close to the front line (score units), on their own side
     private const double RaidCurveMin = 0.015;        // heading drift per step (radians), so trails bend
     private const double RaidCurveMax = 0.035;
@@ -280,6 +285,12 @@ public static class PaintSimulator
         if (options.StrayInkChance > 0)
             ApplyStrayInk(new Rng(Rng.Derive(seed, 11)), new GradientNoise(Rng.Derive(seed, 12)), options.StrayInkChance, score, isPainted, floorPixels, pixelToFloor, pw, ph, p, front);
 
+        if (options.ChaosIntensityMax > 0)
+        {
+            double chaos = new Rng(Rng.Derive(seed, 19)).Range(options.ChaosIntensityMin, options.ChaosIntensityMax);
+            ApplyChaos(new GradientNoise(Rng.Derive(seed, 17)), new GradientNoise(Rng.Derive(seed, 18)), chaos, score, isPainted, floorPixels, pw, p, front);
+        }
+
         if (infiltrated != null)
         {
             var holeNoise = new GradientNoise(Rng.Derive(seed, 16));
@@ -444,6 +455,29 @@ public static class PaintSimulator
             {
                 if (isPainted[fi]) score[fi] = splatValue;
             });
+        }
+    }
+
+    /// <summary>
+    /// Chaos: swapped ink on both sides. A signed noise field marks blotches; where it is strongly positive
+    /// the floor turns the left team's colour, where strongly negative the right team's, wherever the
+    /// ownership score had put it. So each half gets splotches of the other team's ink, shaped by the
+    /// noise, and a finer noise breaks their edges up. Intensity 0..1 lowers the noise cut-off, so
+    /// more of the arena is hit. The final quantile keeps the shares exact.
+    /// </summary>
+    private static void ApplyChaos(GradientNoise blotches, GradientNoise grain, double intensity, float[] score, bool[] isPainted,
+        List<int> floorPixels, int pw, int p, float front)
+    {
+        double cut = ChaosCutMax - (ChaosCutMax - ChaosCutMin) * Math.Clamp(intensity, 0, 1);
+        for (int i = 0; i < score.Length; i++)
+        {
+            if (!isPainted[i]) continue;
+            int pi = floorPixels[i];
+            double gx = (pi % pw + 0.5) / p, gy = (pi / pw + 0.5) / p;
+            double n = blotches.Fbm(gx * ChaosFrequency, gy * ChaosFrequency, 3)
+                + ChaosGrainAmplitude * grain.Sample(gx * ChaosGrainFrequency, gy * ChaosGrainFrequency);
+            if (n > cut) score[i] = (float)(front + SplatStrength);       // left ink
+            else if (n < -cut) score[i] = (float)(front - SplatStrength); // right ink
         }
     }
 

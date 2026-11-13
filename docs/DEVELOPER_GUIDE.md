@@ -179,6 +179,8 @@ Radii are in cells and must be **below 1**. An opening with radius *r* removes f
 
 `Difficulty.RankFor(winnerShare, range)` (`Scoring/DifficultyRank.cs`) turns `WinnerShare` into a rank shown in the round message. The configured `Difficulty` range `[MinWinnerShare, MaxWinnerShare]` is cut into five equal bands: X is the closest fifth, then S, A, B, and C is the widest fifth. Each rank therefore comes up about one round in five whatever the range is. With the default 50.3–52.3% range that is X under 50.7%, S under 51.1%, A under 51.5%, B under 51.9%, otherwise C. A range with min equal to max always ranks A.
 
+**Rerolls.** `RoundGenerator.Generate` rerolls easy rounds so harder ones are favoured: the budget is C 10, B 8, A 5, S 3, X 0 (`Difficulty.RerollsC/B/A/S`). It is a total, set by the best rank found so far (a C that turns into a B on reroll 3 may go on to reroll 8). Rerolls use sub-seeds derived from the seed, so the stored seed still reproduces the final round. The hardest round is kept; ties go to the closer winner share. `GeneratedRound.Rerolls` tells which reroll won (0 = the original). `GeneratorVersion` is 5.
+
 ### Stage 4: rendering (`Render/MapRenderer.cs`)
 
 `RenderRound` and `RenderReveal` return an `SKBitmap`, and `EncodePng` turns it into PNG bytes. Pixels are written into an `int[]` buffer (RGBA8888) and copied into the bitmap. SkiaSharp is used for text, the banner and encoding.
@@ -339,6 +341,8 @@ All options are mutable classes, so the bot can bind them from `appsettings.json
 | `SpawnNeglectVariance` | 0.6 | 0–1 | Each team's spawn neglect `n` is multiplied by its own random factor in `[1 − v, 1 + v]`, independent of the winner, so the spawns can be very differently bare |
 | `StrayInkChance` | 0.4 | 0–1 | Per team and round: chance of a trail or bomb splotches deep in the other team's half, broken up by noise (0 = off) |
 | `RaidTrailsPerTeam` | 6 | 0–12 | Long, curving, broken-up trails each team runs through the other team's turf, starting on its own side of the front (0 = none) |
+| `ChaosIntensityMin` | 0.5 | 0–1 | Low end of the per-round chaos range. Chaos is swapped ink on both sides: noise-shaped blotches of each team's colour inside the other half (0 = none, 1 = a lot of the arena) |
+| `ChaosIntensityMax` | 0.9 | 0–1 | High end of the per-round chaos range; each round picks a value between min and max (higher blurs the front line) |
 | `InfiltratorChancePerTeam` | 0 | 0–1 | Per team and round: chance that a player sneaked past the front and painted part of the enemy base (thin approach trail ending in a blotchy patch near the enemy spawn) (0 = off) |
 | `InfiltratorExtraChance` | 0.3 | 0–1 | Chance that an infiltrating team sent a second sneak |
 | `FrontTiltMaxDegrees` | 20 | 0–60 | Largest tilt of the front line away from vertical; each round picks an angle in `[−max, +max]` (0 = vertical) |

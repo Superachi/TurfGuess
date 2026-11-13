@@ -13,14 +13,16 @@ public class MessagePreviewTests
     {
         string text = MessagePreview.Render(Options(), 42, Now, raw: false);
 
-        Assert.Contains("Turf Guess · Round #12", text);
+        Assert.Contains("Turf Guess · ⚓ Ranked Battle · Round #5", text);
+        Assert.Contains("Turf Guess · 🔫 Regular Battle · Round #3", text);
+        Assert.Contains("🐟", text);
         Assert.Contains("Which team do you think painted more? Cast your vote!", text);
         Assert.Contains("You voted", text);
         Assert.Contains("**11 players have voted:** 🎲@Player1, @Player2, 🎲@Player3", text);
         Assert.Contains(MessageText.VotingClosed, text);
         Assert.Contains("(disabled)", text);
         Assert.Contains("wins!", text);
-        Assert.Contains("Round #12 · Results", text);
+        Assert.Contains("Round #5 · Results", text);
         Assert.Contains("@Player1", text);           // mentions resolved
         Assert.DoesNotContain("<@", text);
         Assert.DoesNotContain("<t:", text);           // timestamps resolved

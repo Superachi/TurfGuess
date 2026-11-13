@@ -32,7 +32,6 @@ public sealed class VoteCountService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        if (!_options.Game.ShowVoteCount) return;
         await _ready.Ready.WaitAsync(stoppingToken);
 
         using var timer = new PeriodicTimer(_options.Discord.VoteCountInterval);
@@ -45,7 +44,8 @@ public sealed class VoteCountService : BackgroundService
                 {
                     var round = _repo.Get(roundId);
                     if (round is not { Status: RoundStatus.Open }) continue;
-                    await _channel.UpdateVotersAsync(round, _repo.GetVoters(roundId), stoppingToken);
+                    if (!_options.Game.ShowVoteCount && !round.ShowVotes) continue;
+                    await _channel.UpdateVotersAsync(round, _repo.GetVotersFor(round), stoppingToken);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {

@@ -27,7 +27,7 @@ public sealed class DiscordRoundChannel(DiscordSocketClient client, BotOptions o
     {
         var channel = await ChannelAsync();
         string fileName = Path.GetFileName(imagePath);
-        IReadOnlyList<Voter>? voters = options.Game.ShowVoteCount ? [] : null;
+        IReadOnlyList<Voter>? voters = options.Game.ShowVoteCount || round.ShowVotes ? [] : null;
 
         var embed = RoundEmbed(round, MessageText.RoundDescription(round, voters, closed: false, difficulty: options.Generator.Difficulty), fileName);
 
@@ -70,7 +70,7 @@ public sealed class DiscordRoundChannel(DiscordSocketClient client, BotOptions o
 
     public async Task<ulong?> FindRevealMessageAsync(RoundRecord round, CancellationToken ct)
     {
-        string footer = MessageText.RevealFooter(round.Id);
+        string footer = MessageText.RevealFooter(round);
         foreach (var m in await RecentOwnMessagesAsync(round, ct))
             if (m.Embeds.Any(e => e.Footer?.Text == footer))
                 return m.Id;
@@ -87,7 +87,7 @@ public sealed class DiscordRoundChannel(DiscordSocketClient client, BotOptions o
             .WithDescription(MessageText.Reveal(round, summary, options.Game.MaxListedWinners))
             .WithColor(new Color(winnerColor.Red, winnerColor.Green, winnerColor.Blue))
             .WithImageUrl(MessageText.AttachmentUrl(fileName))
-            .WithFooter(MessageText.RevealFooter(round.Id))
+            .WithFooter(MessageText.RevealFooter(round))
             .Build();
 
         using var file = new FileAttachment(imagePath, fileName);
@@ -133,24 +133,29 @@ public sealed class DiscordRoundChannel(DiscordSocketClient client, BotOptions o
     /// now-unreferenced attachment a second time above the embed.
     /// </summary>
     private Embed RoundEmbed(RoundRecord round, string description, string fileName) => new EmbedBuilder()
-        .WithTitle(MessageText.RoundTitle(options.Game.Name, round.Id))
+        .WithTitle(MessageText.RoundTitle(options.Game.Name, round))
         .WithDescription(description)
         .WithImageUrl(MessageText.AttachmentUrl(fileName))
-        .WithFooter(MessageText.RoundFooter(round.Id))
+        .WithFooter(MessageText.RoundFooter(round))
         .Build();
 
     /// <summary>The file name of the image attached to the round message (kept on edits).</summary>
     private static string AttachedFileName(IUserMessage message, RoundRecord round) =>
         message.Attachments.FirstOrDefault()?.Filename ?? Path.GetFileName(round.ImagePath);
 
-    private static MessageComponent Buttons(RoundRecord round, bool disabled) => new ComponentBuilder()
-        .WithButton(round.LeftName, MessageText.ButtonId(round.Id, Side.Left), ButtonStyle.Secondary,
-            emote: new Emoji(round.LeftEmoji), disabled: disabled)
-        .WithButton(round.RightName, MessageText.ButtonId(round.Id, Side.Right), ButtonStyle.Secondary,
-            emote: new Emoji(round.RightEmoji), disabled: disabled)
-        .WithButton(MessageText.BetButtonLabel, MessageText.BetButtonId(round.Id), ButtonStyle.Primary,
-            emote: new Emoji(MessageText.BetButtonEmoji), disabled: disabled)
-        .Build();
+    /// <summary>The two team buttons, plus Bet for ranked rounds (regular battles aren't scored, so there is nothing to bet on).</summary>
+    private static MessageComponent Buttons(RoundRecord round, bool disabled)
+    {
+        var builder = new ComponentBuilder()
+            .WithButton(round.LeftName, MessageText.ButtonId(round.Id, Side.Left), ButtonStyle.Secondary,
+                emote: new Emoji(round.LeftEmoji), disabled: disabled)
+            .WithButton(round.RightName, MessageText.ButtonId(round.Id, Side.Right), ButtonStyle.Secondary,
+                emote: new Emoji(round.RightEmoji), disabled: disabled);
+        if (round.Kind == RoundKind.Ranked)
+            builder.WithButton(MessageText.BetButtonLabel, MessageText.BetButtonId(round.Id), ButtonStyle.Primary,
+                emote: new Emoji(MessageText.BetButtonEmoji), disabled: disabled);
+        return builder.Build();
+    }
 
     private static IEnumerable<string> ButtonIds(IEnumerable<IMessageComponent> components)
     {

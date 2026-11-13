@@ -72,6 +72,37 @@ public class RoundGeneratorTests
         Assert.Equal(round.Score, Score.Count(round.Paint));
     }
 
+    [Fact]
+    public void Reroll_never_makes_a_round_easier_and_is_deterministic()
+    {
+        var off = Fast();
+        off.Difficulty.RerollsC = off.Difficulty.RerollsB = off.Difficulty.RerollsA = off.Difficulty.RerollsS = 0;
+
+        for (ulong seed = 1; seed <= 12; seed++)
+        {
+            var plain = RoundGenerator.Generate(seed, off);
+            var rerolled = RoundGenerator.Generate(seed, Fast());
+
+            Assert.Equal(0, plain.Rerolls);
+            Assert.True(rerolled.Score.Rank(Fast().Difficulty) >= plain.Score.Rank(off.Difficulty));
+            Assert.Equal(rerolled.Score, RoundGenerator.Generate(seed, Fast()).Score);
+        }
+    }
+
+    [Fact]
+    public void Reroll_count_respects_the_limit_of_the_best_rank()
+    {
+        var o = Fast();
+        o.Difficulty.RerollsC = 10; o.Difficulty.RerollsB = 8; o.Difficulty.RerollsA = 5; o.Difficulty.RerollsS = 3;
+        for (ulong seed = 1; seed <= 12; seed++)
+        {
+            var round = RoundGenerator.Generate(seed, o);
+            Assert.InRange(round.Rerolls, 0, 10);
+        }
+        Assert.Equal(10, o.Difficulty.RerollLimit(DifficultyRank.C));
+        Assert.Equal(0, o.Difficulty.RerollLimit(DifficultyRank.X));
+    }
+
     [Theory]
     [InlineData(50.0, 54.0)]
     [InlineData(57.0, 52.0)]

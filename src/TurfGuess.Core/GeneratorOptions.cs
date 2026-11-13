@@ -26,6 +26,9 @@ public sealed class GeneratorOptions
         if (Paint.DiligentSpawnChance is < 0 or > 1) errors.Add("Paint.DiligentSpawnChance must be in [0, 1].");
         if (Paint.SpawnNeglectVariance is < 0 or > 1) errors.Add("Paint.SpawnNeglectVariance must be in [0, 1].");
         if (Paint.StrayInkChance is < 0 or > 1) errors.Add("Paint.StrayInkChance must be in [0, 1].");
+        if (Paint.ChaosIntensityMin is < 0 or > 1) errors.Add("Paint.ChaosIntensityMin must be in [0, 1].");
+        if (Paint.ChaosIntensityMax is < 0 or > 1) errors.Add("Paint.ChaosIntensityMax must be in [0, 1].");
+        if (Paint.ChaosIntensityMin > Paint.ChaosIntensityMax) errors.Add("Paint.ChaosIntensityMin must not exceed Paint.ChaosIntensityMax.");
         if (Paint.RaidTrailsPerTeam is < 0 or > 12) errors.Add("Paint.RaidTrailsPerTeam must be in [0, 12].");
         if (Paint.InfiltratorChancePerTeam is < 0 or > 1) errors.Add("Paint.InfiltratorChancePerTeam must be in [0, 1].");
         if (Paint.InfiltratorExtraChance is < 0 or > 1) errors.Add("Paint.InfiltratorExtraChance must be in [0, 1].");
@@ -35,6 +38,9 @@ public sealed class GeneratorOptions
 
         if (Difficulty.MinWinnerShare <= 50 || Difficulty.MaxWinnerShare >= 100 || Difficulty.MinWinnerShare > Difficulty.MaxWinnerShare)
             errors.Add("Difficulty.MinWinnerShare/MaxWinnerShare must satisfy 50 < min <= max < 100.");
+
+        if (Difficulty.RerollsS < 0 || Difficulty.RerollsA < 0 || Difficulty.RerollsB < 0 || Difficulty.RerollsC < 0)
+            errors.Add("Difficulty.Rerolls* must be >= 0.");
 
         if (errors.Count > 0) throw new ArgumentException(string.Join(Environment.NewLine, errors));
     }
@@ -94,6 +100,16 @@ public sealed class PaintOptions
     public int RaidTrailsPerTeam { get; set; } = 6;
 
     /// <summary>
+    /// How much swapped ink there is on both sides: noise-shaped blotches of each team's colour inside
+    /// the other half, anywhere. Each round picks its intensity between min and max, so rounds vary.
+    /// 0 = none, 1 = a lot of the arena is affected.
+    /// </summary>
+    public double ChaosIntensityMin { get; set; } = 0.5;
+
+    /// <summary>Upper end of the per-round chaos intensity range (see <see cref="ChaosIntensityMin"/>).</summary>
+    public double ChaosIntensityMax { get; set; } = 0.9;
+
+    /// <summary>
     /// Chance, per team and round, that a player sneaked past the front and painted part of the enemy
     /// base: a thin approach trail ending in a blotchy patch near the enemy spawn. 0 = none.
     /// </summary>
@@ -129,4 +145,14 @@ public sealed class DifficultyOptions
     /// <summary>Winner share of the PAINTED floor, in percent. Must be &gt; 50.</summary>
     public double MinWinnerShare { get; set; } = 50.3;
     public double MaxWinnerShare { get; set; } = 52.3;
+
+    /// <summary>
+    /// How many times an easy round may be rerolled, keeping the hardest one found. The limit that
+    /// applies is the one for the best rank found so far (a total, not per rank). S, A, B and C
+    /// default to 3, 5, 8 and 10; X is never rerolled.
+    /// </summary>
+    public int RerollsS { get; set; } = 3;
+    public int RerollsA { get; set; } = 5;
+    public int RerollsB { get; set; } = 8;
+    public int RerollsC { get; set; } = 10;
 }

@@ -41,6 +41,9 @@ public sealed class GameOptions
     /// <summary>On first start, a round shorter than this skips to the following round time.</summary>
     public TimeSpan MinRoundLength { get; set; } = TimeSpan.FromHours(6);
 
+    /// <summary>How long a regular battle (started with /turf battle) stays open for votes.</summary>
+    public TimeSpan BattleLength { get; set; } = TimeSpan.FromMinutes(15);
+
     /// <summary>How the ink is drawn.</summary>
     public InkStyle Ink { get; set; } = InkStyle.Marbled;
 
@@ -92,6 +95,9 @@ public static class BotOptionsValidator
         if (o.Game.MaxListedWinners < 0) errors.Add("Game:MaxListedWinners must be >= 0.");
         if (o.Game.MinRoundLength < TimeSpan.Zero || o.Game.MinRoundLength >= TimeSpan.FromDays(1))
             errors.Add("Game:MinRoundLength must be between 0 and 24 hours.");
+
+        if (o.Game.BattleLength < TimeSpan.FromMinutes(1) || o.Game.BattleLength > TimeSpan.FromHours(6))
+            errors.Add("Game:BattleLength must be between 1 minute and 6 hours.");
 
         try { o.Generator.Validate(); }
         catch (ArgumentException ex) { errors.AddRange(ex.Message.Split(Environment.NewLine).Select(e => "Generator: " + e)); }

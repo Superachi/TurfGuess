@@ -26,6 +26,9 @@ public sealed class GeneratorOptions
         if (Paint.DiligentSpawnChance is < 0 or > 1) errors.Add("Paint.DiligentSpawnChance must be in [0, 1].");
         if (Paint.SpawnNeglectVariance is < 0 or > 1) errors.Add("Paint.SpawnNeglectVariance must be in [0, 1].");
         if (Paint.StrayInkChance is < 0 or > 1) errors.Add("Paint.StrayInkChance must be in [0, 1].");
+        if (Paint.ChaosIntensityMin is < 0 or > 1) errors.Add("Paint.ChaosIntensityMin must be in [0, 1].");
+        if (Paint.ChaosIntensityMax is < 0 or > 1) errors.Add("Paint.ChaosIntensityMax must be in [0, 1].");
+        if (Paint.ChaosIntensityMin > Paint.ChaosIntensityMax) errors.Add("Paint.ChaosIntensityMin must not exceed Paint.ChaosIntensityMax.");
         if (Paint.RaidTrailsPerTeam is < 0 or > 12) errors.Add("Paint.RaidTrailsPerTeam must be in [0, 12].");
         if (Paint.InfiltratorChancePerTeam is < 0 or > 1) errors.Add("Paint.InfiltratorChancePerTeam must be in [0, 1].");
         if (Paint.InfiltratorExtraChance is < 0 or > 1) errors.Add("Paint.InfiltratorExtraChance must be in [0, 1].");
@@ -95,6 +98,16 @@ public sealed class PaintOptions
     /// its own side of the front line, like players running through the enemy half. 0 = none.
     /// </summary>
     public int RaidTrailsPerTeam { get; set; } = 6;
+
+    /// <summary>
+    /// How much swapped ink there is on both sides: noise-shaped blotches of each team's colour inside
+    /// the other half, anywhere. Each round picks its intensity between min and max, so rounds vary.
+    /// 0 = none, 1 = a lot of the arena is affected.
+    /// </summary>
+    public double ChaosIntensityMin { get; set; } = 0.5;
+
+    /// <summary>Upper end of the per-round chaos intensity range (see <see cref="ChaosIntensityMin"/>).</summary>
+    public double ChaosIntensityMax { get; set; } = 0.9;
 
     /// <summary>
     /// Chance, per team and round, that a player sneaked past the front and painted part of the enemy

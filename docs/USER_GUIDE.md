@@ -188,6 +188,8 @@ The other settings are in [`src/TurfGuess.Bot/appsettings.json`](../src/TurfGues
 
 `Database:Path` and `Images:Directory` are relative to the folder you start the bot from.
 
+When updating a deployed bot from a new build, don't overwrite the database, `images/` or `.env`. See [Deploying an update](DEPLOYING.md).
+
 ### 4. Start it
 
 ```powershell

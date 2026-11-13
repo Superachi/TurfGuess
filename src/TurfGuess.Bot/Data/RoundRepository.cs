@@ -8,7 +8,7 @@ namespace TurfGuess.Bot.Data;
 public sealed class RoundRepository(Database db)
 {
     private const string RoundColumns = """
-        id, channel_id, status, message_id, reveal_message_id, seed, generator_version,
+        id, number, channel_id, status, message_id, reveal_message_id, seed, generator_version,
         image_path, reveal_image_path, created_at, posted_at, reveal_at,
         left_name, left_color, left_emoji, right_name, right_color, right_emoji,
         winner, winner_share, share_left, share_right, unpainted, kind, show_votes, started_by
@@ -39,16 +39,18 @@ public sealed class RoundRepository(Database db)
     public long Insert(RoundRecord r)
     {
         using var c = db.Open();
-        return c.ExecuteScalar<long>("""
-            INSERT INTO rounds (channel_id, status, seed, generator_version, image_path, reveal_image_path,
+        // The displayed number is the next one for this kind, so ranked and regular rounds count separately.
+        var (id, number) = c.QuerySingle<(long Id, long Number)>("""
+            INSERT INTO rounds (number, channel_id, status, seed, generator_version, image_path, reveal_image_path,
                                 created_at, reveal_at, left_name, left_color, left_emoji,
                                 right_name, right_color, right_emoji, winner, winner_share,
                                 share_left, share_right, unpainted, kind, show_votes, started_by)
-            VALUES (@ChannelId, 'Pending', @Seed, @GeneratorVersion, @ImagePath, @RevealImagePath,
+            VALUES ((SELECT COALESCE(MAX(number), 0) + 1 FROM rounds WHERE kind = @Kind),
+                    @ChannelId, 'Pending', @Seed, @GeneratorVersion, @ImagePath, @RevealImagePath,
                     @CreatedAt, @RevealAt, @LeftName, @LeftColor, @LeftEmoji,
                     @RightName, @RightColor, @RightEmoji, @Winner, @WinnerShare,
-                    @ShareLeft, @ShareRight, @Unpainted, @Kind, @ShowVotes, @StartedBy);
-            SELECT last_insert_rowid();
+                    @ShareLeft, @ShareRight, @Unpainted, @Kind, @ShowVotes, @StartedBy)
+            RETURNING id, number;
             """, new
         {
             r.ChannelId, r.Seed, r.GeneratorVersion, r.ImagePath, r.RevealImagePath, r.CreatedAt, r.RevealAt,
@@ -56,6 +58,8 @@ public sealed class RoundRepository(Database db)
             r.Winner, r.WinnerShare, r.ShareLeft, r.ShareRight, r.Unpainted,
             Kind = r.Kind.ToString(), r.ShowVotes, r.StartedBy,
         });
+        r.Number = number;
+        return id;
     }
 
     public void SetImagePaths(long id, string imagePath, string revealImagePath)

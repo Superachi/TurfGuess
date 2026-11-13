@@ -45,6 +45,10 @@ public sealed class Database
         AddColumnIfMissing(c, "rounds", "show_votes", "INTEGER NOT NULL DEFAULT 0");
         AddColumnIfMissing(c, "rounds", "started_by", "INTEGER NOT NULL DEFAULT 0");
 
+        // Displayed round count, separate for each kind. Existing rounds are numbered in id order within their kind.
+        AddColumnIfMissing(c, "rounds", "number", "INTEGER NOT NULL DEFAULT 0");
+        c.Execute("UPDATE rounds SET number = (SELECT COUNT(*) FROM rounds r2 WHERE r2.kind = rounds.kind AND r2.id <= rounds.id) WHERE number = 0;");
+
         // At most one unfinished round per kind (the old index allowed one in total).
         c.Execute("DROP INDEX IF EXISTS one_active_round;");
         c.Execute("CREATE UNIQUE INDEX IF NOT EXISTS one_active_round_per_kind ON rounds (kind) WHERE status <> 'Done';");

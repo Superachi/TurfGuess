@@ -18,6 +18,10 @@ public static partial class MessagePreview
 {
     private const long SampleRoundId = 12;
 
+    // Ranked rounds and regular battles are counted separately, so the two sample numbers differ.
+    private const long SampleRankedNumber = 5;
+    private const long SampleBattleNumber = 3;
+
     /// <param name="raw">Show the exact markup sent to Discord instead of resolving mentions and timestamps.</param>
     public static string Render(BotOptions options, ulong seed, DateTimeOffset now, bool raw)
     {
@@ -27,7 +31,7 @@ public static partial class MessagePreview
 
         var round = new RoundRecord
         {
-            Id = SampleRoundId,
+            Id = SampleRoundId, Number = SampleRankedNumber,
             Status = RoundStatus.Open,
             Seed = (long)seed,
             RevealAt = revealAt.ToUnixTimeSeconds(),
@@ -113,7 +117,7 @@ public static partial class MessagePreview
         // The same sample round, played as a regular battle: 15 minutes, not scored, no Bet button.
         var battle = new RoundRecord
         {
-            Id = SampleRoundId + 1, Status = RoundStatus.Open, Kind = RoundKind.Regular, StartedBy = (long)ids[0],
+            Id = SampleRoundId + 1, Number = SampleBattleNumber, Status = RoundStatus.Open, Kind = RoundKind.Regular, StartedBy = (long)ids[0],
             Seed = round.Seed, RevealAt = now.AddMinutes(15).ToUnixTimeSeconds(),
             LeftName = round.LeftName, LeftColor = round.LeftColor, LeftEmoji = round.LeftEmoji,
             RightName = round.RightName, RightColor = round.RightColor, RightEmoji = round.RightEmoji,
@@ -122,7 +126,7 @@ public static partial class MessagePreview
         };
         var publicBattle = new RoundRecord
         {
-            Id = battle.Id, Status = battle.Status, Kind = battle.Kind, StartedBy = battle.StartedBy, ShowVotes = true,
+            Id = battle.Id, Number = battle.Number, Status = battle.Status, Kind = battle.Kind, StartedBy = battle.StartedBy, ShowVotes = true,
             RevealAt = battle.RevealAt, LeftName = battle.LeftName, LeftEmoji = battle.LeftEmoji, RightName = battle.RightName,
             RightEmoji = battle.RightEmoji, Winner = battle.Winner, WinnerShare = battle.WinnerShare,
         };

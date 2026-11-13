@@ -32,6 +32,12 @@ public enum RoundKind
 public sealed class RoundRecord
 {
     public long Id { get; set; }
+
+    /// <summary>The count shown to players, kept separately for each <see cref="Kind"/> (0 = not assigned yet).</summary>
+    public long Number { get; set; }
+
+    /// <summary>The number players see: the per-kind count, or the id when none is stored.</summary>
+    public long DisplayNumber => Number > 0 ? Number : Id;
     public long ChannelId { get; set; }
     public RoundStatus Status { get; set; }
     public RoundKind Kind { get; set; } = RoundKind.Ranked;

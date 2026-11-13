@@ -53,6 +53,23 @@ public class BattleTests
     }
 
     [Fact]
+    public async Task Ranked_rounds_and_battles_keep_separate_displayed_counts()
+    {
+        using var env = new TestEnvironment();
+        await env.Rounds.AdvanceAsync(Now, default); // creates the first ranked round
+        var ranked = env.Repo.GetActive(RoundKind.Ranked)!;
+
+        var (first, _) = await env.Rounds.StartBattleAsync(1, false, Now, default);
+        await env.Rounds.AdvanceAsync(Now.AddMinutes(15), default);
+        var (second, _) = await env.Rounds.StartBattleAsync(2, false, Now.AddMinutes(16), default);
+
+        Assert.Equal(1, ranked.DisplayNumber);
+        Assert.Equal(1, first.DisplayNumber);
+        Assert.Equal(2, second.DisplayNumber); // the ranked round in between doesn't count
+        Assert.NotEqual(first.Id, second.Id);
+    }
+
+    [Fact]
     public async Task The_battle_stays_open_until_its_time_is_up()
     {
         using var env = new TestEnvironment();

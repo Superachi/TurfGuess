@@ -15,6 +15,9 @@ public sealed class RoundImages(BotOptions options, ILogger<RoundImages> logger)
     {
         GameName = options.Game.Name,
         Ink = options.Game.Ink,
+        Pattern = options.Game.Pattern,
+        PatternTexture = options.Game.PatternTexture,
+        PatternTextureCells = options.Game.PatternTextureCells,
         Left = new TeamStyle { Name = round.LeftName, Color = round.LeftColor, Emoji = round.LeftEmoji },
         Right = new TeamStyle { Name = round.RightName, Color = round.RightColor, Emoji = round.RightEmoji },
     };

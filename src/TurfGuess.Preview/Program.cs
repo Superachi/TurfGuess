@@ -6,7 +6,7 @@ using TurfGuess.Core.Grid;
 using TurfGuess.Core.Render;
 using TurfGuess.Core.Scoring;
 
-// Usage: dotnet run --project src/TurfGuess.Preview -- [--count 12] [--seed 42] [--out preview] [--ink Flat|Shaded|Marbled] [--outline None|Outside|Inside]
+// Usage: dotnet run --project src/TurfGuess.Preview -- [--count 12] [--seed 42] [--out preview] [--ink Flat|Shaded|Marbled] [--pattern None|Glitter|Texture] [--pattern-texture file.png] [--pattern-cells 8] [--outline None|Outside|Inside]
 //        [--ppc 16] [--symmetry Rotate|Mirror] [--no-reveal] [--blind] [--columns 4] [--radius 0.75] [--inner-radius 0.5]
 //        [--neglect-variance 0.6] [--stray-ink 0.4] [--tilt 20] [--raid-trails 4] [--chaos-min 0.5] [--chaos-max 0.9] [--infiltrators 0.5] [--min-share 50.3] [--max-share 52.3] [--no-reroll] [--regular]
 //        dotnet run --project src/TurfGuess.Preview -- --pairs [--seed 42]
@@ -38,6 +38,10 @@ options.Difficulty.MaxWinnerShare = args_.Double("max-share", options.Difficulty
 if (args_.Flag("no-reroll")) options.Difficulty.RerollsC = options.Difficulty.RerollsB = options.Difficulty.RerollsA = options.Difficulty.RerollsS =
     options.Difficulty.RegularRerollsC = options.Difficulty.RegularRerollsB = options.Difficulty.RegularRerollsA = options.Difficulty.RegularRerollsS = 0;
 var inkStyle = Enum.Parse<InkStyle>(args_.Str("ink", new RenderStyle().Ink.ToString()), ignoreCase: true);
+var pattern = Enum.Parse<PatternStyle>(args_.Str("pattern", new RenderStyle().Pattern.ToString()), ignoreCase: true);
+var patternTexture = args_.Has("pattern-texture") ? args_.Str("pattern-texture", "") : null;
+var patternCells = args_.Double("pattern-cells", new RenderStyle().PatternTextureCells);
+if (patternTexture != null && !args_.Has("pattern")) pattern = PatternStyle.Texture;
 var outline = Enum.Parse<ArenaOutline>(args_.Str("outline", new RenderStyle().Outline.ToString()), ignoreCase: true);
 if (args_.Has("symmetry")) options.Map.Symmetry = Enum.Parse<SymmetryMode>(args_.Str("symmetry", "Rotate"), ignoreCase: true);
 
@@ -52,7 +56,7 @@ if (args_.Flag("pairs"))
     for (int i = 0; i < pairs.Count; i++)
     {
         var pair = pairs[i];
-        var pairStyle = new RenderStyle { Left = pair.A, Right = pair.B, Ink = inkStyle, Outline = outline };
+        var pairStyle = new RenderStyle { Left = pair.A, Right = pair.B, Ink = inkStyle, Pattern = pattern, PatternTexture = patternTexture, PatternTextureCells = patternCells, Outline = outline };
         pairThumbs.Add((MapRenderer.RenderRound(pairRound, pairStyle),
             $"{i + 1}. {pair.A.Name} {pair.A.Color}  vs  {pair.B.Name} {pair.B.Color}"));
         if (args_.Flag("pairs-full"))
@@ -84,6 +88,9 @@ for (int i = 0; i < count; i++)
     var round = RoundGenerator.Generate(seed, options, regular);
     var style = ColorPairs.Pick(seed);
     style.Ink = inkStyle;
+    style.Pattern = pattern;
+    style.PatternTexture = patternTexture;
+    style.PatternTextureCells = patternCells;
     style.Outline = outline;
     long genMs = sw.ElapsedMilliseconds;
 

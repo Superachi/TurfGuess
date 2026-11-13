@@ -22,6 +22,19 @@ public enum InkStyle
     Marbled,
 }
 
+/// <summary>A decorative layer drawn over the ink (on top of whichever <see cref="InkStyle"/> is used).</summary>
+public enum PatternStyle
+{
+    /// <summary>No overlay.</summary>
+    None,
+
+    /// <summary>Scattered glints of light, with the odd four-point sparkle.</summary>
+    Glitter,
+
+    /// <summary>A tiled image supplied by <see cref="RenderStyle.PatternTexture"/>, screened over the paint.</summary>
+    Texture,
+}
+
 /// <summary>Visual settings for one round: which team is which color.</summary>
 /// <summary>Optional outline around the arena, drawn in the unpainted floor color.</summary>
 public enum ArenaOutline
@@ -38,6 +51,14 @@ public sealed class RenderStyle
 {
     public string GameName { get; set; } = "Turf Guess";
     public InkStyle Ink { get; set; } = InkStyle.Marbled;
+    public PatternStyle Pattern { get; set; } = PatternStyle.None;
+
+    /// <summary>Path to a tileable PNG for <see cref="PatternStyle.Texture"/>. Light/opaque areas brighten the paint, black/transparent areas leave it alone.</summary>
+    public string? PatternTexture { get; set; }
+
+    /// <summary>How many cells one tile of the texture covers.</summary>
+    public double PatternTextureCells { get; set; } = 8;
+
     public ArenaOutline Outline { get; set; } = ArenaOutline.Outside;
     public TeamStyle Left { get; set; } = new() { Name = "Orange", Color = "#CF581B", Emoji = "🧡" };
     public TeamStyle Right { get; set; } = new() { Name = "Blue", Color = "#141494", Emoji = "💙" };

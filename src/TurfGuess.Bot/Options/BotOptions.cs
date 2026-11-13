@@ -47,6 +47,15 @@ public sealed class GameOptions
     /// <summary>How the ink is drawn.</summary>
     public InkStyle Ink { get; set; } = InkStyle.Marbled;
 
+    /// <summary>A decorative layer over the ink, e.g. Glitter for the holidays. None by default.</summary>
+    public PatternStyle Pattern { get; set; } = PatternStyle.None;
+
+    /// <summary>Tileable PNG used when Pattern is Texture.</summary>
+    public string? PatternTexture { get; set; }
+
+    /// <summary>How many cells one tile of the texture covers.</summary>
+    public double PatternTextureCells { get; set; } = 8;
+
     public TimeOnly ParsedRoundTime => TimeOnly.Parse(RoundTime, System.Globalization.CultureInfo.InvariantCulture);
     public TimeZoneInfo ParsedTimeZone => TimeZoneInfo.FindSystemTimeZoneById(TimeZone);
 }

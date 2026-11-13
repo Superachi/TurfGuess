@@ -76,6 +76,10 @@ public static class MapRenderer
             InkStyle.Marbled => InkMarble(mask, w, h, p, round.Seed),
             _ => (new float[w * h], new float[w * h]),
         };
+        var sparkle = style.Pattern == PatternStyle.Glitter ? GlitterOverlay(mask, w, h, p, round.Seed) : null;
+        var texture = style.Pattern == PatternStyle.Texture && !string.IsNullOrWhiteSpace(style.PatternTexture)
+            ? LoadTexture(style.PatternTexture) : null;
+        double textureScale = Math.Max(1, style.PatternTextureCells * p) / (texture?.Width ?? 1); // output px per texel
         double edgeShadow = style.Ink switch
         {
             InkStyle.Shaded => ShadeEdgeShadow,
@@ -112,6 +116,8 @@ public static class MapRenderer
                         // Borders sit in cool shadow, which outlines each color.
                         if (edgeShadow > 0 && IsPaintEdge(mask, w, h, x, y, kind)) t = Math.Min(t, 0) - edgeShadow;
                         c = ink.Shade(t, gloss[i]);
+                        if (sparkle != null && sparkle[i] != 0) c = ApplyGlitter(c, sparkle[i]);
+                        if (texture != null) c = texture.Screen(c, x / textureScale, y / textureScale);
                         break;
                     }
 
@@ -291,6 +297,108 @@ public static class MapRenderer
 
         return (tone, gloss);
     }
+
+    // Glitter overlay (PatternStyle.Glitter).
+    private const double GlitterGrainCells = 1 / 6.0;  // grain size, in cells
+    private const double GlitterDensity = 0.05;        // share of grains that catch the light
+    private const double GlitterFleckDensity = 0.03;   // share of grains that are dull flecks instead
+    private const double GlitterStarChance = 0.0025;   // share of grains that flare into a cross
+    private const int GlitterStarArm = 2;              // arm length, in grains
+    private static readonly Rgb GlitterColor = new(255, 252, 240);
+
+    /// <summary>
+    /// Scatters glitter over the paint: each grain (a small square) is hashed from the round seed, so it is
+    /// deterministic. Returns per pixel a signed amount: positive brightens toward white, negative darkens a little.
+    /// </summary>
+    private static float[] GlitterOverlay(PixelKind[] mask, int w, int h, int p, ulong seed)
+    {
+        int g = Math.Max(1, (int)Math.Round(p * GlitterGrainCells));
+        int gw = (w + g - 1) / g, gh = (h + g - 1) / g;
+        var sparkle = new float[w * h];
+
+        for (int gy = 0; gy < gh; gy++)
+        {
+            for (int gx = 0; gx < gw; gx++)
+            {
+                ulong hash = Rng.Derive(seed, 0x91177E6UL + ((ulong)gy << 20) + (ulong)gx);
+                double u = (hash >> 11) * (1.0 / (1UL << 53));
+                double v = (hash & 0xFFFF) / 65535.0;
+
+                if (u < GlitterStarChance)
+                {
+                    PaintGrain(gx, gy, 1.0);
+                    for (int k = 1; k <= GlitterStarArm; k++)
+                    {
+                        double arm = 0.85 * (1 - (k - 1) / (double)GlitterStarArm);
+                        PaintGrain(gx + k, gy, arm); PaintGrain(gx - k, gy, arm);
+                        PaintGrain(gx, gy + k, arm); PaintGrain(gx, gy - k, arm);
+                    }
+                }
+                else if (u < GlitterStarChance + GlitterDensity)
+                    PaintGrain(gx, gy, 0.3 + 0.7 * v * v);
+                else if (u < GlitterStarChance + GlitterDensity + GlitterFleckDensity)
+                    PaintGrain(gx, gy, -0.12 - 0.12 * v);
+            }
+        }
+
+        return sparkle;
+
+        void PaintGrain(int cx, int cy, double amount)
+        {
+            if (cx < 0 || cy < 0 || cx >= gw || cy >= gh) return;
+            for (int y = cy * g; y < Math.Min(h, (cy + 1) * g); y++)
+                for (int x = cx * g; x < Math.Min(w, (cx + 1) * g); x++)
+                {
+                    int i = y * w + x;
+                    if (mask[i] is not (PixelKind.Left or PixelKind.Right)) continue;
+                    if (Math.Abs(amount) > Math.Abs(sparkle[i])) sparkle[i] = (float)amount;
+                }
+        }
+    }
+
+    private static readonly Dictionary<string, (DateTime Stamp, PatternTextureData Data)> TextureCache = new();
+
+    private static PatternTextureData LoadTexture(string path)
+    {
+        var full = Path.GetFullPath(path);
+        var stamp = File.GetLastWriteTimeUtc(full);
+        lock (TextureCache)
+        {
+            if (TextureCache.TryGetValue(full, out var hit) && hit.Stamp == stamp) return hit.Data;
+            using var bmp = SKBitmap.Decode(full) ?? throw new InvalidDataException($"Cannot read pattern texture '{full}'.");
+            var data = new PatternTextureData(bmp.Width, bmp.Height, bmp.Pixels);
+            TextureCache[full] = (stamp, data);
+            return data;
+        }
+    }
+
+    /// <summary>A tiled RGBA texture, sampled bilinearly and screened over the ink.</summary>
+    private sealed class PatternTextureData(int width, int height, SKColor[] pixels)
+    {
+        public int Width { get; } = width;
+
+        public Rgb Screen(Rgb c, double u, double v)
+        {
+            double fu = u - 0.5, fv = v - 0.5;
+            int x0 = (int)Math.Floor(fu), y0 = (int)Math.Floor(fv);
+            double tx = fu - x0, ty = fv - y0;
+            double r = 0, g = 0, b = 0;
+            for (int j = 0; j < 2; j++)
+                for (int i = 0; i < 2; i++)
+                {
+                    double wgt = (i == 0 ? 1 - tx : tx) * (j == 0 ? 1 - ty : ty);
+                    var px = pixels[Wrap(y0 + j, height) * width + Wrap(x0 + i, width)];
+                    double a = px.Alpha / 255.0 * wgt;
+                    r += px.Red * a; g += px.Green * a; b += px.Blue * a;
+                }
+            return new Rgb(255 - (255 - c.R) * (255 - r) / 255, 255 - (255 - c.G) * (255 - g) / 255, 255 - (255 - c.B) * (255 - b) / 255);
+        }
+
+        private static int Wrap(int i, int n) => ((i % n) + n) % n;
+    }
+
+    private static Rgb ApplyGlitter(Rgb c, double amount) =>
+        amount > 0 ? c.Mix(GlitterColor, amount) : c.Scale(1 + amount);
 
     /// <summary>
     /// Treats the ink as a thick, slightly bumpy layer lit from the top-left.

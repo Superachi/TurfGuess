@@ -362,6 +362,7 @@ All options are mutable classes, so the bot can bind them from `appsettings.json
 |---|---|---|
 | `GameName` | "Turf Guess" | Used in captions |
 | `Ink` | `Marbled` | `Flat`, `Shaded`, `Marbled` |
+| `Pattern` | `None` | `None`, `Glitter`: a layer over the ink, drawn on paint pixels only |
 | `Left` / `Right` | Orange / Blue | Normally set by `ColorPairs.Pick` |
 
 ---

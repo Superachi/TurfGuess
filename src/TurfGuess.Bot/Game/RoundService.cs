@@ -29,6 +29,8 @@ public sealed class RandomSeedSource : ISeedSource
 public sealed class RoundService(
     RoundRepository repo,
     ScoreRepository scores,
+    SubscriptionRepository subscriptions,
+    IPlayerNotifier notifier,
     IRoundChannel channel,
     RoundImages images,
     BotOptions options,
@@ -256,6 +258,7 @@ public sealed class RoundService(
         }
 
         repo.MarkDone(round.Id, (long)revealId.Value);
+        await NotifySubscribersAsync(round, votes, ct);
         await PostFinishedWeeksAsync(round, ct);
     }
 
@@ -292,6 +295,39 @@ public sealed class RoundService(
 
         LogRevealStats(round, votes, revealId.Value);
         repo.MarkDone(round.Id, (long)revealId.Value);
+        await NotifySubscribersAsync(round, votes, ct);
+    }
+
+    /// <summary>
+    /// Sends each subscribed voter a private message with their result. Runs once the round is Done, so a
+    /// repeated step never sends twice; a crash in between loses the pings rather than doubling them. A
+    /// player who can't be reached is logged and skipped; it never holds up the game.
+    /// </summary>
+    private async Task NotifySubscribersAsync(RoundRecord round, IReadOnlyList<VoteRecord> votes, CancellationToken ct)
+    {
+        var subscribed = subscriptions.SubscribedAmong(votes.Select(v => v.UserId).ToList());
+        if (subscribed.Count == 0) return;
+
+        var results = round.Kind == RoundKind.Ranked ? scores.GetResults(round.Id).ToDictionary(r => r.UserId) : [];
+        int sent = 0;
+        foreach (var vote in votes.Where(v => subscribed.Contains(v.UserId)))
+        {
+            ct.ThrowIfCancellationRequested();
+            results.TryGetValue(vote.UserId, out var result);
+            bool correct = vote.ChoiceSide == round.WinnerSide;
+            string text = MessageText.RevealPing(round, vote.ChoiceSide, correct, result is { Bet: not 0 },
+                result is null ? null : (int)result.Delta);
+            try
+            {
+                await notifier.SendDirectAsync((ulong)vote.UserId, text, ct);
+                sent++;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogWarning("Round {RoundId}: couldn't send the result to subscriber {UserId}: {Reason}", round.Id, vote.UserId, ex.Message);
+            }
+        }
+        logger.LogInformation("Round {RoundId}: sent the result to {Sent} of {Subscribers} subscribers.", round.Id, sent, subscribed.Count);
     }
 
     /// <summary>The week a round counts for: the week of its reveal time, in the game's time zone.</summary>

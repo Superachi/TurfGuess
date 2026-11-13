@@ -117,6 +117,12 @@ public sealed class Database
         CREATE INDEX IF NOT EXISTS round_results_week ON round_results (week_start);
 
         -- Weeks whose summary is done, and who won them (the trophy tally).
+        -- A row means the player wants a direct message with their result after each round they voted in.
+        CREATE TABLE IF NOT EXISTS subscriptions (
+            user_id       INTEGER PRIMARY KEY,
+            subscribed_at INTEGER NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS closed_weeks (
             week_start TEXT PRIMARY KEY
         );

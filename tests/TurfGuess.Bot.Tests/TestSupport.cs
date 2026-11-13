@@ -14,6 +14,8 @@ public sealed class TestEnvironment : IDisposable
     public RoundRepository Repo { get; }
     public ScoreRepository Scores { get; }
     public FakeChannel Channel { get; } = new();
+    public FakeNotifier Notifier { get; } = new();
+    public SubscriptionRepository Subscriptions { get; }
     public FixedSeeds Seeds { get; } = new();
     public RoundImages Images { get; }
     public RoundService Rounds { get; }
@@ -36,7 +38,8 @@ public sealed class TestEnvironment : IDisposable
         Repo = new RoundRepository(Database);
         Scores = new ScoreRepository(Database);
         Images = new RoundImages(Options, NullLogger<RoundImages>.Instance);
-        Rounds = new RoundService(Repo, Scores, Channel, Images, Options, Seeds, Log.For<RoundService>());
+        Subscriptions = new SubscriptionRepository(Database);
+        Rounds = new RoundService(Repo, Scores, Subscriptions, Notifier, Channel, Images, Options, Seeds, Log.For<RoundService>());
         Votes = new VoteService(Repo, Scores, Options, TimeProvider.System, Log.For<VoteService>());
     }
 
@@ -70,6 +73,20 @@ public sealed class FixedSeeds : ISeedSource
 {
     private ulong _next = 1000;
     public ulong NextSeed() => _next++;
+}
+
+/// <summary>Records direct messages. Users in <see cref="Unreachable"/> fail like a player with DMs closed.</summary>
+public sealed class FakeNotifier : IPlayerNotifier
+{
+    public List<(ulong UserId, string Text)> Sent { get; } = [];
+    public HashSet<ulong> Unreachable { get; } = [];
+
+    public Task SendDirectAsync(ulong userId, string text, CancellationToken ct)
+    {
+        if (Unreachable.Contains(userId)) throw new InvalidOperationException("Cannot send messages to this user.");
+        Sent.Add((userId, text));
+        return Task.CompletedTask;
+    }
 }
 
 /// <summary>An in-memory stand-in for the Discord channel that records what was posted.</summary>

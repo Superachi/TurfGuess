@@ -303,6 +303,43 @@ public static class MessageText
         return sb.ToString();
     }
 
+    public const string SubscribeConfirmation =
+        "🔔 You're subscribed. After every round you voted in, I'll send you a private message with the result.";
+    public const string SubscribeNoDms =
+        "🔔 You're subscribed, but I couldn't send you a message. Allow direct messages from server members " +
+        "(Server Settings → Privacy Settings), or the results can't reach you.";
+    public const string AlreadySubscribed = "You're already subscribed. Use `/turf unsubscribe` to stop the messages.";
+    public const string Unsubscribed = "🔕 You're unsubscribed. No more result messages.";
+    public const string NotSubscribed = "You weren't subscribed.";
+
+    /// <summary>The first direct message after subscribing, to check that messages get through.</summary>
+    public const string SubscribeTestMessage = "🔔 You're subscribed to round results. This is where they'll show up.";
+
+    /// <summary>
+    /// The private result message for one player. Self-contained, since the round message may have
+    /// changed or been deleted by the time it's read. <paramref name="delta"/> is null when the round isn't scored.
+    /// </summary>
+    public static string RevealPing(RoundRecord round, Side picked, bool correct, bool bet, int? delta)
+    {
+        var w = round.WinnerSide;
+        var l = Side.Left;
+        var r = Side.Right;
+
+        var sb = new StringBuilder();
+        sb.Append($"{KindName(round.Kind)} · Round #{round.DisplayNumber}\n");
+        sb.Append(correct ? "✅ **You guessed right!**\n" : "❌ **You guessed wrong.**\n");
+        sb.Append($"{round.TeamEmoji(w)} **{round.TeamName(w)}** won. ");
+        sb.Append($"{round.TeamEmoji(l)} {round.TeamName(l)} {Pct(round.ShareLeft)} · ");
+        sb.Append($"{round.TeamEmoji(r)} {round.TeamName(r)} {Pct(round.ShareRight)} · ");
+        sb.Append($"{Pct(round.Unpainted)} unpainted\n");
+        sb.Append($"You picked {round.TeamEmoji(picked)} {round.TeamName(picked)}");
+        if (delta is { } d)
+            sb.Append($" · {(bet ? "🎲 bet on" : "no bet")} · {Signed(d)} points");
+        else
+            sb.Append(" · no points awarded");
+        return sb.ToString();
+    }
+
     /// <summary>"🎲&lt;@id&gt; (+6)": a 🎲 for a bet, then the points gained, lost, or ~ for no change.</summary>
     private static string Outcome(PlayerOutcome o) => (o.Bet ? "🎲" : "") + $"<@{o.UserId}> ({Signed(o.Delta)})";
 

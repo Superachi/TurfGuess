@@ -60,6 +60,7 @@ database.EnsureSchema();
 services.AddSingleton(database);
 services.AddSingleton<RoundRepository>();
 services.AddSingleton<ScoreRepository>();
+services.AddSingleton<SubscriptionRepository>();
 
 // Game
 services.AddSingleton<ISeedSource, RandomSeedSource>();
@@ -77,6 +78,7 @@ services.AddSingleton(new DiscordSocketClient(new DiscordSocketConfig
 }));
 services.AddSingleton(sp => new InteractionService(sp.GetRequiredService<DiscordSocketClient>().Rest));
 services.AddSingleton<IRoundChannel, DiscordRoundChannel>();
+services.AddSingleton<IPlayerNotifier, DiscordPlayerNotifier>();
 
 services.AddHostedService<DiscordBotService>();
 services.AddHostedService<RoundScheduler>();

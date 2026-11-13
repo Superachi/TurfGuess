@@ -37,6 +37,9 @@ public sealed class RoundService(
 {
     private const int MaxStepsPerAdvance = 12;
 
+    // The message a battle reset writes the new battle over; only set while the gate is held.
+    private ulong? _replaceMessageId;
+
     // Advancing and resetting never run at the same time.
     private readonly SemaphoreSlim _gate = new(1, 1);
 
@@ -60,7 +63,7 @@ public sealed class RoundService(
     /// Starts a regular battle (🔫) and posts it. Only one can run at a time: when one is already
     /// going, nothing is created and that battle is returned with Started = false.
     /// </summary>
-    public async Task<(RoundRecord Round, bool Started)> StartBattleAsync(ulong userId, bool showVotes, DateTimeOffset now, CancellationToken ct)
+    public async Task<(RoundRecord Round, bool Started)> StartBattleAsync(ulong userId, bool showVotes, DateTimeOffset now, CancellationToken ct, ulong? replaceMessageId = null)
     {
         await _gate.WaitAsync(ct);
         try
@@ -72,7 +75,9 @@ public sealed class RoundService(
             logger.LogInformation("Round {RoundId}: regular battle started by {UserId}{Public}.",
                 created.Id, userId, showVotes ? " with public votes" : "");
 
-            await AdvanceCoreAsync(RoundKind.Regular, now, ct); // posts it
+            _replaceMessageId = replaceMessageId;
+            try { await AdvanceCoreAsync(RoundKind.Regular, now, ct); } // posts it
+            finally { _replaceMessageId = null; }
             return (repo.Get(created.Id) ?? created, true);
         }
         finally { _gate.Release(); }
@@ -211,7 +216,13 @@ public sealed class RoundService(
         if (messageId is null)
         {
             var (imagePath, _) = images.Ensure(round);
-            messageId = await channel.PostRoundAsync(round, imagePath, ct);
+            var replace = round.Kind == RoundKind.Regular ? _replaceMessageId : null;
+            try { messageId = await channel.PostRoundAsync(round, imagePath, ct, replace); }
+            catch (Exception ex) when (replace is not null && ex is not OperationCanceledException)
+            {
+                logger.LogWarning(ex, "Round {RoundId}: couldn't reuse message {MessageId}; posting a new one.", round.Id, replace);
+                messageId = await channel.PostRoundAsync(round, imagePath, ct);
+            }
             logger.LogInformation(
                 "Round {RoundId}: posted in channel {ChannelId} (message {MessageId}), {Left} vs {Right}. Voting is open until {RevealAt}.",
                 round.Id, options.Discord.ChannelId, messageId, round.LeftName, round.RightName, LocalTime(round.RevealAtTime));

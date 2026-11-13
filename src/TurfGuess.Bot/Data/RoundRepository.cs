@@ -29,6 +29,15 @@ public sealed class RoundRepository(Database db)
             $"SELECT {RoundColumns} FROM rounds WHERE status <> 'Done' AND kind = @kind", new { kind = kind.ToString() });
     }
 
+    /// <summary>The most recent round of this kind that has a posted message, whatever its status.</summary>
+    public RoundRecord? GetLatestPosted(RoundKind kind)
+    {
+        using var c = db.Open();
+        return c.QueryFirstOrDefault<RoundRecord>(
+            $"SELECT {RoundColumns} FROM rounds WHERE kind = @kind AND message_id IS NOT NULL ORDER BY id DESC LIMIT 1",
+            new { kind = kind.ToString() });
+    }
+
     public RoundRecord? Get(long id)
     {
         using var c = db.Open();
@@ -189,6 +198,16 @@ public sealed class RoundRepository(Database db)
             c.Execute("INSERT INTO bets (round_id, user_id) VALUES (@roundId, @userId)", new { roundId, userId }, tx);
         tx.Commit();
         return removed == 0;
+    }
+
+    /// <summary>Turns a player's bet on (only while the round is Open). Returns true when a bet was added.</summary>
+    public bool EnsureBet(long roundId, long userId)
+    {
+        using var c = db.Open();
+        return c.Execute("""
+            INSERT OR IGNORE INTO bets (round_id, user_id)
+            SELECT @roundId, @userId WHERE EXISTS (SELECT 1 FROM rounds WHERE id = @roundId AND status = 'Open')
+            """, new { roundId, userId }) > 0;
     }
 
     public bool HasBet(long roundId, long userId)

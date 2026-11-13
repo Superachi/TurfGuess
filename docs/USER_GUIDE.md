@@ -188,6 +188,8 @@ The other settings are in [`src/TurfGuess.Bot/appsettings.json`](../src/TurfGues
 
 `Database:Path` and `Images:Directory` are relative to the folder you start the bot from.
 
+When updating a deployed bot from a new build, don't overwrite the database, `images/` or `.env`. See [Deploying an update](DEPLOYING.md).
+
 ### 4. Start it
 
 ```powershell
@@ -235,10 +237,14 @@ Both commands only work in the game's channel.
 
 | Command | What it does |
 |---|---|
-| `/turf battle [show-votes:true]` | Starts a Regular Battle. With `show-votes`, the round message lists who voted for which team while it runs, and voters are told their vote is public. Fails with "already running" while another battle is open. |
+| `/turf battle [show-votes:true]` | Starts a Regular Battle. With `show-votes`, the round message lists who voted for which team while it runs, and voters are told their vote is public. Disabled (answers "already running") while another battle is open. If a battle message already exists from today, it is reset into the new battle instead of posting another message, and the caller gets a private note pointing to it; `show-votes` applies to the new battle. |
 | `/turf battle-reveal` | Reveals the running Regular Battle now. Only the player who started it, or an administrator, can do this. |
 
 The reveal lists who guessed right and wrong, with no points and no standings.
+
+To keep the channel tidy, a Regular Battle lives in one message. While it runs, the message has a **Reveal** button (same permission as `/turf battle-reveal`). The reveal is written over the same message, which then shows a **Reset** button; pressing it replaces the message with a fresh battle. If another battle is already running when Reset is pressed, the button turns into a Reveal button for that battle.
+
+**Auto-bet:** a player with 0 points this week is bet in automatically the first time they vote in a ranked round, since they have nothing to lose. They can press Bet to switch it off.
 
 ### Admin commands
 

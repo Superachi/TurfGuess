@@ -15,8 +15,14 @@ public interface IRoundChannel
     /// </summary>
     Task<ulong?> FindRoundMessageAsync(RoundRecord round, CancellationToken ct);
 
-    /// <summary>Posts the round image with the two vote buttons. Returns the message id.</summary>
-    Task<ulong> PostRoundAsync(RoundRecord round, string imagePath, CancellationToken ct);
+    /// <summary>
+    /// Posts the round image with the vote buttons. Returns the message id. With <paramref name="replaceMessageId"/>
+    /// the round is written over that existing message (a Regular Battle reset) instead of a new post.
+    /// </summary>
+    Task<ulong> PostRoundAsync(RoundRecord round, string imagePath, CancellationToken ct, ulong? replaceMessageId = null);
+
+    /// <summary>Turns a finished Regular Battle's message into a Reveal button, because a battle is running elsewhere.</summary>
+    Task ShowBattleRevealButtonAsync(ulong messageId, RoundRecord runningBattle, CancellationToken ct);
 
     /// <summary>
     /// Disables the buttons and marks the round message closed. <paramref name="voters"/> is null

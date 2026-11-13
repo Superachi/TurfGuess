@@ -192,19 +192,40 @@ public class WeeklyRoundTests
         env.Votes.Cast(round.Id, 2, "bo", winner);
         env.Votes.Cast(round.Id, 3, "cy", winner.Opposite());
         env.Votes.Cast(round.Id, 4, "dee", winner.Opposite());
-        env.Votes.ToggleBet(round.Id, 1, "ann");
-        env.Votes.ToggleBet(round.Id, 3, "cy");
+        // Everyone has 0 points, so every vote turned the bet on; bo switches it off again.
         env.Votes.ToggleBet(round.Id, 5, "eli"); // bet without a vote: ignored
         env.Votes.ToggleBet(round.Id, 2, "bo");
-        env.Votes.ToggleBet(round.Id, 2, "bo");  // and off again
 
         await env.Rounds.AdvanceAsync(Local(11, 9), default);
 
         var (_, summary) = Assert.Single(env.Channel.Reveals);
         Assert.Equal([new PlayerOutcome(1, true, 2 * points), new PlayerOutcome(2, false, points)], summary.Winners);
-        // Cy bet and lost, but had no points yet this week, so there was nothing to lose.
-        Assert.Equal([new PlayerOutcome(3, true, 0), new PlayerOutcome(4, false, 0)], summary.Losers);
+        // Cy and Dee bet and lost, but had no points yet this week, so there was nothing to lose.
+        Assert.Equal([new PlayerOutcome(3, true, 0), new PlayerOutcome(4, true, 0)], summary.Losers);
         Assert.Equal([new StandingEntry(1, 2 * points, 1), new StandingEntry(2, points, 1), new StandingEntry(3, 0, 0), new StandingEntry(4, 0, 0)], summary.Standings);
+    }
+
+    [Fact]
+    public async Task A_first_vote_with_zero_points_turns_the_bet_on_but_not_with_points()
+    {
+        using var env = new TestEnvironment();
+        await env.Rounds.AdvanceAsync(Local(10, 12), default);
+        var round = env.Repo.GetActive()!;
+        env.Votes.Cast(round.Id, 1, "ann", round.WinnerSide);
+        Assert.True(env.Repo.HasBet(round.Id, 1));
+
+        // Changing the vote later must not undo a manual switch-off.
+        env.Votes.ToggleBet(round.Id, 1, "ann");
+        env.Votes.Cast(round.Id, 1, "ann", round.WinnerSide.Opposite());
+        Assert.False(env.Repo.HasBet(round.Id, 1));
+
+        await env.Rounds.AdvanceAsync(Local(11, 9), default); // ann has 0 points: wrong guess, no bet
+        var next = env.Repo.GetActive()!;
+        env.Votes.Cast(next.Id, 2, "bo", next.WinnerSide);
+        await env.Rounds.AdvanceAsync(Local(12, 9), default); // bo now has points
+        var third = env.Repo.GetActive()!;
+        env.Votes.Cast(third.Id, 2, "bo", third.WinnerSide);
+        Assert.False(env.Repo.HasBet(third.Id, 2));
     }
 
     [Fact]
@@ -312,9 +333,11 @@ public class WeeklyLoopSimulationTests
             {
                 if (Script(p, day) is not var (correct, bet)) continue;
                 env.Votes.Cast(round.Id, p, "player" + p, correct ? round.WinnerSide : round.WinnerSide.Opposite());
-                if (bet) env.Votes.ToggleBet(round.Id, p, "player" + p);
+                // A player with 0 points is bet in automatically on their vote; the script's "bet" presses the button.
+                bool betOn = score.GetValueOrDefault(p) == 0;
+                if (bet) { env.Votes.ToggleBet(round.Id, p, "player" + p); betOn = !betOn; }
 
-                int raw = correct ? (bet ? 2 * points : points) : (bet ? -points : 0);
+                int raw = correct ? (betOn ? 2 * points : points) : (betOn ? -points : 0);
                 score[p] = Math.Max(0, score.GetValueOrDefault(p) + raw);
                 if (correct) wins[p] = wins.GetValueOrDefault(p) + 1;
             }

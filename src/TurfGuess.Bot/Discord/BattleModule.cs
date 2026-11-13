@@ -1,5 +1,6 @@
 using Discord;
 using Discord.Interactions;
+using Discord.WebSocket;
 using Microsoft.Extensions.Logging;
 using TurfGuess.Bot.Data;
 using TurfGuess.Bot.Game;
@@ -15,6 +16,7 @@ namespace TurfGuess.Bot.Discord;
 public sealed class BattleModule(
     RoundService rounds,
     RoundRepository repo,
+    IRoundChannel channelPosts,
     SchedulerSignal scheduler,
     TimeProvider clock,
     BotOptions options,
@@ -29,11 +31,21 @@ public sealed class BattleModule(
         await DeferAsync(ephemeral: true);
         try
         {
-            var (round, started) = await rounds.StartBattleAsync(Context.User.Id, showVotes, clock.GetUtcNow(), default);
-            logger.LogInformation("{UserName} ({UserId}) ran /turf battle: {Result}.", Context.User.Username, Context.User.Id,
-                started ? $"round {round.Id} started" : $"refused, round {round.Id} is still running");
+            var now = clock.GetUtcNow();
 
-            await FollowupAsync(MessageText.BattleStarted(round, started), ephemeral: true);
+            // Today's battle message is reused (reset) instead of posting another one.
+            var last = repo.GetLatestPosted(RoundKind.Regular);
+            ulong? reuse = last?.MessageId is { } id && SameLocalDay(last.CreatedAtTime, now) ? (ulong)id : null;
+
+            var (round, started) = await rounds.StartBattleAsync(Context.User.Id, showVotes, now, default, reuse);
+            bool reused = started && reuse is not null && round.MessageId == (long)reuse;
+            logger.LogInformation("{UserName} ({UserId}) ran /turf battle: {Result}.", Context.User.Username, Context.User.Id,
+                !started ? $"refused, round {round.Id} is still running"
+                : reused ? $"round {round.Id} started over message {reuse}" : $"round {round.Id} started");
+
+            string? link = reused && Context.Guild is { } guild
+                ? $"https://discord.com/channels/{guild.Id}/{options.Discord.ChannelId}/{reuse}" : null;
+            await FollowupAsync(reused ? MessageText.BattleReusedMessage(round, link) : MessageText.BattleStarted(round, started), ephemeral: true);
         }
         catch (Exception ex)
         {
@@ -72,6 +84,80 @@ public sealed class BattleModule(
             Context.User.Username, Context.User.Id, round.Id);
         scheduler.Wake();
         await RespondAsync(MessageText.BattleRevealing, ephemeral: true);
+    }
+
+    [ComponentInteraction("battle-reveal:*", ignoreGroupNames: true)]
+    public async Task RevealButtonAsync(string roundIdText)
+    {
+        var round = repo.GetActive(RoundKind.Regular);
+        if (!long.TryParse(roundIdText, out long roundId) || round is not { Status: RoundStatus.Open } || round.Id != roundId)
+        {
+            await RespondAsync(MessageText.NoBattleRunning, ephemeral: true);
+            return;
+        }
+
+        bool isAdmin = Context.User is IGuildUser { GuildPermissions.Administrator: true };
+        if (round.StartedBy != (long)Context.User.Id && !isAdmin)
+        {
+            await RespondAsync(MessageText.BattleRevealNotAllowed, ephemeral: true);
+            return;
+        }
+
+        if (!rounds.RevealNow(clock.GetUtcNow(), RoundKind.Regular))
+        {
+            await RespondAsync(MessageText.NoBattleRunning, ephemeral: true);
+            return;
+        }
+
+        logger.LogInformation("{UserName} ({UserId}) pressed Reveal; revealing round {RoundId} early.",
+            Context.User.Username, Context.User.Id, round.Id);
+        scheduler.Wake();
+        await RespondAsync(MessageText.BattleRevealing, ephemeral: true);
+    }
+
+    /// <summary>Reset on a finished battle: the same message becomes a fresh battle.</summary>
+    [ComponentInteraction("battle-reset:*", ignoreGroupNames: true)]
+    public async Task ResetButtonAsync(string roundIdText)
+    {
+        ulong messageId = ((SocketMessageComponent)Context.Interaction).Message.Id;
+        var running = repo.GetActive(RoundKind.Regular);
+        if (running is not null)
+        {
+            await ShowRevealInsteadAsync(messageId, running);
+            return;
+        }
+
+        bool showVotes = long.TryParse(roundIdText, out long oldId) && repo.Get(oldId)?.ShowVotes == true;
+
+        await DeferAsync();
+        try
+        {
+            var (round, started) = await rounds.StartBattleAsync(Context.User.Id, showVotes, clock.GetUtcNow(), default, messageId);
+            logger.LogInformation("{UserName} ({UserId}) pressed Reset: {Result}.", Context.User.Username, Context.User.Id,
+                started ? $"round {round.Id} started over message {messageId}" : $"refused, round {round.Id} is still running");
+            if (!started) await ShowRevealInsteadAsync(messageId, round);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Resetting the Regular Battle for {UserName} ({UserId}) failed.", Context.User.Username, Context.User.Id);
+            scheduler.Wake();
+            await FollowupAsync("Couldn't reset the Regular Battle. Please try again in a moment.", ephemeral: true);
+        }
+    }
+
+    private async Task ShowRevealInsteadAsync(ulong messageId, RoundRecord running)
+    {
+        try { await channelPosts.ShowBattleRevealButtonAsync(messageId, running, default); }
+        catch (Exception ex) { logger.LogWarning(ex, "Couldn't swap the Reset button for Reveal on message {MessageId}.", messageId); }
+        var text = MessageText.BattleAlreadyRunning(running);
+        if (Context.Interaction.HasResponded) await FollowupAsync(text, ephemeral: true);
+        else await RespondAsync(text, ephemeral: true);
+    }
+
+    private bool SameLocalDay(DateTimeOffset a, DateTimeOffset b)
+    {
+        var zone = options.Game.ParsedTimeZone;
+        return TimeZoneInfo.ConvertTime(a, zone).Date == TimeZoneInfo.ConvertTime(b, zone).Date;
     }
 
     /// <summary>Battles are posted in the game's channel, so the commands only work there.</summary>

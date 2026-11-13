@@ -26,7 +26,7 @@ Status: implemented on this branch (not yet merged). Trophies are tallied but no
 ```
 Which team do you think painted more? Cast your vote!
 
-Rank A | 🔥🔥🔥
+**Rank A** · 3🔥
 Worth 3 points · bet: win +6 / lose −3
 Results in 2 hours (Fri 18:00).
 

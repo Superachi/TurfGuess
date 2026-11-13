@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using TurfGuess.Bot.Data;
+using TurfGuess.Bot.Options;
 using TurfGuess.Core.Grid;
 
 namespace TurfGuess.Bot.Game;
@@ -11,7 +12,7 @@ public enum VoteResult
 }
 
 /// <summary>Records votes. Closing is enforced by the database, not by disabled buttons.</summary>
-public sealed class VoteService(RoundRepository repo, TimeProvider clock, ILogger<VoteService> logger)
+public sealed class VoteService(RoundRepository repo, ScoreRepository scores, BotOptions options, TimeProvider clock, ILogger<VoteService> logger)
 {
     /// <summary>Raised after a vote is recorded, with the round id (used for the live vote counter).</summary>
     public event Action<long>? VoteRecorded;
@@ -37,6 +38,13 @@ public sealed class VoteService(RoundRepository repo, TimeProvider clock, ILogge
                 roundId, userName, userId, round is null ? previous.Choice : round.TeamName(previous.ChoiceSide), team);
         else
             logger.LogInformation("Round {RoundId}: {UserName} ({UserId}) voted {Team} again (no change).", roundId, userName, userId, team);
+
+        // A player with no points has nothing to lose, so their first vote in a ranked round turns the bet on.
+        // They can still switch it off with the Bet button.
+        if (previous is null && round is { Kind: RoundKind.Ranked }
+            && scores.WeekPoints(Weekly.WeekStart(round.RevealAtTime, options.Game.ParsedTimeZone), (long)userId) == 0
+            && repo.EnsureBet(roundId, (long)userId))
+            logger.LogInformation("Round {RoundId}: {UserName} ({UserId}) has 0 points this week; bet turned on automatically.", roundId, userName, userId);
 
         VoteRecorded?.Invoke(roundId);
         return VoteResult.Accepted;

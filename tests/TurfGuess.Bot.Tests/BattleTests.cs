@@ -10,6 +10,20 @@ public class BattleTests
     private static readonly DateTimeOffset Now = new(2026, 11, 10, 12, 0, 0, TimeSpan.Zero);
 
     [Fact]
+    public async Task A_reset_writes_the_new_battle_over_the_given_message()
+    {
+        using var env = new TestEnvironment();
+        var (first, _) = await env.Rounds.StartBattleAsync(1, showVotes: false, Now, default);
+        await env.Rounds.AdvanceAsync(Now.AddHours(1), default); // revealed
+
+        var (second, started) = await env.Rounds.StartBattleAsync(2, showVotes: false, Now.AddHours(2), default, replaceMessageId: 777);
+        Assert.True(started);
+        Assert.NotEqual(first.Id, second.Id);
+        Assert.Equal((second.Id, 777UL), Assert.Single(env.Channel.Replacements));
+        Assert.Equal(777L, env.Repo.Get(second.Id)!.MessageId);
+    }
+
+    [Fact]
     public async Task Starting_a_battle_posts_it_and_it_ends_after_the_battle_length()
     {
         using var env = new TestEnvironment();
@@ -182,8 +196,8 @@ public class BattleTests
     [Fact]
     public void Titles_and_footers_tell_the_two_kinds_apart()
     {
-        Assert.Equal("Turf Guess · ⚓ Ranked Battle · Round #13", MessageText.RoundTitle("Turf Guess", Round(RoundKind.Ranked)));
-        Assert.Equal("Turf Guess · 🔫 Regular Battle · Round #13", MessageText.RoundTitle("Turf Guess", Round(RoundKind.Regular)));
+        Assert.Equal("⚓ Ranked Battle · Round #13", MessageText.RoundTitle(Round(RoundKind.Ranked)));
+        Assert.Equal("🔫 Regular Battle · Round #13", MessageText.RoundTitle(Round(RoundKind.Regular)));
         Assert.Equal("Round #13 · Results", MessageText.RevealFooter(Round(RoundKind.Ranked))); // recovery relies on this text
         Assert.Equal("Regular Battle #13 · Results", MessageText.RevealFooter(Round(RoundKind.Regular)));
     }
@@ -203,10 +217,9 @@ public class BattleTests
     public void Battle_message_says_there_are_no_points_and_offers_no_bet()
     {
         string text = MessageText.RoundDescription(Round(RoundKind.Regular), [], closed: false);
-        Assert.Contains("no points", text);
-        Assert.Contains("Started by <@99>", text);
+        Assert.Contains("Just for fun: no points!\nVotes are hidden\nStarted by <@99>", text);
         Assert.DoesNotContain("bet:", text);
-        Assert.DoesNotContain("votes are public", text);
+        Assert.DoesNotContain("Votes are public", text);
     }
 
     [Fact]
@@ -215,7 +228,7 @@ public class BattleTests
         var voters = new[] { new Voter(1, false, Side.Left), new Voter(2, false, Side.Right), new Voter(3, false, Side.Left) };
 
         string open = MessageText.RoundDescription(Round(RoundKind.Regular, showVotes: true), voters, closed: false);
-        Assert.Contains("votes are public", open);
+        Assert.Contains("Votes are public", open);
         Assert.Contains("🔴 **Reds** (2): <@1>, <@3>", open);
         Assert.Contains("🔵 **Blues** (1): <@2>", open);
 

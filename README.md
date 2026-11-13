@@ -30,3 +30,5 @@ To run the bot, set a token and channel (see the [User Guide](docs/USER_GUIDE.md
 ```bash
 dotnet run --project src/TurfGuess.Bot -c Release
 ```
+
+Updating a running server (and what to keep: the database, `images/`, `.env`): see [Deploying an update](docs/DEPLOYING.md).

@@ -23,8 +23,8 @@ public static class MessageText
     public static string KindName(RoundKind kind) =>
         kind == RoundKind.Regular ? $"{RegularEmoji} Regular Battle" : $"{RankedEmoji} Ranked Battle";
 
-    public static string RoundTitle(string gameName, RoundRecord round) =>
-        $"{gameName} · {KindName(round.Kind)} · Round #{round.DisplayNumber}";
+    public static string RoundTitle(RoundRecord round) =>
+        $"{KindName(round.Kind)} · Round #{round.DisplayNumber}";
 
     /// <summary>Footer on the round message.</summary>
     public static string RoundFooter(RoundRecord round) =>
@@ -98,19 +98,34 @@ public static class MessageText
         var rank = Difficulty.RankFor(round.WinnerShare, difficulty ?? new DifficultyOptions());
         int count = (int)rank + 1; // C = 1 … X = 5
         string icon = round.Kind == RoundKind.Regular ? "🐟" : "🔥";
-        return $"Rank {rank} | {string.Concat(Enumerable.Repeat(icon, count))}";
+        return $"**Rank {rank}** · {count}{icon}";
     }
 
     /// <summary>What a regular battle is: unscored, who started it, and whether votes are public.</summary>
     public static string BattleLine(RoundRecord round) =>
-        $"{RegularEmoji} Regular Battle · no points, doesn't count towards the weekly score" +
-        (round.ShowVotes ? " · votes are public" : "") +
+        "Just for fun: no points!" +
+        (round.ShowVotes ? "\nVotes are public" : "\nVotes are hidden") +
         (round.StartedBy != 0 ? $"\nStarted by <@{round.StartedBy}>" : "");
 
     /// <summary>Reply to /turf battle (only the caller sees it).</summary>
     public static string BattleStarted(RoundRecord round, bool started) => started
         ? $"{RegularEmoji} Regular Battle started! Voting ends <t:{round.RevealAt}:R>."
-        : $"A Regular Battle is already running. It ends <t:{round.RevealAt}:R>.";
+        : $"A Regular Battle is already running, so the command is disabled until it ends <t:{round.RevealAt}:R>.";
+
+    public static string BattleRevealButtonId(long roundId) => $"battle-reveal:{roundId}";
+    public static string BattleResetButtonId(long roundId) => $"battle-reset:{roundId}";
+    public const string BattleRevealButtonLabel = "Reveal";
+    public const string BattleResetButtonLabel = "Reset";
+    public const string BattleResetButtonEmoji = "🔁";
+    public const string BattleResetting = "Setting up a fresh Regular Battle…";
+    public static string BattleAlreadyRunning(RoundRecord round) =>
+        $"A Regular Battle is already running (ends <t:{round.RevealAt}:R>), so Reset is now a Reveal button on this message.";
+
+    /// <summary>Reply to /turf battle when today's battle message was reset instead of posting a new one.</summary>
+    public static string BattleReusedMessage(RoundRecord round, string? link) =>
+        $"{RegularEmoji} A fresh Regular Battle is running! Voting ends <t:{round.RevealAt}:R>.\n" +
+        (link is null ? "Look at the previous Regular Battle message in the channel."
+                      : $"Look at the previous Regular Battle message: {link}");
 
     public const string NoBattleRunning = "There's no Regular Battle running right now.";
     public const string BattleRevealNotAllowed = "Only the player who started this Regular Battle, or an admin, can reveal it early.";

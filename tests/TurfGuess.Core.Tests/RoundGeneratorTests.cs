@@ -93,14 +93,21 @@ public class RoundGeneratorTests
     public void Reroll_count_respects_the_limit_of_the_best_rank()
     {
         var o = Fast();
-        o.Difficulty.RerollsC = 10; o.Difficulty.RerollsB = 8; o.Difficulty.RerollsA = 5; o.Difficulty.RerollsS = 3;
         for (ulong seed = 1; seed <= 12; seed++)
         {
-            var round = RoundGenerator.Generate(seed, o);
-            Assert.InRange(round.Rerolls, 0, 10);
+            Assert.InRange(RoundGenerator.Generate(seed, o).Rerolls, 0, 5);
+            Assert.InRange(RoundGenerator.Generate(seed, o, regular: true).Rerolls, 0, 2);
         }
-        Assert.Equal(10, o.Difficulty.RerollLimit(DifficultyRank.C));
+        Assert.Equal(5, o.Difficulty.RerollLimit(DifficultyRank.C));
+        Assert.Equal(4, o.Difficulty.RerollLimit(DifficultyRank.B));
+        Assert.Equal(3, o.Difficulty.RerollLimit(DifficultyRank.A));
+        Assert.Equal(2, o.Difficulty.RerollLimit(DifficultyRank.S));
         Assert.Equal(0, o.Difficulty.RerollLimit(DifficultyRank.X));
+
+        Assert.Equal(2, o.Difficulty.RerollLimit(DifficultyRank.C, regular: true));
+        Assert.Equal(1, o.Difficulty.RerollLimit(DifficultyRank.B, regular: true));
+        Assert.Equal(0, o.Difficulty.RerollLimit(DifficultyRank.A, regular: true));
+        Assert.Equal(0, o.Difficulty.RerollLimit(DifficultyRank.S, regular: true));
     }
 
     [Theory]

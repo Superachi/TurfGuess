@@ -51,7 +51,7 @@ public sealed class RoundImages(BotOptions options, ILogger<RoundImages> logger)
             logger.LogWarning("Round {Id} was generated with version {Old}; regenerating its images with version {New} may differ.",
                 round.Id, round.GeneratorVersion, RoundGenerator.GeneratorVersion);
 
-        var generated = RoundGenerator.Generate((ulong)round.Seed, options.Generator);
+        var generated = RoundGenerator.Generate((ulong)round.Seed, options.Generator, regular: round.Kind == RoundKind.Regular);
         return Save(round, generated);
     }
 }

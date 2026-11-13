@@ -157,7 +157,7 @@ public sealed class RoundService(
     private RoundRecord CreateRound(DateTimeOffset now, RoundKind kind, long startedBy = 0, bool showVotes = false)
     {
         ulong seed = seeds.NextSeed();
-        var generated = RoundGenerator.Generate(seed, options.Generator);
+        var generated = RoundGenerator.Generate(seed, options.Generator, regular: kind == RoundKind.Regular);
         var style = ColorPairs.Pick(seed, options.EffectiveColorPairs, options.Game.Name);
 
         var revealAt = kind == RoundKind.Regular

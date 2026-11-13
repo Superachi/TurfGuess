@@ -34,7 +34,8 @@ options.Paint.ChaosIntensityMin = args_.Double("chaos-min", options.Paint.ChaosI
 options.Paint.ChaosIntensityMax = args_.Double("chaos-max", options.Paint.ChaosIntensityMax);
 options.Difficulty.MinWinnerShare = args_.Double("min-share", options.Difficulty.MinWinnerShare);
 options.Difficulty.MaxWinnerShare = args_.Double("max-share", options.Difficulty.MaxWinnerShare);
-if (args_.Flag("no-reroll")) options.Difficulty.RerollsC = options.Difficulty.RerollsB = options.Difficulty.RerollsA = options.Difficulty.RerollsS = 0;
+if (args_.Flag("no-reroll")) options.Difficulty.RerollsC = options.Difficulty.RerollsB = options.Difficulty.RerollsA = options.Difficulty.RerollsS =
+    options.Difficulty.RegularRerollsC = options.Difficulty.RegularRerollsB = options.Difficulty.RegularRerollsA = options.Difficulty.RegularRerollsS = 0;
 var inkStyle = Enum.Parse<InkStyle>(args_.Str("ink", new RenderStyle().Ink.ToString()), ignoreCase: true);
 var outline = Enum.Parse<ArenaOutline>(args_.Str("outline", new RenderStyle().Outline.ToString()), ignoreCase: true);
 if (args_.Has("symmetry")) options.Map.Symmetry = Enum.Parse<SymmetryMode>(args_.Str("symmetry", "Rotate"), ignoreCase: true);

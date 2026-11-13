@@ -40,12 +40,16 @@ public static class Difficulty
     public static int Points(this DifficultyRank rank) => (int)rank + 1;
 
     /// <summary>Total rerolls allowed while the best round so far has this rank.</summary>
-    public static int RerollLimit(this DifficultyOptions options, DifficultyRank rank) => rank switch
+    public static int RerollLimit(this DifficultyOptions options, DifficultyRank rank, bool regular = false) => (rank, regular) switch
     {
-        DifficultyRank.C => options.RerollsC,
-        DifficultyRank.B => options.RerollsB,
-        DifficultyRank.A => options.RerollsA,
-        DifficultyRank.S => options.RerollsS,
+        (DifficultyRank.C, false) => options.RerollsC,
+        (DifficultyRank.B, false) => options.RerollsB,
+        (DifficultyRank.A, false) => options.RerollsA,
+        (DifficultyRank.S, false) => options.RerollsS,
+        (DifficultyRank.C, true) => options.RegularRerollsC,
+        (DifficultyRank.B, true) => options.RegularRerollsB,
+        (DifficultyRank.A, true) => options.RegularRerollsA,
+        (DifficultyRank.S, true) => options.RegularRerollsS,
         _ => 0,
     };
 

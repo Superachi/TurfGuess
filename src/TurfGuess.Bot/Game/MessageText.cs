@@ -58,14 +58,15 @@ public static class MessageText
     /// <summary>
     /// The round message. <paramref name="voters"/> are the players who voted, in display order
     /// (a 🎲 marks those betting), or null to leave the voter line out (Game:ShowVoteCount off).
-    /// Only who voted and who bets, never what they picked.
+    /// Only who voted and who bets, never what they picked. An open regular battle leaves out its rank.
     /// </summary>
     public static string RoundDescription(RoundRecord round, IReadOnlyList<Voter>? voters, bool closed,
         int maxListed = MaxListedVoters, int limit = EmbedDescriptionLimit, DifficultyOptions? difficulty = null)
     {
         var sb = new StringBuilder();
         sb.Append(closed ? "**Voting is closed.** The results are below.\n\n" : "Which team do you think painted more? Cast your vote!\n\n");
-        sb.Append(DifficultyLine(round, difficulty)).Append('\n');
+        // A regular battle keeps its rank secret until the reveal; a ranked round shows it, as it sets the points.
+        if (round.Kind != RoundKind.Regular || closed) sb.Append(DifficultyLine(round, difficulty)).Append('\n');
         sb.Append(round.Kind == RoundKind.Regular ? BattleLine(round) : PointsLine(round, difficulty));
         if (!closed) sb.Append($"\nResults <t:{round.RevealAt}:R> (<t:{round.RevealAt}:f>).");
 
@@ -211,9 +212,9 @@ public static class MessageText
     /// disabled, so nobody is pinged). Each list is cut off at <paramref name="maxListed"/> names and
     /// the whole text is kept within <paramref name="limit"/> characters.
     /// </summary>
-    public static string Reveal(RoundRecord round, RevealSummary s, int maxListed, int limit = DiscordMessageLimit)
+    public static string Reveal(RoundRecord round, RevealSummary s, int maxListed, int limit = DiscordMessageLimit, DifficultyOptions? difficulty = null)
     {
-        if (round.Kind == RoundKind.Regular) return BattleReveal(round, s, maxListed, limit);
+        if (round.Kind == RoundKind.Regular) return BattleReveal(round, s, maxListed, limit, difficulty);
         var w = round.WinnerSide;
         var l = Side.Left;
         var r = Side.Right;
@@ -258,8 +259,11 @@ public static class MessageText
         return sb.ToString();
     }
 
-    /// <summary>The reveal of a regular battle: who was right and wrong, no points and no standings.</summary>
-    private static string BattleReveal(RoundRecord round, RevealSummary s, int maxListed, int limit)
+    /// <summary>
+    /// The reveal of a regular battle: who was right and wrong, no points and no standings. It overwrites
+    /// the battle message, so it is also where the rank, hidden while voting, finally shows.
+    /// </summary>
+    private static string BattleReveal(RoundRecord round, RevealSummary s, int maxListed, int limit, DifficultyOptions? difficulty)
     {
         var w = round.WinnerSide;
         var l = Side.Left;
@@ -272,7 +276,7 @@ public static class MessageText
         sb.Append($"{Pct(round.Unpainted)} unpainted\n");
         sb.Append($"Votes: {round.TeamEmoji(l)} {s.LeftVotes} · {round.TeamEmoji(r)} {s.RightVotes}\n\n");
 
-        const string footer = $"\n{RegularEmoji} Regular Battle · no points awarded";
+        string footer = $"\n{RegularEmoji} Regular Battle · {DifficultyLine(round, difficulty)} · no points awarded";
         if (s.Winners.Count == 0 && s.Losers.Count == 0)
         {
             sb.Append("Nobody voted this battle.");

@@ -214,6 +214,15 @@ public class BattleTests
     }
 
     [Fact]
+    public void Regular_battle_hides_its_rank_until_the_reveal_but_ranked_shows_it()
+    {
+        Assert.DoesNotContain("Rank", MessageText.RoundDescription(Round(RoundKind.Regular), [], closed: false));
+        Assert.Contains("Rank", MessageText.RoundDescription(Round(RoundKind.Regular), [], closed: true));
+        Assert.Contains("🐟", MessageText.Reveal(Round(RoundKind.Regular), new RevealSummary(0, 0, [], [], []), 50));
+        Assert.Contains("Rank", MessageText.RoundDescription(Round(RoundKind.Ranked), [], closed: false));
+    }
+
+    [Fact]
     public void Battle_message_says_there_are_no_points_and_offers_no_bet()
     {
         string text = MessageText.RoundDescription(Round(RoundKind.Regular), [], closed: false);

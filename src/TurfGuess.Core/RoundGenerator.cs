@@ -30,15 +30,15 @@ public static class RoundGenerator
     /// from the seed, so the result stays deterministic) up to the limits in
     /// <see cref="DifficultyOptions"/>. The budget is a total, set by the best rank found so far:
     /// the harder the best round, the fewer rerolls remain. The hardest round wins; ties go to the
-    /// closer winner share.
+    /// closer winner share. A regular battle uses its own, smaller reroll limits.
     /// </summary>
-    public static GeneratedRound Generate(ulong seed, GeneratorOptions options)
+    public static GeneratedRound Generate(ulong seed, GeneratorOptions options, bool regular = false)
     {
         options.Validate();
 
         var best = GenerateOnce(seed, seed, 0, options);
         var bestRank = best.Score.Rank(options.Difficulty);
-        for (int reroll = 1; reroll <= options.Difficulty.RerollLimit(bestRank); reroll++)
+        for (int reroll = 1; reroll <= options.Difficulty.RerollLimit(bestRank, regular); reroll++)
         {
             var candidate = GenerateOnce(seed, Rng.Derive(seed, 0x5EED0000UL + (ulong)reroll), reroll, options);
             var rank = candidate.Score.Rank(options.Difficulty);

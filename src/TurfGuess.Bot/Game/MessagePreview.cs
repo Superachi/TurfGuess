@@ -177,6 +177,7 @@ public static partial class MessagePreview
 
     private static void Section(StringBuilder sb, string title)
     {
+        sb.AppendLine().AppendLine(); // extra space so the messages are easy to tell apart
         sb.AppendLine(title);
         sb.AppendLine(new string('─', Math.Min(title.Length, 72)));
     }

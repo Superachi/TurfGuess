@@ -59,7 +59,8 @@ public static class PaintSimulator
     private const double ChaosGrainAmplitude = 0.12;
     private const double ChaosCutMax = 0.6;           // noise cut-off at intensity 0 (barely any blotches)
     private const double ChaosCutMin = 0.12;          // noise cut-off at intensity 1 (a lot of the arena)
-    private const double RaidStartBand = 1.0;         // raid trails start this close to the front line (score units), on their own side
+    private const double SetPieceChance = 1.0;        // chance per round of a spiral or giant splat
+    private const double RaidStartBand= 1.0;         // raid trails start this close to the front line (score units), on their own side
     private const double RaidCurveMin = 0.015;        // heading drift per step (radians), so trails bend
     private const double RaidCurveMax = 0.035;
     private const double RaidWidthMin = 0.45;         // raid trail base radius range, in cells (wide spread = thickness variance)
@@ -291,6 +292,11 @@ public static class PaintSimulator
             ApplyChaos(new GradientNoise(Rng.Derive(seed, 17)), new GradientNoise(Rng.Derive(seed, 18)), chaos, score, isPainted, floorPixels, pw, p, front);
         }
 
+        // Rarely, one big set piece: a spiral of rings or a huge splat, in either team's ink.
+        var featureRng = new Rng(Rng.Derive(seed, 21));
+        if (featureRng.Chance(SetPieceChance))
+            ApplySetPiece(featureRng, new GradientNoise(Rng.Derive(seed, 22)), score, isPainted, floorPixels, pixelToFloor, pw, ph, p, front);
+
         if (infiltrated != null)
         {
             var holeNoise = new GradientNoise(Rng.Derive(seed, 16));
@@ -455,6 +461,65 @@ public static class PaintSimulator
             {
                 if (isPainted[fi]) score[fi] = splatValue;
             });
+        }
+    }
+
+    /// <summary>
+    /// A rare set piece in one team's ink: either concentric rings drawn as a broken spiral (a player
+    /// circling), or one huge lobed splat with spikes and droplets (a big bomb). Sized relative to the
+    /// arena. Stamped pixels are forced to that team's side; the final quantile keeps the shares exact.
+    /// </summary>
+    private static void ApplySetPiece(Rng rng, GradientNoise breakup, float[] score, bool[] isPainted, List<int> floorPixels,
+        int[] pixelToFloor, int pw, int ph, int p, float front)
+    {
+        int centre = -1;
+        for (int t = 0; t < 200 && centre < 0; t++)
+        {
+            int i = rng.Next(0, floorPixels.Count);
+            if (isPainted[i]) centre = floorPixels[i];
+        }
+        if (centre < 0) return;
+
+        double cx = centre % pw, cy = centre / pw;
+        double scale = Math.Min(pw, ph);
+        float value = (float)(front + (rng.Chance(0.5) ? 1 : -1) * SplatStrength);
+        var cut = new[] { 0.1 };
+        var ink = BrokenInk(breakup, score, isPainted, floorPixels, pw, p, value, cut);
+
+        if (rng.Chance(0.5))
+        {
+            // Spiral: radius grows linearly with angle; ring spacing is a few stroke widths.
+            double maxR = scale * rng.Range(0.09, 0.15);
+            double stroke = maxR * rng.Range(0.035, 0.05);
+            double spacing = stroke * rng.Range(3.2, 4.2);
+            double turns = maxR / spacing;
+            double phase = rng.Range(0, 2 * Math.PI);
+            double stepAngle = 0.9 * stroke / maxR; // small enough that the line is continuous at the rim
+            for (double a = 0; a < turns * 2 * Math.PI; a += stepAngle)
+            {
+                double r = a / (2 * Math.PI) * spacing;
+                double w = stroke * rng.Range(0.8, 1.3);
+                StampSplat(rng, cx + Math.Cos(a + phase) * r, cy + Math.Sin(a + phase) * r, w, 0, 1, pw, ph, pixelToFloor, ink);
+            }
+        }
+        else
+        {
+            // Big splat: a fat blob, long thin spikes ending in knobs, and scattered droplets.
+            double radius = scale * rng.Range(0.07, 0.11);
+            StampSplat(rng, cx, cy, radius, 4, 10, pw, ph, pixelToFloor, fi => ink(fi));
+            int spikes = rng.Next(4, 8);
+            for (int s = 0; s < spikes; s++)
+            {
+                double ang = rng.Range(0, 2 * Math.PI);
+                double len = radius * rng.Range(1.2, 1.9);
+                double w = radius * rng.Range(0.08, 0.14);
+                for (double d = radius * 0.6; d < len; d += w * 0.7)
+                {
+                    double taper = 1 - 0.5 * (d / len);
+                    StampSplat(rng, cx + Math.Cos(ang) * d, cy + Math.Sin(ang) * d, w * taper, 0, 1, pw, ph, pixelToFloor, ink);
+                }
+                StampSplat(rng, cx + Math.Cos(ang) * len, cy + Math.Sin(ang) * len, w * 1.6, 0, 1, pw, ph, pixelToFloor, ink);
+            }
         }
     }
 

@@ -27,7 +27,8 @@ public static class ColorPairs
         Pair("Silver", "#D2D7E0", "🤍", "Gold", "#D4AF37", "💛"),
         Pair("Blue", "#343BC4", "💙", "Pink", "#E0559A", "❤️"),
         Pair("Scarlet", "#E0282E", "❤️", "Blue", "#343BC4", "💙"),
-        Pair("Black", "#1C1C22", "🖤", "White", "#F5F5F5", "🤍"),
+        // Temporarily out of rotation: black is unreadable on the dark results bar.
+        // Pair("Black", "#1C1C22", "🖤", "White", "#F5F5F5", "🤍"),
         Pair("Dark Green", "#1C5B38", "💚", "Orange", "#DE6624", "🧡"),
     ];
 

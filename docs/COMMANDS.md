@@ -33,7 +33,7 @@ The bot DMs you a short, self-contained summary, so it still makes sense if the 
 You picked 🔴 Reds · 🎲 bet on · +6 points
 ```
 
-Ranked rounds show whether you bet and the points you gained or lost (`~` means no change). Regular battles end with "no points awarded" instead.
+Ranked rounds show whether you bet and the points you gained or lost (a bet that lost nothing, or a wrong guess without a bet, shows "no change in points"). Regular battles end with "no points awarded" instead.
 
 ### Events that send you a DM
 

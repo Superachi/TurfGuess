@@ -334,7 +334,7 @@ public static class MessageText
         sb.Append($"{Pct(round.Unpainted)} unpainted\n");
         sb.Append($"You picked {round.TeamEmoji(picked)} {round.TeamName(picked)}");
         if (delta is { } d)
-            sb.Append($" · {(bet ? "🎲 bet on" : "no bet")} · {Signed(d)} points");
+            sb.Append($" · {(bet ? "🎲 bet on" : "no bet")} · {(d == 0 ? "no change in points" : $"{Signed(d)} points")}");
         else
             sb.Append(" · no points awarded");
         return sb.ToString();

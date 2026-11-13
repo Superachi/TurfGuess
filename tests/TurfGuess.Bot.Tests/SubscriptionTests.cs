@@ -56,7 +56,7 @@ public class SubscriptionTests
         Assert.Contains(round.TeamName(winner), ann);
         var bo = env.Notifier.Sent.Single(s => s.UserId == 2).Text;
         Assert.Contains("You guessed wrong.", bo);
-        Assert.Contains("~ points", bo);
+        Assert.Contains("no change in points", bo);
     }
 
     [Fact]

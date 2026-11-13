@@ -81,15 +81,15 @@ public static partial class MessagePreview
         sb.AppendLine();
 
         Section(sb, "2. Vote confirmation (only the voter sees this)");
-        sb.AppendLine(Show(MessageText.VoteAccepted(round, Side.Left)));
-        sb.AppendLine(Show(MessageText.VoteAccepted(round, Side.Left, bet: true, difficulty: options.Generator.Difficulty)));
-        sb.AppendLine();
+        Messages(sb,
+            Show(MessageText.VoteAccepted(round, Side.Left)),
+            Show(MessageText.VoteAccepted(round, Side.Left, bet: true, difficulty: options.Generator.Difficulty)));
 
         Section(sb, "2b. Pressing the Bet button (only the player sees this)");
-        sb.AppendLine(Show(MessageText.BetToggled(round, bet: true, hasVoted: true, options.Generator.Difficulty)));
-        sb.AppendLine(Show(MessageText.BetToggled(round, bet: true, hasVoted: false, options.Generator.Difficulty)));
-        sb.AppendLine(Show(MessageText.BetToggled(round, bet: false, hasVoted: true, options.Generator.Difficulty)));
-        sb.AppendLine();
+        Messages(sb,
+            Show(MessageText.BetToggled(round, bet: true, hasVoted: true, options.Generator.Difficulty)),
+            Show(MessageText.BetToggled(round, bet: true, hasVoted: false, options.Generator.Difficulty)),
+            Show(MessageText.BetToggled(round, bet: false, hasVoted: true, options.Generator.Difficulty)));
 
         Section(sb, "3. Round message, live voter list (edited at most every " +
                     $"{options.Discord.VoteCountInterval.TotalSeconds:0} s)");
@@ -139,10 +139,10 @@ public static partial class MessagePreview
         var battleSummary = new RevealSummary(summary.LeftVotes, summary.RightVotes, battleWinners, battleLosers, []);
 
         Section(sb, "8. /turf battle (only the caller sees these replies)");
-        sb.AppendLine(Show(MessageText.BattleStarted(battle, started: true)));
-        sb.AppendLine(Show(MessageText.BattleStarted(battle, started: false)) + "  (the command is disabled while a battle runs)");
-        sb.AppendLine(Show(MessageText.BattleReusedMessage(battle, "https://discord.com/channels/1/2/3")) + "  (today's battle message was reset)");
-        sb.AppendLine();
+        Messages(sb,
+            Show(MessageText.BattleStarted(battle, started: true)),
+            Show(MessageText.BattleStarted(battle, started: false)) + "  (the command is disabled while a battle runs)",
+            Show(MessageText.BattleReusedMessage(battle, "https://discord.com/channels/1/2/3")) + "  (today's battle message was reset)");
 
         Section(sb, "9. Regular Battle message (15 minutes, not scored, no Bet button)");
         Embed(sb, MessageText.RoundTitle(battle),
@@ -164,14 +164,37 @@ public static partial class MessagePreview
         Embed(sb, null, Show(MessageText.Reveal(battle, battleSummary, options.Game.MaxListedWinners)),
             $"reveal_{battle.Id}.png", MessageText.RevealFooter(battle));
         sb.AppendLine($"Buttons: [ {MessageText.BattleResetButtonEmoji} {MessageText.BattleResetButtonLabel} ]  (the reveal is written over the battle's own message)");
-        sb.AppendLine(Show(MessageText.BattleAlreadyRunning(battle)) + "  (pressing Reset while a battle runs)");
-        sb.AppendLine(MessageText.BattleSettingUp + "  (Reset or /turf battle pressed while a battle is being drawn; the message shows a disabled [ " + MessageText.BattleSettingUpLabel + " ] button meanwhile)");
         sb.AppendLine();
+        Messages(sb,
+            Show(MessageText.BattleAlreadyRunning(battle)) + "  (pressing Reset while a battle runs)",
+            MessageText.BattleSettingUp + "  (Reset or /turf battle pressed while a battle is being drawn; the message shows a disabled [ " + MessageText.BattleSettingUpLabel + " ] button meanwhile)");
 
         Section(sb, "11. /turf battle-reveal or the Reveal button (only the caller sees these replies)");
-        sb.AppendLine(MessageText.BattleRevealing);
-        sb.AppendLine(MessageText.BattleRevealNotAllowed);
-        sb.AppendLine(MessageText.NoBattleRunning);
+        Messages(sb, MessageText.BattleRevealing, MessageText.BattleRevealNotAllowed, MessageText.NoBattleRunning);
+
+        Section(sb, "12. /turf subscribe and /turf unsubscribe (only the caller sees these replies)");
+        Messages(sb,
+            MessageText.SubscribeConfirmation,
+            MessageText.SubscribeNoDms + "  (when the test message couldn't be delivered)",
+            MessageText.AlreadySubscribed,
+            MessageText.Unsubscribed,
+            MessageText.NotSubscribed);
+
+        Section(sb, "13. Direct messages to subscribers");
+        sb.AppendLine("Right after subscribing:");
+        sb.AppendLine(MessageText.SubscribeTestMessage);
+        sb.AppendLine();
+        sb.AppendLine("Ranked round, guessed right with a bet:");
+        sb.AppendLine(Show(MessageText.RevealPing(round, winner, correct: true, bet: true, winners[0].Delta)));
+        sb.AppendLine();
+        sb.AppendLine("Ranked round, guessed wrong with a bet:");
+        sb.AppendLine(Show(MessageText.RevealPing(round, winner.Opposite(), correct: false, bet: true, losers[1].Delta)));
+        sb.AppendLine();
+        sb.AppendLine("Ranked round, guessed wrong without a bet:");
+        sb.AppendLine(Show(MessageText.RevealPing(round, winner.Opposite(), correct: false, bet: false, losers[0].Delta)));
+        sb.AppendLine();
+        sb.AppendLine("Regular battle, guessed right:");
+        sb.AppendLine(Show(MessageText.RevealPing(battle, winner, correct: true, bet: false, delta: null)));
 
         return sb.ToString();
     }
@@ -181,6 +204,12 @@ public static partial class MessagePreview
         sb.AppendLine().AppendLine(); // extra space so the messages are easy to tell apart
         sb.AppendLine(title);
         sb.AppendLine(new string('─', Math.Min(title.Length, 72)));
+    }
+
+    /// <summary>Writes separate messages with a blank line between them, and one after the last.</summary>
+    private static void Messages(StringBuilder sb, params string[] messages)
+    {
+        foreach (var message in messages) sb.AppendLine(message).AppendLine();
     }
 
     private static void Embed(StringBuilder sb, string? title, string description, string image, string footer, string? timestamp = null)

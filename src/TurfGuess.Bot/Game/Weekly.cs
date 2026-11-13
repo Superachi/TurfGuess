@@ -7,6 +7,12 @@ namespace TurfGuess.Bot.Game;
 public sealed record StandingEntry(ulong UserId, int Points, int Wins);
 
 /// <summary>
+/// One player's all-time record: weekly trophies, and right/wrong guesses in revealed ranked and regular
+/// rounds (a "win" is a correct guess). Rounds an admin cancelled never count.
+/// </summary>
+public sealed record AllTimeEntry(ulong UserId, int Trophies, int RankedWins, int RankedLosses, int RegularWins, int RegularLosses);
+
+/// <summary>
 /// A player who voted, and whether they placed a bet. <see cref="Choice"/> is only filled in for
 /// regular battles with public votes; otherwise it stays null and the team they picked is never shown.
 /// </summary>

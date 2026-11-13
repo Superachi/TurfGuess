@@ -79,6 +79,30 @@ public sealed class ScoreRepository(Database db)
             """, new { weekStart }).Select(r => new StandingEntry((ulong)r.UserId, (int)r.Points, (int)r.Wins)).ToList();
     }
 
+    /// <summary>
+    /// Everyone who ever voted in a revealed round, best first: trophies, then ranked wins, then regular wins.
+    /// Wins and losses come straight from the votes, so they cover rounds from before this was shown and
+    /// survive a wipe of the weekly scores. Cancelled rounds (no reveal message) are left out.
+    /// </summary>
+    public IReadOnlyList<AllTimeEntry> AllTime()
+    {
+        using var c = db.Open();
+        return c.Query<(long UserId, long Trophies, long RankedWins, long RankedLosses, long RegularWins, long RegularLosses)>("""
+            SELECT v.user_id AS UserId,
+                   (SELECT COUNT(*) FROM weekly_winners w WHERE w.user_id = v.user_id) AS Trophies,
+                   COALESCE(SUM(r.kind = 'Ranked'  AND v.choice =  r.winner), 0) AS RankedWins,
+                   COALESCE(SUM(r.kind = 'Ranked'  AND v.choice <> r.winner), 0) AS RankedLosses,
+                   COALESCE(SUM(r.kind = 'Regular' AND v.choice =  r.winner), 0) AS RegularWins,
+                   COALESCE(SUM(r.kind = 'Regular' AND v.choice <> r.winner), 0) AS RegularLosses
+            FROM votes v
+            JOIN rounds r ON r.id = v.round_id
+            WHERE r.status = 'Done' AND r.reveal_message_id IS NOT NULL
+            GROUP BY v.user_id
+            ORDER BY Trophies DESC, RankedWins DESC, RegularWins DESC, v.user_id
+            """).Select(x => new AllTimeEntry((ulong)x.UserId, (int)x.Trophies, (int)x.RankedWins, (int)x.RankedLosses,
+                (int)x.RegularWins, (int)x.RegularLosses)).ToList();
+    }
+
     /// <summary>Weeks before <paramref name="weekStart"/> that have results but no summary yet, oldest first.</summary>
     public IReadOnlyList<string> UnclosedWeeksBefore(string weekStart)
     {

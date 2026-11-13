@@ -370,6 +370,51 @@ public static class MessageText
         return sb.ToString();
     }
 
+    /// <summary>Most characters of a standings list; Discord allows 2000 per message.</summary>
+    private const int ListBudget = 1900;
+
+    /// <summary>The current week's standings for <c>/turf standings</c>, as many players as fit in one message.</summary>
+    public static string WeeklyStandings(string weekStart, IReadOnlyList<StandingEntry> standings)
+    {
+        string title = $"📊 **Weekly standings · Week {Weekly.WeekNumber(weekStart)}**";
+        if (standings.Count == 0) return $"{title}{'\n'}Nobody has scored yet this week.";
+
+        var leaders = Weekly.WeekWinners(standings);
+        var lines = standings.Select((e, i) =>
+            $"{i + 1}. {(leaders.Contains(e) ? "🏆 " : "")}<@{e.UserId}> {Plural(e.Points, "pt")} · {Plural(e.Wins, "win")}").ToList();
+        return Standings(title, lines);
+    }
+
+    /// <summary>The all-time standings for <c>/turf all-time</c>: trophies and the ranked and regular win/loss record.</summary>
+    public static string AllTimeStandings(IReadOnlyList<AllTimeEntry> entries)
+    {
+        const string title = "🏛️ **All-time standings**";
+        if (entries.Count == 0) return $"{title}{'\n'}No round has been revealed yet.";
+
+        var lines = entries.Select((e, i) =>
+            $"{i + 1}. <@{e.UserId}> 🏆 {e.Trophies} · {RankedEmoji} {Record(e.RankedWins, e.RankedLosses)} · {RegularEmoji} {Record(e.RegularWins, e.RegularLosses)}").ToList();
+        return Standings(title, lines) + "\n-# 🏆 weekly trophies · wins–losses (win rate) in guesses";
+    }
+
+    /// <summary>"6W–2L (75%)", or "–" for a player who never played that kind.</summary>
+    public static string Record(int wins, int losses) =>
+        wins + losses == 0 ? "–" : $"{wins}W–{losses}L ({100 * wins / (wins + losses)}%)";
+
+    /// <summary>A title and as many lines as fit; whoever is left out is counted.</summary>
+    private static string Standings(string title, IReadOnlyList<string> lines)
+    {
+        var sb = new StringBuilder(title);
+        int shown = 0;
+        foreach (var line in lines)
+        {
+            if (sb.Length + 1 + line.Length > ListBudget) break;
+            sb.Append('\n').Append(line);
+            shown++;
+        }
+        if (shown < lines.Count) sb.Append($"\n…and {lines.Count - shown} more");
+        return sb.ToString();
+    }
+
     /// <summary>The message after the first reveal of a new week. Null when nobody scored that week.</summary>
     public static string? WeekSummary(string weekStart, IReadOnlyList<StandingEntry> winners)
     {

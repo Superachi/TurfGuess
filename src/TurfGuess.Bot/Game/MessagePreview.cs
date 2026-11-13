@@ -194,6 +194,17 @@ public static partial class MessagePreview
         sb.AppendLine("Regular battle, guessed right:");
         Card(sb, MessageText.RevealPing(battle, correct: true, bet: false, delta: null, SampleRevealMessageId), Show);
 
+        Section(sb, "14. /turf standings and /turf all-time (only the caller sees these replies)");
+        sb.AppendLine(Show(MessageText.WeeklyStandings("2026-11-02", standings)));
+        sb.AppendLine();
+        sb.AppendLine(Show(MessageText.AllTimeStandings(
+        [
+            new AllTimeEntry(ids[0], 3, 21, 9, 6, 2),
+            new AllTimeEntry(ids[1], 1, 18, 12, 0, 0),
+            new AllTimeEntry(ids[2], 0, 4, 6, 9, 3),
+        ])));
+        sb.AppendLine();
+
         return sb.ToString();
     }
 

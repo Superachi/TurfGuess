@@ -20,6 +20,7 @@ public sealed class BattleModule(
     IRoundChannel channelPosts,
     SchedulerSignal scheduler,
     SubscriptionRepository subscriptions,
+    ScoreRepository scores,
     IPlayerNotifier notifier,
     TimeProvider clock,
     BotOptions options,
@@ -208,6 +209,17 @@ public sealed class BattleModule(
         await RespondAsync($"Regular Battles are played in <#{options.Discord.ChannelId}>. Use this command there.", ephemeral: true);
         return true;
     }
+
+    [SlashCommand("standings", "Show this week's standings (only you see it).")]
+    public async Task StandingsAsync()
+    {
+        string week = Weekly.WeekStart(clock.GetUtcNow(), options.Game.ParsedTimeZone);
+        await RespondAsync(MessageText.WeeklyStandings(week, scores.Standings(week)), ephemeral: true, allowedMentions: AllowedMentions.None);
+    }
+
+    [SlashCommand("all-time", "Show everyone's weekly trophies and ranked and regular battle record (only you see it).")]
+    public async Task AllTimeAsync() =>
+        await RespondAsync(MessageText.AllTimeStandings(scores.AllTime()), ephemeral: true, allowedMentions: AllowedMentions.None);
 
     [SlashCommand("subscribe", "Get a private message with your result after every round you voted in.")]
     public async Task SubscribeAsync()

@@ -115,6 +115,8 @@ public static class MessageText
     public static string BattleRevealButtonId(long roundId) => $"battle-reveal:{roundId}";
     public static string BattleResetButtonId(long roundId) => $"battle-reset:{roundId}";
     public const string BattleRevealButtonLabel = "Reveal";
+    public const string BattleSettingUpLabel = "Setting up…";
+    public const string BattleSettingUp = "⏳ BATTLE TIME! Inklings are currently participating in battle. Please take cover and wait for the match to be over.";
     public const string BattleResetButtonLabel = "Reset";
     public const string BattleResetButtonEmoji = "🔁";
     public const string BattleResetting = "Setting up a fresh Regular Battle…";

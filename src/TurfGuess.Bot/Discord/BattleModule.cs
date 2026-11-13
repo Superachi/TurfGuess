@@ -27,6 +27,11 @@ public sealed class BattleModule(
         [Summary("show-votes", "Show who voted for which team while the battle is running (default: no)")] bool showVotes = false)
     {
         if (await WrongChannelAsync()) return;
+        if (!TryBeginSetup())
+        {
+            await RespondAsync(MessageText.BattleSettingUp, ephemeral: true);
+            return;
+        }
 
         await DeferAsync(ephemeral: true);
         try
@@ -53,6 +58,7 @@ public sealed class BattleModule(
             scheduler.Wake(); // a round that was created but not posted is retried by the scheduler
             await FollowupAsync("Couldn't start the Regular Battle. Please try again in a moment.", ephemeral: true);
         }
+        finally { EndSetup(); }
     }
 
     [SlashCommand("battle-reveal", "Reveal the running Regular Battle now. Only the player who started it, or an admin.")]
@@ -119,7 +125,24 @@ public sealed class BattleModule(
     [ComponentInteraction("battle-reset:*", ignoreGroupNames: true)]
     public async Task ResetButtonAsync(string roundIdText)
     {
-        ulong messageId = ((SocketMessageComponent)Context.Interaction).Message.Id;
+        // Rendering a battle takes a while. While one is being set up, further presses only get a hint to wait.
+        if (!TryBeginSetup())
+        {
+            await RespondAsync(MessageText.BattleSettingUp, ephemeral: true);
+            return;
+        }
+
+        try
+        {
+            await ResetAsync(roundIdText);
+        }
+        finally { EndSetup(); }
+    }
+
+    private async Task ResetAsync(string roundIdText)
+    {
+        var component = (SocketMessageComponent)Context.Interaction;
+        ulong messageId = component.Message.Id;
         var running = repo.GetActive(RoundKind.Regular);
         if (running is not null)
         {
@@ -129,7 +152,10 @@ public sealed class BattleModule(
 
         bool showVotes = long.TryParse(roundIdText, out long oldId) && repo.Get(oldId)?.ShowVotes == true;
 
-        await DeferAsync();
+        // Show a disabled "Setting up…" button right away and tell the presser (privately) to wait.
+        await component.UpdateAsync(p => p.Components = new ComponentBuilder()
+            .WithButton(MessageText.BattleSettingUpLabel, "battle-setting-up", ButtonStyle.Secondary, disabled: true).Build());
+        await FollowupAsync(MessageText.BattleSettingUp, ephemeral: true);
         try
         {
             var (round, started) = await rounds.StartBattleAsync(Context.User.Id, showVotes, clock.GetUtcNow(), default, messageId);
@@ -141,6 +167,13 @@ public sealed class BattleModule(
         {
             logger.LogError(ex, "Resetting the Regular Battle for {UserName} ({UserId}) failed.", Context.User.Username, Context.User.Id);
             scheduler.Wake();
+            try
+            {
+                await ModifyOriginalResponseAsync(p => p.Components = new ComponentBuilder()
+                    .WithButton(MessageText.BattleResetButtonLabel, MessageText.BattleResetButtonId(long.TryParse(roundIdText, out long id) ? id : 0),
+                        ButtonStyle.Success, emote: new Emoji(MessageText.BattleResetButtonEmoji)).Build());
+            }
+            catch (Exception restore) { logger.LogWarning(restore, "Couldn't restore the Reset button on message {MessageId}.", messageId); }
             await FollowupAsync("Couldn't reset the Regular Battle. Please try again in a moment.", ephemeral: true);
         }
     }
@@ -153,6 +186,11 @@ public sealed class BattleModule(
         if (Context.Interaction.HasResponded) await FollowupAsync(text, ephemeral: true);
         else await RespondAsync(text, ephemeral: true);
     }
+
+    // One battle is set up at a time; presses and commands that arrive meanwhile are told to wait.
+    private static int _settingUp;
+    private static bool TryBeginSetup() => Interlocked.CompareExchange(ref _settingUp, 1, 0) == 0;
+    private static void EndSetup() => Interlocked.Exchange(ref _settingUp, 0);
 
     private bool SameLocalDay(DateTimeOffset a, DateTimeOffset b)
     {

@@ -165,6 +165,7 @@ public static partial class MessagePreview
             $"reveal_{battle.Id}.png", MessageText.RevealFooter(battle));
         sb.AppendLine($"Buttons: [ {MessageText.BattleResetButtonEmoji} {MessageText.BattleResetButtonLabel} ]  (the reveal is written over the battle's own message)");
         sb.AppendLine(Show(MessageText.BattleAlreadyRunning(battle)) + "  (pressing Reset while a battle runs)");
+        sb.AppendLine(MessageText.BattleSettingUp + "  (Reset or /turf battle pressed while a battle is being drawn; the message shows a disabled [ " + MessageText.BattleSettingUpLabel + " ] button meanwhile)");
         sb.AppendLine();
 
         Section(sb, "11. /turf battle-reveal or the Reveal button (only the caller sees these replies)");

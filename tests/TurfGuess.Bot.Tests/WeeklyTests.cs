@@ -247,3 +247,98 @@ public class WeeklyRoundTests
         Assert.Single(env.Channel.WeekSummaries);
     }
 }
+
+public class WeeklyLoopSimulationTests
+{
+    private static readonly TimeZoneInfo Amsterdam = TimeZoneInfo.FindSystemTimeZoneById("Europe/Amsterdam");
+
+    private static DateTimeOffset At(DateTime localDate, int hour)
+    {
+        var dt = localDate.Date.AddHours(hour);
+        return new DateTimeOffset(dt, Amsterdam.GetUtcOffset(dt));
+    }
+
+    /// <summary>What a scripted player does on reveal number <c>day</c> (0 = Monday 2 November): vote correctly or not, and bet or not. Null = skips the round.</summary>
+    private static (bool Correct, bool Bet)? Script(ulong player, int day) => player switch
+    {
+        1 => (true, false),                                   // always right, never bets
+        2 => (day % 2 == 0, true),                            // always bets, right every other day
+        3 => (day % 3 == 0, day % 3 == 1),                    // bets only on days it gets wrong
+        4 => day % 7 >= 5 ? (day % 2 == 0, day % 4 == 0) : null, // weekends only
+        _ => null,
+    };
+
+    /// <summary>
+    /// Plays three weeks of rounds with four scripted players against a plain model of the rules,
+    /// checking the standings after every reveal, the weekly summaries and the trophy tally.
+    /// </summary>
+    [Fact]
+    public async Task Three_weeks_of_rounds_match_a_plain_model_of_the_rules()
+    {
+        using var env = new TestEnvironment();
+        var monday = new DateTime(2026, 11, 2);
+        await env.Rounds.AdvanceAsync(At(monday.AddDays(-1), 12), default); // Sunday: round 1 opens, revealed Monday 09:00
+
+        var players = new ulong[] { 1, 2, 3, 4 };
+        var score = new Dictionary<ulong, int>();
+        var wins = new Dictionary<ulong, int>();
+        var trophies = players.ToDictionary(p => p, _ => 0);
+        int summariesExpected = 0;
+        int lastWeek = 0;
+
+        for (int day = 0; day < 15; day++) // Monday 2 Nov … Monday 16 Nov: three weeks, the last with one round
+        {
+            int week = day / 7;
+            if (week != lastWeek)
+            {
+                // The new week's first reveal also announces the old week. Work out who should have won it.
+                var best = players.Where(p => score.GetValueOrDefault(p) > 0)
+                    .GroupBy(p => (Points: score[p], Wins: wins[p])).OrderByDescending(g => g.Key.Points).ThenByDescending(g => g.Key.Wins)
+                    .FirstOrDefault();
+                if (best is not null)
+                {
+                    summariesExpected++;
+                    foreach (var p in best) trophies[p]++;
+                }
+                score.Clear();
+                wins.Clear();
+                lastWeek = week;
+            }
+
+            var round = env.Repo.GetActive()!;
+            int points = MessageText.PointsFor(round, env.Options.Generator.Difficulty);
+
+            foreach (var p in players)
+            {
+                if (Script(p, day) is not var (correct, bet)) continue;
+                env.Votes.Cast(round.Id, p, "player" + p, correct ? round.WinnerSide : round.WinnerSide.Opposite());
+                if (bet) env.Votes.ToggleBet(round.Id, p, "player" + p);
+
+                int raw = correct ? (bet ? 2 * points : points) : (bet ? -points : 0);
+                score[p] = Math.Max(0, score.GetValueOrDefault(p) + raw);
+                if (correct) wins[p] = wins.GetValueOrDefault(p) + 1;
+            }
+
+            await env.Rounds.AdvanceAsync(At(monday.AddDays(day), 9), default);
+
+            var (_, reveal) = env.Channel.Reveals.Last();
+            var expected = score.Keys
+                .OrderByDescending(p => score[p]).ThenByDescending(p => wins.GetValueOrDefault(p)).ThenBy(p => p)
+                .Select(p => new StandingEntry(p, score[p], wins.GetValueOrDefault(p))).ToList();
+            Assert.Equal(expected, reveal.Standings);
+            Assert.True(reveal.Standings.All(s => s.Points >= 0));
+            Assert.Equal(summariesExpected, env.Channel.WeekSummaries.Count);
+        }
+
+        Assert.Equal(2, summariesExpected); // weeks 1 and 2 were announced; week 3 is still running
+        Assert.True(env.Channel.WeekSummaries.All(s => s.Contains("is over!") && s.Contains("🏆")));
+        Assert.Contains("Week 45 is over!", env.Channel.WeekSummaries[0]);
+        Assert.Contains("Week 46 is over!", env.Channel.WeekSummaries[1]);
+        foreach (var p in players)
+            Assert.Equal(trophies[p], env.Scores.TrophyCount(p));
+
+        // The summary names exactly the players who got a trophy.
+        foreach (var p in players)
+            Assert.Equal(trophies[p] > 0, env.Channel.WeekSummaries.Any(s => s.Contains($"<@{p}>")));
+    }
+}

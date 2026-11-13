@@ -8,7 +8,7 @@ using TurfGuess.Core.Scoring;
 
 // Usage: dotnet run --project src/TurfGuess.Preview -- [--count 12] [--seed 42] [--out preview] [--ink Flat|Shaded|Marbled] [--outline None|Outside|Inside]
 //        [--ppc 16] [--symmetry Rotate|Mirror] [--no-reveal] [--blind] [--columns 4] [--radius 0.75] [--inner-radius 0.5]
-//        [--neglect-variance 0.6] [--stray-ink 0.4] [--tilt 20] [--raid-trails 4] [--chaos-min 0.5] [--chaos-max 0.9] [--infiltrators 0.5] [--min-share 50.3] [--max-share 52.3] [--no-reroll]
+//        [--neglect-variance 0.6] [--stray-ink 0.4] [--tilt 20] [--raid-trails 4] [--chaos-min 0.5] [--chaos-max 0.9] [--infiltrators 0.5] [--min-share 50.3] [--max-share 52.3] [--no-reroll] [--regular]
 //        dotnet run --project src/TurfGuess.Preview -- --pairs [--seed 42]
 //          [--pairs-file pairs.json] [--pairs-out name.png] [--pairs-full]
 //          renders one map in every color pair -> preview/color_pairs.png
@@ -20,6 +20,7 @@ string outDir = Path.GetFullPath(args_.Str("out", "preview"));
 int columns = args_.Int("columns", 4);
 bool blind = args_.Flag("blind"); // hide the winner and shares from the console and captions; answers go to answers.txt
 bool reveal = !args_.Flag("no-reveal") && !blind;
+bool regular = args_.Flag("regular"); // use the reroll limits of a regular battle instead of a ranked round
 
 var options = new GeneratorOptions();
 options.Paint.PixelsPerCell = args_.Int("ppc", options.Paint.PixelsPerCell);
@@ -80,7 +81,7 @@ for (int i = 0; i < count; i++)
 {
     ulong seed = baseSeed + (ulong)i;
     var sw = Stopwatch.StartNew();
-    var round = RoundGenerator.Generate(seed, options);
+    var round = RoundGenerator.Generate(seed, options, regular);
     var style = ColorPairs.Pick(seed);
     style.Ink = inkStyle;
     style.Outline = outline;

@@ -312,12 +312,12 @@ public static class MessageText
     public const string SubscribeNoDms =
         "🔔 You're subscribed, but I couldn't send you a message. Allow direct messages from server members " +
         "(Server Settings → Privacy Settings), or the results can't reach you.";
-    public const string AlreadySubscribed = "You're already subscribed. Use `/turf unsubscribe` to stop the messages.";
-    public const string Unsubscribed = "🔕 You're unsubscribed. No more result messages.";
-    public const string NotSubscribed = "You weren't subscribed.";
+    public const string AlreadySubscribed = "You're already getting result messages (that's the default). Use `/turf unsubscribe` to stop them.";
+    public const string Unsubscribed = "🔕 You're unsubscribed. No more result messages. Use `/turf subscribe` to get them again.";
+    public const string NotSubscribed = "You were already unsubscribed.";
 
-    /// <summary>The first direct message after subscribing, to check that messages get through.</summary>
-    public const string SubscribeTestMessage = "🔔 You're subscribed to round results. This is where they'll show up.";
+    /// <summary>The first direct message after subscribing again, to check that messages get through.</summary>
+    public const string SubscribeTestMessage = "🔔 You're subscribed to round results again. This is where they'll show up.";
 
     /// <summary>Small print (Discord subtext) at the end of every result message.</summary>
     public const string UnsubscribeFooter = "-# To stop these messages, use /turf unsubscribe in the server.";

@@ -16,21 +16,25 @@ public class SubscriptionTests
     }
 
     [Fact]
-    public void Subscribing_twice_and_unsubscribing_report_what_changed()
+    public void Everyone_is_subscribed_by_default_until_they_opt_out()
     {
         using var env = new TestEnvironment();
-        Assert.True(env.Subscriptions.Subscribe(7, 100));
-        Assert.False(env.Subscriptions.Subscribe(7, 200));
         Assert.True(env.Subscriptions.IsSubscribed(7));
-        Assert.Equal(new HashSet<long> { 7 }, env.Subscriptions.SubscribedAmong([6, 7, 8]));
-        Assert.True(env.Subscriptions.Unsubscribe(7));
-        Assert.False(env.Subscriptions.Unsubscribe(7));
-        Assert.Empty(env.Subscriptions.SubscribedAmong([7]));
+        Assert.False(env.Subscriptions.Subscribe(7));             // already subscribed by default
+        Assert.Equal(new HashSet<long> { 6, 7, 8 }, env.Subscriptions.SubscribedAmong([6, 7, 8]));
+
+        Assert.True(env.Subscriptions.Unsubscribe(7, 100));
+        Assert.False(env.Subscriptions.Unsubscribe(7, 200));      // already opted out
+        Assert.False(env.Subscriptions.IsSubscribed(7));
+        Assert.Equal(new HashSet<long> { 6, 8 }, env.Subscriptions.SubscribedAmong([6, 7, 8]));
         Assert.Empty(env.Subscriptions.SubscribedAmong([]));
+
+        Assert.True(env.Subscriptions.Subscribe(7));              // opted back in
+        Assert.True(env.Subscriptions.IsSubscribed(7));
     }
 
     [Fact]
-    public async Task Ranked_reveal_messages_only_subscribed_voters_with_result_bet_and_points()
+    public async Task Ranked_reveal_messages_every_voter_except_opt_outs_with_result_bet_and_points()
     {
         using var env = new TestEnvironment();
         await env.Rounds.AdvanceAsync(Local(10, 12), default);
@@ -40,10 +44,9 @@ public class SubscriptionTests
 
         env.Votes.Cast(round.Id, 1, "ann", winner);               // right, auto-bet (0 points)
         env.Votes.Cast(round.Id, 2, "bo", winner.Opposite());     // wrong, auto-bet but nothing to lose
-        env.Votes.Cast(round.Id, 3, "cy", winner);                // not subscribed
-        env.Subscriptions.Subscribe(1, 0);
-        env.Subscriptions.Subscribe(2, 0);
-        env.Subscriptions.Subscribe(9, 0);                        // subscribed but didn't vote
+        env.Votes.Cast(round.Id, 3, "cy", winner);                // opted out
+        env.Subscriptions.Unsubscribe(3, 0);
+        // Player 9 never voted, so gets nothing even though they're subscribed by default.
 
         await env.Rounds.AdvanceAsync(Local(11, 9), default);
 
@@ -67,7 +70,6 @@ public class SubscriptionTests
         var now = Local(10, 12);
         var (round, _) = await env.Rounds.StartBattleAsync(1, false, now, default);
         env.Votes.Cast(round.Id, 1, "ann", round.WinnerSide.Opposite());
-        env.Subscriptions.Subscribe(1, 0);
 
         await env.Rounds.AdvanceAsync(now.AddHours(1), default);
 
@@ -87,8 +89,6 @@ public class SubscriptionTests
         var round = env.Repo.GetActive()!;
         env.Votes.Cast(round.Id, 1, "ann", round.WinnerSide);
         env.Votes.Cast(round.Id, 2, "bo", round.WinnerSide);
-        env.Subscriptions.Subscribe(1, 0);
-        env.Subscriptions.Subscribe(2, 0);
         env.Notifier.Unreachable.Add(1);
 
         await env.Rounds.AdvanceAsync(Local(11, 9), default);

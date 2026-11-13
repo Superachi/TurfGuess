@@ -212,7 +212,8 @@ public sealed class BattleModule(
     [SlashCommand("subscribe", "Get a private message with your result after every round you voted in.")]
     public async Task SubscribeAsync()
     {
-        if (!subscriptions.Subscribe((long)Context.User.Id, clock.GetUtcNow().ToUnixTimeSeconds()))
+        // Result messages are on by default; this only does something for a player who opted out.
+        if (!subscriptions.Subscribe((long)Context.User.Id))
         {
             await RespondAsync(MessageText.AlreadySubscribed, ephemeral: true);
             return;
@@ -235,7 +236,7 @@ public sealed class BattleModule(
     [SlashCommand("unsubscribe", "Stop the private result messages.")]
     public async Task UnsubscribeAsync()
     {
-        bool was = subscriptions.Unsubscribe((long)Context.User.Id);
+        bool was = subscriptions.Unsubscribe((long)Context.User.Id, clock.GetUtcNow().ToUnixTimeSeconds());
         if (was) logger.LogInformation("{UserName} ({UserId}) unsubscribed from result messages.", Context.User.Username, Context.User.Id);
         await RespondAsync(was ? MessageText.Unsubscribed : MessageText.NotSubscribed, ephemeral: true);
     }

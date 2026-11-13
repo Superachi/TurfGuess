@@ -59,7 +59,7 @@ public static class PaintSimulator
     private const double RaidCurveMax = 0.035;
     private const double RaidWidthMin = 0.45;         // raid trail base radius range, in cells (wide spread = thickness variance)
     private const double RaidWidthMax = 0.95;
-    private const double RaidTaper = 0.25;            // a raid trail thins by this fraction by its end
+    private const double RaidTaper = 0.3;             // a raid trail thins by this fraction by its end
     private const double RaidEndCut = 0.05;           // break-up cut at the end of a raid trail (lower = more holes)
     private const int RaidAttemptsPerTrail = 6;      // tries per wanted trail before giving up
     private const double RaidPull = 0.01;             // how strongly a raid trail leans toward the enemy spawn

@@ -91,7 +91,7 @@ public sealed class PaintOptions
     /// Long, curving, broken-up trails each team runs through the other team's turf, starting at
     /// its own side of the front line, like players running through the enemy half. 0 = none.
     /// </summary>
-    public int RaidTrailsPerTeam { get; set; } = 8;
+    public int RaidTrailsPerTeam { get; set; } = 6;
 
     /// <summary>
     /// Chance, per team and round, that a player sneaked past the front and painted part of the enemy

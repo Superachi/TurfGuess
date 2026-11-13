@@ -39,6 +39,16 @@ public static class Difficulty
     /// <summary>Points a round of this rank is worth: C = 1 … X = 5.</summary>
     public static int Points(this DifficultyRank rank) => (int)rank + 1;
 
+    /// <summary>Total rerolls allowed while the best round so far has this rank.</summary>
+    public static int RerollLimit(this DifficultyOptions options, DifficultyRank rank) => rank switch
+    {
+        DifficultyRank.C => options.RerollsC,
+        DifficultyRank.B => options.RerollsB,
+        DifficultyRank.A => options.RerollsA,
+        DifficultyRank.S => options.RerollsS,
+        _ => 0,
+    };
+
     /// <summary>The rank for the default difficulty range.</summary>
     public static DifficultyRank RankFor(double winnerShare) => RankFor(winnerShare, new DifficultyOptions());
 

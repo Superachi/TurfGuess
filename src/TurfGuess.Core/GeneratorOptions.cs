@@ -36,6 +36,9 @@ public sealed class GeneratorOptions
         if (Difficulty.MinWinnerShare <= 50 || Difficulty.MaxWinnerShare >= 100 || Difficulty.MinWinnerShare > Difficulty.MaxWinnerShare)
             errors.Add("Difficulty.MinWinnerShare/MaxWinnerShare must satisfy 50 < min <= max < 100.");
 
+        if (Difficulty.RerollsS < 0 || Difficulty.RerollsA < 0 || Difficulty.RerollsB < 0 || Difficulty.RerollsC < 0)
+            errors.Add("Difficulty.Rerolls* must be >= 0.");
+
         if (errors.Count > 0) throw new ArgumentException(string.Join(Environment.NewLine, errors));
     }
 }
@@ -129,4 +132,14 @@ public sealed class DifficultyOptions
     /// <summary>Winner share of the PAINTED floor, in percent. Must be &gt; 50.</summary>
     public double MinWinnerShare { get; set; } = 50.3;
     public double MaxWinnerShare { get; set; } = 52.3;
+
+    /// <summary>
+    /// How many times an easy round may be rerolled, keeping the hardest one found. The limit that
+    /// applies is the one for the best rank found so far (a total, not per rank). S, A, B and C
+    /// default to 3, 5, 8 and 10; X is never rerolled.
+    /// </summary>
+    public int RerollsS { get; set; } = 3;
+    public int RerollsA { get; set; } = 5;
+    public int RerollsB { get; set; } = 8;
+    public int RerollsC { get; set; } = 10;
 }

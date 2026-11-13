@@ -179,6 +179,8 @@ Radii are in cells and must be **below 1**. An opening with radius *r* removes f
 
 `Difficulty.RankFor(winnerShare, range)` (`Scoring/DifficultyRank.cs`) turns `WinnerShare` into a rank shown in the round message. The configured `Difficulty` range `[MinWinnerShare, MaxWinnerShare]` is cut into five equal bands: X is the closest fifth, then S, A, B, and C is the widest fifth. Each rank therefore comes up about one round in five whatever the range is. With the default 50.3–52.3% range that is X under 50.7%, S under 51.1%, A under 51.5%, B under 51.9%, otherwise C. A range with min equal to max always ranks A.
 
+**Rerolls.** `RoundGenerator.Generate` rerolls easy rounds so harder ones are favoured: the budget is C 10, B 8, A 5, S 3, X 0 (`Difficulty.RerollsC/B/A/S`). It is a total, set by the best rank found so far (a C that turns into a B on reroll 3 may go on to reroll 8). Rerolls use sub-seeds derived from the seed, so the stored seed still reproduces the final round. The hardest round is kept; ties go to the closer winner share. `GeneratedRound.Rerolls` tells which reroll won (0 = the original). `GeneratorVersion` is 5.
+
 ### Stage 4: rendering (`Render/MapRenderer.cs`)
 
 `RenderRound` and `RenderReveal` return an `SKBitmap`, and `EncodePng` turns it into PNG bytes. Pixels are written into an `int[]` buffer (RGBA8888) and copied into the bitmap. SkiaSharp is used for text, the banner and encoding.

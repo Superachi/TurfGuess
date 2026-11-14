@@ -78,3 +78,56 @@ public class ChannelTests
             Assert.Contains("/turf-admin " + command, admin);
     }
 }
+
+public class BattleReadyPingTests
+{
+    private static readonly DateTimeOffset Now = new(2026, 11, 11, 10, 0, 0, TimeSpan.Zero);
+
+    [Fact]
+    public async Task The_starter_gets_a_ping_with_a_link_once_the_battle_is_posted()
+    {
+        using var env = new TestEnvironment();
+        var (round, _) = await env.Rounds.StartBattleAsync(42, false, Now, default, channelId: 999);
+
+        var (userId, card) = Assert.Single(env.Notifier.Cards);
+        Assert.Equal(42UL, userId);
+        Assert.Equal((ulong)round.MessageId!, card.LinkedMessageId);
+        Assert.Equal(999UL, card.LinkedChannelId);
+    }
+
+    [Fact]
+    public async Task An_opted_out_starter_gets_no_ping()
+    {
+        using var env = new TestEnvironment();
+        env.Subscriptions.Unsubscribe(42, Now.ToUnixTimeSeconds());
+
+        await env.Rounds.StartBattleAsync(42, false, Now, default);
+
+        Assert.Empty(env.Notifier.Cards);
+    }
+
+    [Fact]
+    public async Task A_refused_second_battle_sends_no_ping()
+    {
+        using var env = new TestEnvironment();
+        await env.Rounds.StartBattleAsync(1, false, Now, default);
+        env.Notifier.Cards.Clear();
+
+        var (_, started) = await env.Rounds.StartBattleAsync(2, false, Now.AddMinutes(1), default);
+
+        Assert.False(started);
+        Assert.Empty(env.Notifier.Cards);
+    }
+
+    [Fact]
+    public async Task Closed_DMs_do_not_break_the_battle()
+    {
+        using var env = new TestEnvironment();
+        env.Notifier.Unreachable.Add(42);
+
+        var (round, started) = await env.Rounds.StartBattleAsync(42, false, Now, default);
+
+        Assert.True(started);
+        Assert.Equal(RoundStatus.Open, round.Status);
+    }
+}

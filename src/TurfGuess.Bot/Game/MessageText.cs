@@ -135,7 +135,7 @@ public static class MessageText
     {
         var sb = new StringBuilder();
         sb.AppendLine("**Turf Guess commands**");
-        sb.AppendLine("`/turf battle [show-votes]`: start a 🔫 Regular Battle in this channel (not scored)");
+        sb.AppendLine("`/turf battle [show-votes]`: start a 🔫 Regular Battle in this channel (not scored); you get a private message when it is ready");
         sb.AppendLine("`/turf battle-reveal`: reveal the running battle now (whoever started it, or an admin)");
         sb.AppendLine("`/turf standings`: this week's standings");
         sb.AppendLine("`/turf all-time`: trophies and ranked and regular battle records");
@@ -362,6 +362,15 @@ public static class MessageText
     public const string OptInButtonLabel = "Turn them back on";
     public const string OptOutButtonEmoji = "🔕";
     public const string OptInButtonEmoji = "🔔";
+
+    public const string BattleReadyLinkLabel = "Go to the battle";
+
+    /// <summary>The private ping to the player who started a Regular Battle once its image is rendered and posted.</summary>
+    public static DirectMessage BattleReadyPing(RoundRecord battle, ulong messageId) => new(
+        RoundTitle(battle),
+        $"🔫 Your battle is ready! Voting is open until <t:{battle.RevealAt}:t> (<t:{battle.RevealAt}:R>).",
+        UnsubscribeFooter, LinkedMessageId: messageId, LinkLabel: BattleReadyLinkLabel, OptOutButton: true,
+        LinkedChannelId: (ulong)battle.ChannelId);
 
     public const string RevealLinkLabel = "Go to the result in the server";
 

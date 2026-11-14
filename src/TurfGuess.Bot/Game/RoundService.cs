@@ -83,9 +83,31 @@ public sealed class RoundService(
             _replaceMessageId = replaceMessageId;
             try { await AdvanceCoreAsync(RoundKind.Regular, now, ct); } // posts it
             finally { _replaceMessageId = null; }
-            return (repo.Get(created.Id) ?? created, true);
+
+            var posted = repo.Get(created.Id) ?? created;
+            await NotifyBattleReadyAsync(posted, ct);
+            return (posted, true);
         }
         finally { _gate.Release(); }
+    }
+
+    /// <summary>
+    /// Tells the player who started a battle that it is up, unless they opted out of private messages.
+    /// Rendering takes a while, so this saves them watching the channel. A failure (closed DMs) never affects the battle.
+    /// </summary>
+    private async Task NotifyBattleReadyAsync(RoundRecord battle, CancellationToken ct)
+    {
+        if (battle.Status != RoundStatus.Open || battle.MessageId is not { } messageId || battle.StartedBy == 0) return;
+        if (!subscriptions.IsSubscribed(battle.StartedBy)) return;
+        try
+        {
+            var message = MessageText.BattleReadyPing(battle, (ulong)messageId);
+            await notifier.SendDirectAsync((ulong)battle.StartedBy, message, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning("Round {RoundId}: couldn't tell {UserId} their battle is ready: {Reason}", battle.Id, battle.StartedBy, ex.Message);
+        }
     }
 
     /// <summary>

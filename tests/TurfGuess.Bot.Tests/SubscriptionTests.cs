@@ -57,7 +57,7 @@ public class SubscriptionTests
         Assert.Contains("🎲 Bet on", ann);
         Assert.Contains($"+{2 * points} points", ann);
         Assert.StartsWith($"{MessageText.RoundTitle(round)}{'\n'}", ann);
-        Assert.Contains($"{round.TeamName(winner)} won with {TurfGuess.Core.Util.Percent.Share(round.WinnerShare)}", ann);
+        Assert.Contains($"{round.TeamName(winner)} won with {TurfGuess.Core.Util.Percent.Share(winner == Side.Left ? round.ShareLeft : round.ShareRight)}", ann);
         var card = env.Notifier.Cards.Single(s => s.UserId == 1).Message;
         Assert.Equal((ulong)env.Repo.Get(round.Id)!.RevealMessageId!.Value, card.LinkedMessageId);
         Assert.Equal(winner == Side.Left ? round.LeftColor : round.RightColor, card.ColorHex);

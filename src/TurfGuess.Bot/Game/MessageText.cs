@@ -391,7 +391,9 @@ public static class MessageText
 
         var sb = new StringBuilder();
         sb.Append(correct ? "✅ **You guessed right!**\n" : "❌ **You guessed wrong.**\n");
-        sb.Append($"{round.TeamEmoji(w)} **{round.TeamName(w)} won with {Pct(round.WinnerShare)}** ");
+        // Both figures are shares of the whole floor, matching the reveal message and image (WinnerShare is
+        // of the painted floor only, so it would not line up with the loser's figure).
+        sb.Append($"{round.TeamEmoji(w)} **{round.TeamName(w)} won with {Pct(w == Side.Left ? round.ShareLeft : round.ShareRight)}** ");
         sb.Append($"vs. {round.TeamEmoji(o)} {round.TeamName(o)} {Pct(o == Side.Left ? round.ShareLeft : round.ShareRight)}");
         if (delta is { } d)
             sb.Append($"\n{(bet ? "🎲 Bet on" : "No bet")} · {(d == 0 ? "no change in points" : $"{Signed(d)} points")}");

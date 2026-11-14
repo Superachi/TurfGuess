@@ -44,6 +44,7 @@ public sealed class Database
         AddColumnIfMissing(c, "rounds", "kind", "TEXT NOT NULL DEFAULT 'Ranked' CHECK (kind IN ('Ranked', 'Regular'))");
         AddColumnIfMissing(c, "rounds", "show_votes", "INTEGER NOT NULL DEFAULT 0");
         AddColumnIfMissing(c, "rounds", "started_by", "INTEGER NOT NULL DEFAULT 0");
+        AddColumnIfMissing(c, "rounds", "reminder_sent", "INTEGER NOT NULL DEFAULT 0");
 
         // Displayed round count, separate for each kind. Existing rounds are numbered in id order within their kind.
         AddColumnIfMissing(c, "rounds", "number", "INTEGER NOT NULL DEFAULT 0");

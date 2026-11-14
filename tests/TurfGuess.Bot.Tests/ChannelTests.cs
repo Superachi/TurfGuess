@@ -131,3 +131,107 @@ public class BattleReadyPingTests
         Assert.Equal(RoundStatus.Open, round.Status);
     }
 }
+
+public class ReminderTests
+{
+    private static readonly DateTimeOffset Now = new(2026, 11, 11, 10, 0, 0, TimeSpan.Zero);
+
+    private static async Task<RoundRecord> OpenRankedAsync(TestEnvironment env, bool defaultLead = true)
+    {
+        if (defaultLead && env.Options.Game.ReminderMinutes == 0) env.Options.Game.ReminderMinutes = 60;
+        await env.Rounds.AdvanceAsync(Now, default);
+        return env.Repo.GetActive()!;
+    }
+
+    [Fact]
+    public async Task The_reminder_is_posted_an_hour_before_the_reveal_and_only_once()
+    {
+        using var env = new TestEnvironment();
+        var round = await OpenRankedAsync(env);
+
+        await env.Rounds.AdvanceAsync(round.RevealAtTime.AddMinutes(-61), default);
+        Assert.Empty(env.Channel.Reminders);
+
+        await env.Rounds.AdvanceAsync(round.RevealAtTime.AddMinutes(-60), default);
+        await env.Rounds.AdvanceAsync(round.RevealAtTime.AddMinutes(-30), default);
+
+        var (id, minutes) = Assert.Single(env.Channel.Reminders);
+        Assert.Equal(round.Id, id);
+        Assert.Equal(60, minutes);
+    }
+
+    [Fact]
+    public async Task The_scheduler_is_woken_at_the_reminder_time()
+    {
+        using var env = new TestEnvironment();
+        var round = await OpenRankedAsync(env);
+
+        var next = await env.Rounds.AdvanceAsync(Now, default);
+
+        Assert.Equal(round.RevealAtTime.AddMinutes(-60), next);
+    }
+
+    [Fact]
+    public async Task The_lead_time_is_configurable_and_zero_turns_it_off()
+    {
+        using var env = new TestEnvironment();
+        env.Options.Game.ReminderMinutes = 15;
+        var round = await OpenRankedAsync(env);
+        await env.Rounds.AdvanceAsync(round.RevealAtTime.AddMinutes(-16), default);
+        Assert.Empty(env.Channel.Reminders);
+        await env.Rounds.AdvanceAsync(round.RevealAtTime.AddMinutes(-15), default);
+        Assert.Equal(15, Assert.Single(env.Channel.Reminders).MinutesLeft);
+
+        using var off = new TestEnvironment();
+        var r2 = await OpenRankedAsync(off, defaultLead: false);
+        await off.Rounds.AdvanceAsync(r2.RevealAtTime.AddMinutes(-1), default);
+        Assert.Empty(off.Channel.Reminders);
+    }
+
+    [Fact]
+    public async Task A_round_that_opens_with_less_time_than_the_lead_gets_no_reminder()
+    {
+        using var env = new TestEnvironment();
+        env.Options.Game.ReminderMinutes = 24 * 60; // longer than the round
+        var round = await OpenRankedAsync(env);
+
+        await env.Rounds.AdvanceAsync(round.RevealAtTime.AddMinutes(-5), default);
+
+        Assert.Empty(env.Channel.Reminders);
+    }
+
+    [Fact]
+    public async Task A_late_reminder_counts_the_minutes_really_left()
+    {
+        using var env = new TestEnvironment();
+        var round = await OpenRankedAsync(env);
+
+        await env.Rounds.AdvanceAsync(round.RevealAtTime.AddMinutes(-20), default); // bot was down at the due time
+
+        Assert.Equal(20, Assert.Single(env.Channel.Reminders).MinutesLeft);
+    }
+
+    [Fact]
+    public async Task A_failing_reminder_does_not_hold_up_the_round()
+    {
+        using var env = new TestEnvironment();
+        env.Channel.FailReminders = true;
+        var round = await OpenRankedAsync(env);
+
+        await env.Rounds.AdvanceAsync(round.RevealAtTime.AddMinutes(-30), default);
+        await env.Rounds.AdvanceAsync(round.RevealAtTime.AddMinutes(1), default);
+
+        Assert.Equal(1, env.Channel.RevealPosts);
+    }
+
+    [Fact]
+    public void The_text_and_validation()
+    {
+        var round = new RoundRecord { Id = 12, Number = 12 };
+        Assert.Equal("**It's now or never!** Ranked Battle #12 has 60 minutes left.\n[**Vote now!**](https://x/y)", MessageText.Reminder(round, 60, "https://x/y"));
+        Assert.Contains("1 minute left", MessageText.Reminder(round, 1, "u"));
+
+        var o = new TurfGuess.Bot.Options.BotOptions { Discord = { Token = "t", ChannelId = 1 }, Game = { ReminderMinutes = -1 } };
+        Assert.Contains(TurfGuess.Bot.Options.BotOptionsValidator.Validate(o), e => e.Contains("ReminderMinutes"));
+    }
+}

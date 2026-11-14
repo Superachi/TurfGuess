@@ -31,7 +31,7 @@ public sealed class TestEnvironment : IDisposable
             Discord = { Token = "test", ChannelId = 1234 },
             Database = { Path = Path.Combine(Folder, "test.db") },
             Images = { Directory = Path.Combine(Folder, "images") },
-            Game = { RoundTime = "09:00", TimeZone = "Europe/Amsterdam", MinRoundLength = TimeSpan.FromHours(6) },
+            Game = { RoundTime = "09:00", TimeZone = "Europe/Amsterdam", MinRoundLength = TimeSpan.FromHours(6), ReminderMinutes = 0 }, // reminders are tested on their own
             Generator = { Paint = { PixelsPerCell = 4 } }, // small images keep the tests fast
         };
         Database = new Database(Options.Database.Path);
@@ -164,6 +164,16 @@ public sealed class FakeChannel : IRoundChannel
         Assert.True(File.Exists(imagePath), "reveal image missing");
         Reveals.Add((round.Id, summary));
         return Post(round.Id, "reveal");
+    }
+
+    public List<(long RoundId, int MinutesLeft)> Reminders { get; } = [];
+    public bool FailReminders { get; set; }
+
+    public Task<ulong> PostReminderAsync(RoundRecord round, int minutesLeft, CancellationToken ct)
+    {
+        if (FailReminders) throw new InvalidOperationException("Missing permissions.");
+        Reminders.Add((round.Id, minutesLeft));
+        return Post(round.Id, "reminder");
     }
 
     public Task PostWeekSummaryAsync(string text, CancellationToken ct)

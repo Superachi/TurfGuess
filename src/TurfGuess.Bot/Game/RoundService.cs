@@ -157,7 +157,12 @@ public sealed class RoundService(
                     break;
 
                 case RoundStatus.Open:
-                    if (now < round.RevealAtTime) return round.RevealAtTime;
+                    if (now < round.RevealAtTime)
+                    {
+                        var wake = await RemindAsync(round, now, ct);
+                        if (wake is null) break; // the reminder was handled; check the round again
+                        return wake.Value;
+                    }
                     repo.MarkRevealed(round.Id);
                     logger.LogInformation("Round {RoundId}: voting closed with {Votes} votes.", round.Id, repo.CountVotes(round.Id));
                     break;
@@ -170,6 +175,40 @@ public sealed class RoundService(
         }
 
         throw new InvalidOperationException($"The current {kind} round didn't settle after {MaxStepsPerAdvance} steps.");
+    }
+
+    /// <summary>
+    /// Posts the "running out of time" reminder of an open ranked round once it is due. Returns when the round
+    /// next needs attention, or null when the reminder was just handled and the caller should look again.
+    /// A round that opened with less time left than the lead time gets no reminder.
+    /// </summary>
+    private async Task<DateTimeOffset?> RemindAsync(RoundRecord round, DateTimeOffset now, CancellationToken ct)
+    {
+        int lead = options.Game.ReminderMinutes;
+        if (round.Kind != RoundKind.Ranked || lead <= 0 || round.ReminderSent || round.MessageId is null)
+            return round.RevealAtTime;
+
+        var due = round.RevealAtTime - TimeSpan.FromMinutes(lead);
+        if (now < due) return due;
+
+        var postedAt = round.PostedAt is { } p ? DateTimeOffset.FromUnixTimeSeconds(p) : now;
+        if (postedAt <= due)
+        {
+            // Late (the bot was down at the due time) still says the truth: it counts the minutes that are really left.
+            int minutesLeft = Math.Max(1, (int)Math.Ceiling((round.RevealAtTime - now).TotalMinutes));
+            try
+            {
+                var id = await channel.PostReminderAsync(round, minutesLeft, ct);
+                logger.LogInformation("Round {RoundId}: posted the reminder (message {MessageId}), {Minutes} minutes before the reveal.", round.Id, id, minutesLeft);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogWarning(ex, "Round {RoundId}: couldn't post the reminder; skipping it.", round.Id);
+            }
+        }
+
+        repo.MarkReminderSent(round.Id); // also when skipped, so it isn't reconsidered
+        return null;
     }
 
     /// <summary>Moves the open round's reveal to now. Returns false when no round of that kind is open.</summary>

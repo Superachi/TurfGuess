@@ -26,6 +26,11 @@ public static class MessageText
     public static string RoundTitle(RoundRecord round) =>
         $"{KindName(round.Kind)} · Round #{round.DisplayNumber}";
 
+    /// <summary>The reminder under a ranked round shortly before its reveal. Links back to the round message.</summary>
+    public static string Reminder(RoundRecord round, int minutesLeft, string messageUrl) =>
+        $"**It's now or never!** Ranked Battle #{round.DisplayNumber} has {minutesLeft} {(minutesLeft == 1 ? "minute" : "minutes")} left.\n" +
+        $"[**Vote now!**]({messageUrl})";
+
     /// <summary>Footer on the round message.</summary>
     public static string RoundFooter(RoundRecord round) =>
         round.Kind == RoundKind.Regular ? $"Regular Battle #{round.DisplayNumber}" : $"Round #{round.DisplayNumber}";

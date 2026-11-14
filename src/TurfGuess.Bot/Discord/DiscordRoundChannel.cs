@@ -139,6 +139,16 @@ public sealed class DiscordRoundChannel(DiscordSocketClient client, BotOptions o
             .Build(), Request(ct));
     }
 
+    public async Task<ulong> PostReminderAsync(RoundRecord round, int minutesLeft, CancellationToken ct)
+    {
+        var channel = await ChannelAsync(round);
+        string guild = channel is IGuildChannel g ? g.GuildId.ToString() : "@me";
+        string url = $"https://discord.com/channels/{guild}/{round.ChannelId}/{round.MessageId}";
+        var message = await channel.SendMessageAsync(MessageText.Reminder(round, minutesLeft, url),
+            allowedMentions: AllowedMentions.None, options: Request(ct));
+        return message.Id;
+    }
+
     public async Task PostWeekSummaryAsync(string text, CancellationToken ct)
     {
         var channel = await ChannelAsync(settings.RankedChannelId());

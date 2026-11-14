@@ -16,7 +16,7 @@ public sealed class DiscordPlayerNotifier(DiscordSocketClient client, BotOptions
             ?? throw new InvalidOperationException($"User {userId} not found.");
 
         string description = message.Description;
-        if (message.LinkedMessageId is { } linked && await MessageUrlAsync(linked) is { } url)
+        if (message.LinkedMessageId is { } linked && await MessageUrlAsync(message.LinkedChannelId ?? options.Discord.ChannelId, linked) is { } url)
             description += $"\n[{message.LinkLabel ?? "Go to the message"}]({url})";
 
         if (message.Title is null)
@@ -45,11 +45,11 @@ public sealed class DiscordPlayerNotifier(DiscordSocketClient client, BotOptions
             emote: new Emoji(subscribed ? MessageText.OptOutButtonEmoji : MessageText.OptInButtonEmoji))
         .Build();
 
-    /// <summary>A jump link to a message in the game channel, or null when the channel isn't in a server.</summary>
-    private async Task<string?> MessageUrlAsync(ulong messageId)
+    /// <summary>A jump link to a message in the given channel, or null when the channel isn't in a server.</summary>
+    private async Task<string?> MessageUrlAsync(ulong channelId, ulong messageId)
     {
-        var channel = client.GetChannel(options.Discord.ChannelId) as IGuildChannel
-            ?? await client.Rest.GetChannelAsync(options.Discord.ChannelId) as IGuildChannel;
+        var channel = client.GetChannel(channelId) as IGuildChannel
+            ?? await client.Rest.GetChannelAsync(channelId) as IGuildChannel;
         return channel is null ? null : $"https://discord.com/channels/{channel.GuildId}/{channel.Id}/{messageId}";
     }
 }

@@ -61,6 +61,7 @@ services.AddSingleton(database);
 services.AddSingleton<RoundRepository>();
 services.AddSingleton<ScoreRepository>();
 services.AddSingleton<SubscriptionRepository>();
+services.AddSingleton<SettingsRepository>();
 
 // Game
 services.AddSingleton<ISeedSource, RandomSeedSource>();

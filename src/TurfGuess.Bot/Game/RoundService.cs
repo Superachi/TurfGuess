@@ -30,6 +30,7 @@ public sealed class RoundService(
     RoundRepository repo,
     ScoreRepository scores,
     SubscriptionRepository subscriptions,
+    SettingsRepository settings,
     IPlayerNotifier notifier,
     IRoundChannel channel,
     RoundImages images,
@@ -63,9 +64,11 @@ public sealed class RoundService(
 
     /// <summary>
     /// Starts a regular battle (🔫) and posts it. Only one can run at a time: when one is already
-    /// going, nothing is created and that battle is returned with Started = false.
+    /// going, nothing is created and that battle is returned with Started = false. The battle is posted in
+    /// <paramref name="channelId"/> (default: the configured game channel).
     /// </summary>
-    public async Task<(RoundRecord Round, bool Started)> StartBattleAsync(ulong userId, bool showVotes, DateTimeOffset now, CancellationToken ct, ulong? replaceMessageId = null)
+    public async Task<(RoundRecord Round, bool Started)> StartBattleAsync(ulong userId, bool showVotes, DateTimeOffset now, CancellationToken ct,
+        ulong? replaceMessageId = null, ulong? channelId = null)
     {
         await _gate.WaitAsync(ct);
         try
@@ -73,16 +76,38 @@ public sealed class RoundService(
             var running = repo.GetActive(RoundKind.Regular);
             if (running is not null) return (running, false);
 
-            var created = CreateRound(now, RoundKind.Regular, (long)userId, showVotes);
+            var created = CreateRound(now, RoundKind.Regular, channelId ?? options.Discord.ChannelId, (long)userId, showVotes);
             logger.LogInformation("Round {RoundId}: regular battle started by {UserId}{Public}.",
                 created.Id, userId, showVotes ? " with public votes" : "");
 
             _replaceMessageId = replaceMessageId;
             try { await AdvanceCoreAsync(RoundKind.Regular, now, ct); } // posts it
             finally { _replaceMessageId = null; }
-            return (repo.Get(created.Id) ?? created, true);
+
+            var posted = repo.Get(created.Id) ?? created;
+            await NotifyBattleReadyAsync(posted, ct);
+            return (posted, true);
         }
         finally { _gate.Release(); }
+    }
+
+    /// <summary>
+    /// Tells the player who started a battle that it is up, unless they opted out of private messages.
+    /// Rendering takes a while, so this saves them watching the channel. A failure (closed DMs) never affects the battle.
+    /// </summary>
+    private async Task NotifyBattleReadyAsync(RoundRecord battle, CancellationToken ct)
+    {
+        if (battle.Status != RoundStatus.Open || battle.MessageId is not { } messageId || battle.StartedBy == 0) return;
+        if (!subscriptions.IsSubscribed(battle.StartedBy)) return;
+        try
+        {
+            var message = MessageText.BattleReadyPing(battle, (ulong)messageId);
+            await notifier.SendDirectAsync((ulong)battle.StartedBy, message, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning("Round {RoundId}: couldn't tell {UserId} their battle is ready: {Reason}", battle.Id, battle.StartedBy, ex.Message);
+        }
     }
 
     /// <summary>
@@ -121,7 +146,7 @@ public sealed class RoundService(
             if (round is null)
             {
                 if (kind == RoundKind.Regular) return DateTimeOffset.MaxValue;
-                CreateRound(now, RoundKind.Ranked);
+                CreateRound(now, RoundKind.Ranked, settings.RankedChannelId());
                 continue;
             }
 
@@ -132,7 +157,12 @@ public sealed class RoundService(
                     break;
 
                 case RoundStatus.Open:
-                    if (now < round.RevealAtTime) return round.RevealAtTime;
+                    if (now < round.RevealAtTime)
+                    {
+                        var wake = await RemindAsync(round, now, ct);
+                        if (wake is null) break; // the reminder was handled; check the round again
+                        return wake.Value;
+                    }
                     repo.MarkRevealed(round.Id);
                     logger.LogInformation("Round {RoundId}: voting closed with {Votes} votes.", round.Id, repo.CountVotes(round.Id));
                     break;
@@ -147,6 +177,40 @@ public sealed class RoundService(
         throw new InvalidOperationException($"The current {kind} round didn't settle after {MaxStepsPerAdvance} steps.");
     }
 
+    /// <summary>
+    /// Posts the "running out of time" reminder of an open ranked round once it is due. Returns when the round
+    /// next needs attention, or null when the reminder was just handled and the caller should look again.
+    /// A round that opened with less time left than the lead time gets no reminder.
+    /// </summary>
+    private async Task<DateTimeOffset?> RemindAsync(RoundRecord round, DateTimeOffset now, CancellationToken ct)
+    {
+        int lead = options.Game.ReminderMinutes;
+        if (round.Kind != RoundKind.Ranked || lead <= 0 || round.ReminderSent || round.MessageId is null)
+            return round.RevealAtTime;
+
+        var due = round.RevealAtTime - TimeSpan.FromMinutes(lead);
+        if (now < due) return due;
+
+        var postedAt = round.PostedAt is { } p ? DateTimeOffset.FromUnixTimeSeconds(p) : now;
+        if (postedAt <= due)
+        {
+            // Late (the bot was down at the due time) still says the truth: it counts the minutes that are really left.
+            int minutesLeft = Math.Max(1, (int)Math.Ceiling((round.RevealAtTime - now).TotalMinutes));
+            try
+            {
+                var id = await channel.PostReminderAsync(round, minutesLeft, ct);
+                logger.LogInformation("Round {RoundId}: posted the reminder (message {MessageId}), {Minutes} minutes before the reveal.", round.Id, id, minutesLeft);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogWarning(ex, "Round {RoundId}: couldn't post the reminder; skipping it.", round.Id);
+            }
+        }
+
+        repo.MarkReminderSent(round.Id); // also when skipped, so it isn't reconsidered
+        return null;
+    }
+
     /// <summary>Moves the open round's reveal to now. Returns false when no round of that kind is open.</summary>
     public bool RevealNow(DateTimeOffset now, RoundKind kind = RoundKind.Ranked)
     {
@@ -154,7 +218,7 @@ public sealed class RoundService(
         return round is { Status: RoundStatus.Open } && repo.SetRevealAt(round.Id, now.ToUnixTimeSeconds());
     }
 
-    private RoundRecord CreateRound(DateTimeOffset now, RoundKind kind, long startedBy = 0, bool showVotes = false)
+    private RoundRecord CreateRound(DateTimeOffset now, RoundKind kind, ulong channelId, long startedBy = 0, bool showVotes = false)
     {
         ulong seed = seeds.NextSeed();
         var generated = RoundGenerator.Generate(seed, options.Generator, regular: kind == RoundKind.Regular);
@@ -167,7 +231,7 @@ public sealed class RoundService(
 
         var record = new RoundRecord
         {
-            ChannelId = (long)options.Discord.ChannelId,
+            ChannelId = (long)channelId,
             Status = RoundStatus.Pending,
             Kind = kind,
             ShowVotes = showVotes,
@@ -227,7 +291,7 @@ public sealed class RoundService(
             }
             logger.LogInformation(
                 "Round {RoundId}: posted in channel {ChannelId} (message {MessageId}), {Left} vs {Right}. Voting is open until {RevealAt}.",
-                round.Id, options.Discord.ChannelId, messageId, round.LeftName, round.RightName, LocalTime(round.RevealAtTime));
+                round.Id, round.ChannelId, messageId, round.LeftName, round.RightName, LocalTime(round.RevealAtTime));
         }
         else
         {

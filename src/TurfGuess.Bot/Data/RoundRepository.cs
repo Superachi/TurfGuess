@@ -11,7 +11,7 @@ public sealed class RoundRepository(Database db)
         id, number, channel_id, status, message_id, reveal_message_id, seed, generator_version,
         image_path, reveal_image_path, created_at, posted_at, reveal_at,
         left_name, left_color, left_emoji, right_name, right_color, right_emoji,
-        winner, winner_share, share_left, share_right, unpainted, kind, show_votes, started_by
+        winner, winner_share, share_left, share_right, unpainted, kind, show_votes, started_by, reminder_sent
         """;
 
     /// <summary>Whether any ranked round exists (regular battles don't count).</summary>
@@ -109,6 +109,13 @@ public sealed class RoundRepository(Database db)
     {
         using var c = db.Open();
         return c.Execute("UPDATE rounds SET status = 'Done' WHERE id = @id AND status <> 'Done'", new { id }) > 0;
+    }
+
+    /// <summary>Records that the reminder is done, so a restart doesn't post it again.</summary>
+    public void MarkReminderSent(long id)
+    {
+        using var c = db.Open();
+        c.Execute("UPDATE rounds SET reminder_sent = 1 WHERE id = @id", new { id });
     }
 
     /// <summary>Moves an open round's reveal time (admin "reveal now").</summary>

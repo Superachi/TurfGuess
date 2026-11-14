@@ -26,6 +26,11 @@ public static class MessageText
     public static string RoundTitle(RoundRecord round) =>
         $"{KindName(round.Kind)} · Round #{round.DisplayNumber}";
 
+    /// <summary>The reminder under a ranked round shortly before its reveal. Links back to the round message.</summary>
+    public static string Reminder(RoundRecord round, int minutesLeft, string messageUrl) =>
+        $"**It's now or never!** Ranked Battle #{round.DisplayNumber} has {minutesLeft} {(minutesLeft == 1 ? "minute" : "minutes")} left.\n" +
+        $"[**Vote now!**]({messageUrl})";
+
     /// <summary>Footer on the round message.</summary>
     public static string RoundFooter(RoundRecord round) =>
         round.Kind == RoundKind.Regular ? $"Regular Battle #{round.DisplayNumber}" : $"Round #{round.DisplayNumber}";
@@ -129,6 +134,37 @@ public static class MessageText
         $"{RegularEmoji} A fresh Regular Battle is running! Voting ends <t:{round.RevealAt}:R>.\n" +
         (link is null ? "Look at the previous Regular Battle message in the channel."
                       : $"Look at the previous Regular Battle message: {link}");
+
+    /// <summary>The command list for <c>/turf help</c>. Admin commands are only listed for administrators.</summary>
+    public static string Help(bool isAdmin)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("**Turf Guess commands**");
+        sb.AppendLine("`/turf battle [show-votes]`: start a 🔫 Regular Battle in this channel (not scored); you get a private message when it is ready");
+        sb.AppendLine("`/turf battle-reveal`: reveal the running battle now (whoever started it, or an admin)");
+        sb.AppendLine("`/turf standings`: this week's standings");
+        sb.AppendLine("`/turf all-time`: trophies and ranked and regular battle records");
+        sb.AppendLine("`/turf subscribe`: get a private message with your result after each round");
+        sb.AppendLine("`/turf unsubscribe`: stop those private messages");
+        sb.Append("`/turf help`: show this list");
+        if (isAdmin)
+        {
+            sb.AppendLine().AppendLine().AppendLine("**Admin commands**");
+            sb.AppendLine("`/turf-admin status`: show the current ranked round");
+            sb.AppendLine("`/turf-admin reveal-now`: reveal the current ranked round now and post the next one");
+            sb.AppendLine("`/turf-admin reset-round`: cancel the current ranked round and start a new one");
+            sb.AppendLine("`/turf-admin reset-scores`: wipe all weekly scores (asks for confirmation)");
+            sb.Append("`/turf-admin set-ranked-channel`: choose the channel ranked battles are posted in");
+        }
+        return sb.ToString();
+    }
+
+    public static string RankedChannelChanged(ulong channelId, bool roundOpen) =>
+        $"⚓ Ranked Battles are now posted in <#{channelId}>." +
+        (roundOpen ? " The round that is running now stays where it is; the next one goes to the new channel." : "");
+
+    public static string RankedChannelUnusable(ulong channelId, string missing) =>
+        $"I can't use <#{channelId}>: I'm missing the {missing} permission there. Give me access and run the command again.";
 
     public const string NoBattleRunning = "There's no Regular Battle running right now.";
     public const string BattleRevealNotAllowed = "Only the player who started this Regular Battle, or an admin, can reveal it early.";
@@ -332,6 +368,15 @@ public static class MessageText
     public const string OptOutButtonEmoji = "🔕";
     public const string OptInButtonEmoji = "🔔";
 
+    public const string BattleReadyLinkLabel = "Go to the battle";
+
+    /// <summary>The private ping to the player who started a Regular Battle once its image is rendered and posted.</summary>
+    public static DirectMessage BattleReadyPing(RoundRecord battle, ulong messageId) => new(
+        RoundTitle(battle),
+        $"🔫 Your battle is ready! Voting is open until <t:{battle.RevealAt}:t> (<t:{battle.RevealAt}:R>).",
+        UnsubscribeFooter, LinkedMessageId: messageId, LinkLabel: BattleReadyLinkLabel, OptOutButton: true,
+        LinkedChannelId: (ulong)battle.ChannelId);
+
     public const string RevealLinkLabel = "Go to the result in the server";
 
     /// <summary>
@@ -352,7 +397,7 @@ public static class MessageText
             sb.Append($"\n{(bet ? "🎲 Bet on" : "No bet")} · {(d == 0 ? "no change in points" : $"{Signed(d)} points")}");
 
         string color = w == Side.Left ? round.LeftColor : round.RightColor;
-        return new DirectMessage(RoundTitle(round), sb.ToString(), UnsubscribeFooter, color, revealMessageId, RevealLinkLabel, OptOutButton: true);
+        return new DirectMessage(RoundTitle(round), sb.ToString(), UnsubscribeFooter, color, revealMessageId, RevealLinkLabel, OptOutButton: true, LinkedChannelId: (ulong)round.ChannelId);
     }
 
     /// <summary>"🎲&lt;@id&gt; (+6)": a 🎲 for a bet, then the points gained, lost, or ~ for no change.</summary>

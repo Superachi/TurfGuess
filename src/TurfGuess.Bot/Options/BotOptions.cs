@@ -44,6 +44,12 @@ public sealed class GameOptions
     /// <summary>How long a regular battle (started with /turf battle) stays open for votes.</summary>
     public TimeSpan BattleLength { get; set; } = TimeSpan.FromMinutes(15);
 
+    /// <summary>
+    /// How many minutes before the reveal a reminder to vote is posted under the ranked round. 0 turns it off.
+    /// Rounds that open with less time left than this get no reminder.
+    /// </summary>
+    public int ReminderMinutes { get; set; } = 60;
+
     /// <summary>How the ink is drawn.</summary>
     public InkStyle Ink { get; set; } = InkStyle.Marbled;
 
@@ -98,6 +104,9 @@ public static class BotOptionsValidator
 
         if (o.Game.BattleLength < TimeSpan.FromMinutes(1) || o.Game.BattleLength > TimeSpan.FromHours(6))
             errors.Add("Game:BattleLength must be between 1 minute and 6 hours.");
+
+        if (o.Game.ReminderMinutes < 0 || o.Game.ReminderMinutes > 1440)
+            errors.Add("Game:ReminderMinutes must be between 0 (off) and 1440 (24 hours).");
 
         try { o.Generator.Validate(); }
         catch (ArgumentException ex) { errors.AddRange(ex.Message.Split(Environment.NewLine).Select(e => "Generator: " + e)); }

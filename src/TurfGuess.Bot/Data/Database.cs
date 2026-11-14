@@ -44,6 +44,7 @@ public sealed class Database
         AddColumnIfMissing(c, "rounds", "kind", "TEXT NOT NULL DEFAULT 'Ranked' CHECK (kind IN ('Ranked', 'Regular'))");
         AddColumnIfMissing(c, "rounds", "show_votes", "INTEGER NOT NULL DEFAULT 0");
         AddColumnIfMissing(c, "rounds", "started_by", "INTEGER NOT NULL DEFAULT 0");
+        AddColumnIfMissing(c, "rounds", "reminder_sent", "INTEGER NOT NULL DEFAULT 0");
 
         // Displayed round count, separate for each kind. Existing rounds are numbered in id order within their kind.
         AddColumnIfMissing(c, "rounds", "number", "INTEGER NOT NULL DEFAULT 0");
@@ -122,6 +123,12 @@ public sealed class Database
         CREATE TABLE IF NOT EXISTS subscription_opt_outs (
             user_id      INTEGER PRIMARY KEY,
             opted_out_at INTEGER NOT NULL
+        );
+
+        -- Settings an admin changes with a command (for example the ranked channel).
+        CREATE TABLE IF NOT EXISTS settings (
+            key   TEXT PRIMARY KEY,
+            value TEXT NOT NULL
         );
 
         CREATE TABLE IF NOT EXISTS closed_weeks (

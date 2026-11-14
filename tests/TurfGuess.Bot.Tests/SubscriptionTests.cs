@@ -73,6 +73,7 @@ public class SubscriptionTests
         using var env = new TestEnvironment();
         var now = Local(10, 12);
         var (round, _) = await env.Rounds.StartBattleAsync(1, false, now, default);
+        env.Notifier.Sent.Clear(); // the "battle is ready" ping
         env.Votes.Cast(round.Id, 1, "ann", round.WinnerSide.Opposite());
 
         await env.Rounds.AdvanceAsync(now.AddHours(1), default);

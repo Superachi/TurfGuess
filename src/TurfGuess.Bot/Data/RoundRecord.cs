@@ -47,6 +47,9 @@ public sealed class RoundRecord
 
     /// <summary>Regular battles only: the player who started it (0 for ranked rounds).</summary>
     public long StartedBy { get; set; }
+
+    /// <summary>Ranked rounds only: the "time is running out" reminder has been handled (posted or deliberately skipped).</summary>
+    public bool ReminderSent { get; set; }
     public long? MessageId { get; set; }
     public long? RevealMessageId { get; set; }
 

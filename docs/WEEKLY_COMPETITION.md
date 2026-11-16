@@ -46,7 +46,7 @@ Votes: 🔴 4 · 🔵 3
 Winners (4): 🎲@Ann (+6), @Bo (+3), 🎲@Dee (+6), @Eli (+3)
 Losers (1): 🎲@Cy (−3), @SafePlayer (~)
 
-Weekly standings
+Week 46 standings
 1. @Ann 14 pts · 5 wins
 2. @Dee 11 pts · 4 wins
 3. @Bo 9 pts · 5 wins
@@ -59,15 +59,20 @@ Weekly standings
 
 ### Weekly rollover (Monday)
 
-Posted right after the first reveal of the new week (the reveal on Monday of the round that started Sunday). The week boundary is Monday 00:00 in the configured time zone, and that reveal is the first one scored in the new week.
+Posted right **before** the first reveal of the new week (the reveal on Monday of the round that started Sunday), so that reveal, which already shows the new week's standings, reads as the start of the new week. The week boundary is Monday 00:00 in the configured time zone, and that reveal is the first one scored in the new week.
 
 ```
 🏁 Week 46 is over!
 🏆 @Ann wins with 41 pts and 17 wins.
-A new week starts now.
+
+📊 Final standings
+  #  Player   Pts  Wins
+* 1  Ann       41    17
+  2  Bo        33    14
+-# * week winner · A new week starts now.
 ```
 
-Ties name every tied winner.
+The table lists every player who scored that week. Ties name every tied winner.
 
 ## Open for implementation
 

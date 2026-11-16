@@ -55,11 +55,14 @@ public static partial class MessagePreview
             new(ids[i], bettors.Contains(i), Weekly.RawDelta(points, correct, bettors.Contains(i)));
         var winners = Enumerable.Range(0, 7).Select(i => Outcome(i, true)).ToList();
         var losers = Enumerable.Range(7, 4).Select(i => Outcome(i, false)).ToList();
+        // The sample round reveals in this week; the weekly summary below is the one for the week before it.
+        string weekStart = Weekly.WeekStart(round.RevealAtTime, options.Game.ParsedTimeZone);
+        string lastWeekStart = DateOnly.ParseExact(weekStart, "yyyy-MM-dd", CultureInfo.InvariantCulture).AddDays(-7).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         var standings = new List<StandingEntry>
         {
             new(ids[0], 14, 5), new(ids[1], 11, 4), new(ids[2], 11, 3), new(ids[3], 9, 5),
         };
-        var summary = new RevealSummary(winner == Side.Left ? 7 : 4, winner == Side.Left ? 4 : 7, winners, losers, standings);
+        var summary = new RevealSummary(winner == Side.Left ? 7 : 4, winner == Side.Left ? 4 : 7, winners, losers, standings, Weekly.WeekNumber(weekStart));
 
         string Stamp(RoundRecord r) => TimeZoneInfo.ConvertTime(r.RevealAtTime, options.Game.ParsedTimeZone)
             .ToString("d MMMM yyyy HH:mm", CultureInfo.InvariantCulture); // Discord shows the footer timestamp in the viewer's own time zone
@@ -77,7 +80,7 @@ public static partial class MessagePreview
         Section(sb, "1. Round message (posted at the round time)");
         Embed(sb, MessageText.RoundTitle(round),
             Show(MessageText.RoundDescription(round, options.Game.ShowVoteCount ? [] : null, closed: false, difficulty: options.Generator.Difficulty)),
-            $"round_{round.Id}.png", MessageText.RoundFooter(round), Stamp(round));
+            $"round_{round.Id}.png", MessageText.RoundFooter(round, options.Game.ParsedTimeZone), Stamp(round));
         sb.AppendLine($"Buttons: {buttons(false)}");
         sb.AppendLine();
 
@@ -104,7 +107,7 @@ public static partial class MessagePreview
         Section(sb, "5. Round message after the reveal");
         Embed(sb, MessageText.RoundTitle(round),
             Show(MessageText.RoundDescription(round, options.Game.ShowVoteCount ? voters : null, closed: true, difficulty: options.Generator.Difficulty)),
-            $"round_{round.Id}.png", MessageText.RoundFooter(round), Stamp(round));
+            $"round_{round.Id}.png", MessageText.RoundFooter(round, options.Game.ParsedTimeZone), Stamp(round));
         sb.AppendLine($"Buttons: {buttons(true)}");
         sb.AppendLine();
 
@@ -113,8 +116,11 @@ public static partial class MessagePreview
             $"reveal_{round.Id}.png", MessageText.RevealFooter(round));
         sb.AppendLine();
 
-        Section(sb, "7. Weekly summary (posted after the first reveal of a new week, no pings)");
-        sb.AppendLine(Show(MessageText.WeekSummary("2026-11-02", [standings[0]]) ?? ""));
+        var tableNames = ids.Select((id, i) => (id, name: $"Player{i + 1}")).ToDictionary(x => x.id, x => x.name);
+        tableNames[ids[2]] = "TheLongestUsernameEverMade_xX"; // shows how long names are cut
+
+        Section(sb, "7. Weekly summary (posted before the first reveal of a new week, no pings)");
+        sb.AppendLine(Show(MessageText.WeekSummary(lastWeekStart, standings, tableNames) ?? ""));
         sb.AppendLine();
 
         // The same sample round, played as a regular battle: 15 minutes, not scored, no Bet button.
@@ -149,14 +155,14 @@ public static partial class MessagePreview
         Embed(sb, MessageText.RoundTitle(battle),
             Show(MessageText.RoundDescription(battle, options.Game.ShowVoteCount ? voters.Select(v => v with { Bet = false }).ToList() : null,
                 closed: false, difficulty: options.Generator.Difficulty)),
-            $"round_{battle.Id}.png", MessageText.RoundFooter(battle), Stamp(battle));
+            $"round_{battle.Id}.png", MessageText.RoundFooter(battle, options.Game.ParsedTimeZone), Stamp(battle));
         sb.AppendLine($"Buttons: {battleButtons}");
         sb.AppendLine();
 
         Section(sb, "9b. Regular Battle with show-votes (who voted for which team)");
         Embed(sb, MessageText.RoundTitle(publicBattle),
             Show(MessageText.RoundDescription(publicBattle, battleVoters, closed: false, difficulty: options.Generator.Difficulty)),
-            $"round_{battle.Id}.png", MessageText.RoundFooter(publicBattle), Stamp(publicBattle));
+            $"round_{battle.Id}.png", MessageText.RoundFooter(publicBattle, options.Game.ParsedTimeZone), Stamp(publicBattle));
         sb.AppendLine($"Buttons: {battleButtons}");
         sb.AppendLine(Show(MessageText.VoteAccepted(publicBattle, Side.Left)));
         sb.AppendLine();
@@ -195,9 +201,7 @@ public static partial class MessagePreview
         Card(sb, MessageText.RevealPing(battle, correct: true, bet: false, delta: null, SampleRevealMessageId), Show);
 
         Section(sb, "14. /turf standings and /turf all-time (only the caller sees these replies)");
-        var tableNames = ids.Select((id, i) => (id, name: $"Player{i + 1}")).ToDictionary(x => x.id, x => x.name);
-        tableNames[ids[2]] = "TheLongestUsernameEverMade_xX"; // shows how long names are cut
-        sb.AppendLine(MessageText.WeeklyStandings("2026-11-02", standings, tableNames));
+        sb.AppendLine(MessageText.WeeklyStandings(weekStart, standings, tableNames));
         sb.AppendLine();
         sb.AppendLine(MessageText.AllTimeStandings(
         [

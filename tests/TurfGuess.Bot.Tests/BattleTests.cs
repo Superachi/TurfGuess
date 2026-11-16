@@ -194,6 +194,23 @@ public class BattleTests
     };
 
     [Fact]
+    public void Ranked_round_footer_names_the_week_and_day_in_the_game_time_zone()
+    {
+        var zone = TimeZoneInfo.FindSystemTimeZoneById("Europe/Amsterdam");
+        // Tuesday 17 November 2026, 18:00 in Amsterdam: ISO week 47, day 2.
+        var tuesday = Round(RoundKind.Ranked);
+        tuesday.RevealAt = new DateTimeOffset(2026, 11, 17, 17, 0, 0, TimeSpan.Zero).ToUnixTimeSeconds();
+        Assert.Equal("Round #13 (week 47, day 2/7)", MessageText.RoundFooter(tuesday, zone));
+
+        // Sunday 22 November 23:30 UTC is already Monday 23 November in Amsterdam: day 1 of week 48.
+        var late = Round(RoundKind.Ranked);
+        late.RevealAt = new DateTimeOffset(2026, 11, 22, 23, 30, 0, TimeSpan.Zero).ToUnixTimeSeconds();
+        Assert.Equal("Round #13 (week 48, day 1/7)", MessageText.RoundFooter(late, zone));
+
+        Assert.Equal("Regular Battle #13", MessageText.RoundFooter(Round(RoundKind.Regular), zone));
+    }
+
+    [Fact]
     public void Titles_and_footers_tell_the_two_kinds_apart()
     {
         Assert.Equal("⚓ Ranked Battle · Round #13", MessageText.RoundTitle(Round(RoundKind.Ranked)));
@@ -258,7 +275,7 @@ public class BattleTests
         Assert.Contains("✅ **Correct (1):** <@1>", text);
         Assert.Contains("❌ **Wrong (1):** <@2>", text);
         Assert.Contains("no points awarded", text);
-        Assert.DoesNotContain("Weekly standings", text);
+        Assert.DoesNotContain("standings", text);
         Assert.DoesNotContain("(+", text);
     }
 

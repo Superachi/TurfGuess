@@ -31,9 +31,16 @@ public static class MessageText
         $"**It's now or never!** Ranked Battle #{round.DisplayNumber} has {minutesLeft} {(minutesLeft == 1 ? "minute" : "minutes")} left.\n" +
         $"[**Vote now!**]({messageUrl})";
 
-    /// <summary>Footer on the round message.</summary>
-    public static string RoundFooter(RoundRecord round) =>
-        round.Kind == RoundKind.Regular ? $"Regular Battle #{round.DisplayNumber}" : $"Round #{round.DisplayNumber}";
+    /// <summary>
+    /// Footer on the round message. A ranked round also says which week and day of the week it reveals in
+    /// (the week it scores for, see <see cref="Weekly.WeekStart"/>), e.g. "Round #5 (week 47, day 2/7)".
+    /// </summary>
+    public static string RoundFooter(RoundRecord round, TimeZoneInfo zone)
+    {
+        if (round.Kind == RoundKind.Regular) return $"Regular Battle #{round.DisplayNumber}";
+        int week = Weekly.WeekNumber(Weekly.WeekStart(round.RevealAtTime, zone));
+        return $"Round #{round.DisplayNumber} (week {week}, day {Weekly.DayOfWeek(round.RevealAtTime, zone)}/7)";
+    }
 
     /// <summary>Footer on the reveal; recovery finds an already posted reveal by this exact text.</summary>
     public static string RevealFooter(RoundRecord round) =>
@@ -262,7 +269,7 @@ public static class MessageText
         sb.Append($"{Pct(round.Unpainted)} unpainted\n");
         sb.Append($"Votes: {round.TeamEmoji(l)} {s.LeftVotes} · {round.TeamEmoji(r)} {s.RightVotes}\n\n");
 
-        string standings = StandingsText(s.Standings);
+        string standings = StandingsText(s.Standings, s.Week);
 
         if (s.Winners.Count == 0 && s.Losers.Count == 0)
         {
@@ -411,11 +418,11 @@ public static class MessageText
     };
 
     /// <summary>The top of the weekly standings, with a blank line before it. Empty when nobody has scored.</summary>
-    private static string StandingsText(IReadOnlyList<StandingEntry> standings)
+    private static string StandingsText(IReadOnlyList<StandingEntry> standings, int week)
     {
         if (standings.Count == 0) return "";
         var leaders = Weekly.WeekWinners(standings);
-        var sb = new StringBuilder("\n\n**Weekly standings**");
+        var sb = new StringBuilder($"\n\n**Week {week} standings**");
         for (int i = 0; i < Math.Min(standings.Count, StandingsShown); i++)
         {
             var e = standings[i];
@@ -438,12 +445,19 @@ public static class MessageText
         if (standings.Count == 0) return $"{title}\nNobody has scored yet this week.";
 
         var leaders = Weekly.WeekWinners(standings);
+        return StandingsTable(title, standings, leaders, names, leaders.Count > 0 ? "-# * leading the week" : null);
+    }
+
+    /// <summary>A week's standings as a code-block table, best first, with * marking the leaders.</summary>
+    private static string StandingsTable(string title, IReadOnlyList<StandingEntry> standings, IReadOnlyList<StandingEntry> leaders,
+        IReadOnlyDictionary<ulong, string> names, string? note)
+    {
         string Row(string mark, string rank, string name, string points, string wins) =>
             $"{mark}{rank,2}  {name,-NameWidth}  {points,4}  {wins,4}".TrimEnd();
 
         var rows = standings.Select((e, i) =>
             Row(leaders.Contains(e) ? "*" : " ", (i + 1).ToString(), ShortName(names, e.UserId), e.Points.ToString(), e.Wins.ToString())).ToList();
-        return Table(title, Row(" ", "#", "Player", "Pts", "Wins"), rows, leaders.Count > 0 ? "-# * leading the week" : null);
+        return Table(title, Row(" ", "#", "Player", "Pts", "Wins"), rows, note);
     }
 
     /// <summary>The all-time standings for <c>/turf all-time</c>: trophies and the ranked and regular win/loss record.</summary>
@@ -501,16 +515,21 @@ public static class MessageText
         return sb.ToString();
     }
 
-    /// <summary>The message after the first reveal of a new week. Null when nobody scored that week.</summary>
-    public static string? WeekSummary(string weekStart, IReadOnlyList<StandingEntry> winners)
+    /// <summary>
+    /// The message before the first reveal of a new week: who won, then the final standings of every player
+    /// who scored that week as a table. Null when nobody scored that week.
+    /// </summary>
+    public static string? WeekSummary(string weekStart, IReadOnlyList<StandingEntry> standings, IReadOnlyDictionary<ulong, string> names)
     {
+        var winners = Weekly.WeekWinners(standings);
         if (winners.Count == 0) return null;
         var top = winners[0];
-        string names = string.Join(", ", winners.Select(x => $"<@{x.UserId}>"));
+        string mentions = string.Join(", ", winners.Select(x => $"<@{x.UserId}>"));
         string verb = winners.Count == 1 ? "wins" : "win";
-        return $"🏁 **Week {Weekly.WeekNumber(weekStart)} is over!**\n" +
-               $"🏆 {names} {verb} with {Plural(top.Points, "pt")} and {Plural(top.Wins, "win")}.\n" +
-               "A new week starts now.";
+        string title = $"🏁 **Week {Weekly.WeekNumber(weekStart)} is over!**\n" +
+                       $"🏆 {mentions} {verb} with {Plural(top.Points, "pt")} and {Plural(top.Wins, "win")}.\n\n" +
+                       "📊 **Final standings**";
+        return StandingsTable(title, standings, winners, names, "-# * week winner · A new week starts now.");
     }
 
     /// <summary>

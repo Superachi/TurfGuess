@@ -39,6 +39,10 @@ public static class Weekly
         return date.AddDays(-sinceMonday).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
     }
 
+    /// <summary>Which day of its week (1 = Monday … 7 = Sunday) <paramref name="at"/> falls on in <paramref name="zone"/>.</summary>
+    public static int DayOfWeek(DateTimeOffset at, TimeZoneInfo zone) =>
+        ((int)TimeZoneInfo.ConvertTime(at, zone).DayOfWeek + 6) % 7 + 1;
+
     /// <summary>The ISO week number of a week start, for the weekly summary title.</summary>
     public static int WeekNumber(string weekStart) =>
         ISOWeek.GetWeekOfYear(DateTime.ParseExact(weekStart, "yyyy-MM-dd", CultureInfo.InvariantCulture));

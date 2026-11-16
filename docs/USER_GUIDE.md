@@ -49,8 +49,8 @@ Every round has a difficulty rank from C (easiest) to X (hardest), worth 1 to 5 
 - **A correct guess earns the round's points.** A wrong guess costs nothing.
 - **Press 🎲 Bet** to risk those points: a correct guess earns **double**, a wrong guess **loses** the round's points. Press it again to take the bet back. You can change your bet, like your vote, until the reveal. A bet only counts if you voted too.
 - **Your weekly score never drops below 0**, so you can always catch up.
-- The reveal lists winners and losers with their points (🎲 marks a bet, `~` means no change) and the top 3 of the week.
-- **Weeks run Monday to Monday** in the game's time zone (`Game:TimeZone`). After the first reveal of a new week, the bot announces last week's winner: the most points, then the most wins (correct guesses). Players still tied all win. Everyone starts the new week at 0.
+- The reveal lists winners and losers with their points (🎲 marks a bet, `~` means no change) and the top 3 of the week. The footer of a ranked round says which week and day it is, like `Round #5 (week 47, day 2/7)`.
+- **Weeks run Monday to Monday** in the game's time zone (`Game:TimeZone`). Right before the first reveal of a new week, the bot announces last week's winner (the most points, then the most wins, i.e. correct guesses) with the final standings of everyone who scored. Players still tied all win. Everyone starts the new week at 0.
 
 ### Reading an arena
 
@@ -279,13 +279,12 @@ cd D:\Documents\HobbyProjects\TurfGuess
 dotnet run --project src\TurfGuess.Bot -c Release -- --preview-messages
 ```
 
-This builds a sample round with the real generator and prints every message for it:
-1. the round post with its buttons,
-2. the private vote confirmation,
-3. the live list of who has voted,
-4. the "voting is closed" reply,
-5. the round post after it closes,
-6. the reveal.
+This builds a sample round with the real generator and prints every message for it, numbered in the output:
+- the ranked round post with its buttons, the vote and bet replies, the live list of who has voted, the "voting is closed" reply, and the round post after it closes,
+- the reveal and the weekly summary (the summary is posted before the first reveal of a new week),
+- the Regular Battle messages, their reveal, and the replies to `/turf battle` and `/turf battle-reveal`,
+- the `/turf subscribe` and `/turf unsubscribe` replies and the private result messages,
+- the `/turf standings` and `/turf all-time` tables.
 
 Mentions and timestamps are shown as Discord would display them.
 

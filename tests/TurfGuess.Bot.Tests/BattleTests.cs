@@ -220,14 +220,10 @@ public class BattleTests
     }
 
     [Fact]
-    public void Difficulty_is_fire_for_ranked_and_fish_for_regular()
+    public void Difficulty_is_just_the_rank_for_both_kinds()
     {
-        string ranked = MessageText.DifficultyLine(Round(RoundKind.Ranked));
-        string regular = MessageText.DifficultyLine(Round(RoundKind.Regular));
-        Assert.Contains("🔥", ranked);
-        Assert.DoesNotContain("🐟", ranked);
-        Assert.Contains("🐟", regular);
-        Assert.DoesNotContain("🔥", regular);
+        Assert.Matches(@"^\*\*Rank [CBASX]\*\*$", MessageText.DifficultyLine(Round(RoundKind.Ranked)));
+        Assert.Matches(@"^\*\*Rank [CBASX]\*\*$", MessageText.DifficultyLine(Round(RoundKind.Regular)));
     }
 
     [Fact]
@@ -235,7 +231,7 @@ public class BattleTests
     {
         Assert.DoesNotContain("Rank", MessageText.RoundDescription(Round(RoundKind.Regular), [], closed: false));
         Assert.Contains("Rank", MessageText.RoundDescription(Round(RoundKind.Regular), [], closed: true));
-        Assert.Contains("🐟", MessageText.Reveal(Round(RoundKind.Regular), new RevealSummary(0, 0, [], [], []), 50));
+        Assert.Contains("Rank", MessageText.Reveal(Round(RoundKind.Regular), new RevealSummary(0, 0, [], [], []), 50));
         Assert.Contains("Rank", MessageText.RoundDescription(Round(RoundKind.Ranked), [], closed: false));
     }
 

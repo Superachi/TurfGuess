@@ -15,7 +15,8 @@ public class MessagePreviewTests
 
         Assert.Contains("⚓ Ranked Battle · Round #5", text);
         Assert.Contains("🔫 Regular Battle · Round #3", text);
-        Assert.Contains("🐟", text);
+        Assert.DoesNotContain("🐟", text);
+        Assert.DoesNotContain("🔥", text);
         Assert.Contains("Which team do you think painted more? Cast your vote!", text);
         Assert.Contains("You voted", text);
         Assert.Contains("**11 players have voted:** 🎲@Player1, @Player2, 🎲@Player3", text);

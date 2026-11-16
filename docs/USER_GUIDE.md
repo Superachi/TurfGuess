@@ -75,17 +75,17 @@ Every round has a difficulty rank from C (easiest) to X (hardest), worth 1 to 5 
 
 ### Difficulty rank
 
-The round message shows how hard the round is, e.g. *S-rank difficulty 🔥🔥🔥🔥*. The rank only says how close the two colors are, never which one is ahead.
+The round message shows how hard the round is, e.g. **Rank S**. The rank only says how close the two colors are, never which one is ahead.
 
 The ranks are five equal slices of the configured `Generator:Difficulty` range, so each rank comes up about one day in five whatever range you set. The table shows the default range (50.3–52.3%).
 
 | Rank | Shown as | Winner's share of the painted floor (default range) |
 |---|---|---|
-| **C** (easiest) | C-rank difficulty 🔥 | 51.9% or more |
-| **B** | B-rank difficulty 🔥🔥 | 51.5% – 51.9% |
-| **A** | A-rank difficulty 🔥🔥🔥 | 51.1% – 51.5% |
-| **S** | S-rank difficulty 🔥🔥🔥🔥 | 50.7% – 51.1% |
-| **X** (hardest) | X-rank difficulty 🔥🔥🔥🔥🔥 | under 50.7% |
+| **C** (easiest) | Rank C | 51.9% or more |
+| **B** | Rank B | 51.5% – 51.9% |
+| **A** | Rank A | 51.1% – 51.5% |
+| **S** | Rank S | 50.7% – 51.1% |
+| **X** (hardest) | Rank X | under 50.7% |
 
 With a different range the bands move with it. For example, with 50.05–51.0% each band is 0.19 points wide, and X is anything under 50.24%.
 
@@ -231,8 +231,8 @@ The answer is in the log from the moment a round is created, so don't share the 
 
 There are two kinds of round:
 
-- **⚓ Ranked Battle** is the daily round. It is scored and counts towards the weekly standings. Difficulty is shown with 🔥.
-- **🔫 Regular Battle** is started by any player with a command. It lasts 15 minutes (`Game:BattleLength`), is never scored, never touches the weekly standings, and has no Bet button. Difficulty is shown with 🐟, but only once the battle is over. Regular battles also lean less towards hard rounds than ranked ones. A regular battle runs next to the ranked round, and only one can run at a time.
+- **⚓ Ranked Battle** is the daily round. It is scored and counts towards the weekly standings. Difficulty is shown as a rank.
+- **🔫 Regular Battle** is started by any player with a command. It lasts 15 minutes (`Game:BattleLength`), is never scored, never touches the weekly standings, and has no Bet button. Its rank is shown only once the battle is over. Regular battles also lean less towards hard rounds than ranked ones. A regular battle runs next to the ranked round, and only one can run at a time.
 
 Both commands work in any channel the bot can post in; the battle is posted in the channel where the command is run. Ranked Battles go to the ranked channel (see `/turf-admin set-ranked-channel` below).
 

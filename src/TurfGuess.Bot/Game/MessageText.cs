@@ -109,9 +109,7 @@ public static class MessageText
     public static string DifficultyLine(RoundRecord round, DifficultyOptions? difficulty = null)
     {
         var rank = Difficulty.RankFor(round.WinnerShare, difficulty ?? new DifficultyOptions());
-        int count = (int)rank + 1; // C = 1 … X = 5
-        string icon = round.Kind == RoundKind.Regular ? "🐟" : "🔥";
-        return $"**Rank {rank}** · {count}{icon}";
+        return $"**Rank {rank}**";
     }
 
     /// <summary>What a regular battle is: unscored, who started it, and whether votes are public.</summary>

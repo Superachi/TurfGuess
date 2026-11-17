@@ -19,7 +19,7 @@ public class MessageTextTests
     private static IReadOnlyList<Voter> V(params ulong[] ids) => ids.Select(i => new Voter(i, false)).ToList();
     private static RevealSummary Summary(int left, int right, IReadOnlyList<PlayerOutcome> winners,
         IReadOnlyList<PlayerOutcome>? losers = null, IReadOnlyList<StandingEntry>? standings = null) =>
-        new(left, right, winners, losers ?? [], standings ?? []);
+        new(left, right, winners, losers ?? [], standings ?? [], Week: 46);
 
     [Fact]
     public void Reveal_names_the_winner_coverage_and_votes()
@@ -43,7 +43,7 @@ public class MessageTextTests
             Summary(1, 2, [Out(1, 6, bet: true)], [Out(5, -3, bet: true), Out(6, 0), Out(7, 0, bet: true)], standings), maxListed: 50);
 
         Assert.Contains("**Losers (3):** 🎲<@5> (−3), <@6> (~), 🎲<@7> (~)", text);
-        Assert.Contains("**Weekly standings**\n1. 🏆 <@1> 14 pts · 5 wins\n2. <@2> 11 pts · 4 wins\n3. <@3> 9 pts · 5 wins", text);
+        Assert.Contains("**Week 46 standings**\n1. 🏆 <@1> 14 pts · 5 wins\n2. <@2> 11 pts · 4 wins\n3. <@3> 9 pts · 5 wins", text);
         Assert.DoesNotContain("<@4>", text); // only the top three
     }
 
@@ -69,7 +69,7 @@ public class MessageTextTests
             var text = MessageText.Reveal(Round(), summary, maxListed: 500);
             Assert.True(text.Length <= MessageText.DiscordMessageLimit, $"{text.Length} chars");
             Assert.Contains("more", text);
-            Assert.Contains("**Weekly standings**", text);
+            Assert.Contains("**Week 46 standings**", text);
         }
     }
 
@@ -102,7 +102,7 @@ public class MessageTextTests
         round.WinnerShare = 0.5130; // A rank = 3 points
         var text = MessageText.RoundDescription(round, [new Voter(1, true), new Voter(2, false), new Voter(3, true)], closed: false);
 
-        Assert.Contains("**Rank A** · 3🔥\nWorth 3 points · bet: win +6 / lose −3\nResults <t:", text);
+        Assert.Contains("**Rank A**\nWorth 3 points · bet: win +6 / lose −3\nResults <t:", text);
         Assert.Contains("**3 players have voted:** 🎲<@1>, <@2>, 🎲<@3>", text);
 
         round.WinnerShare = 0.5210; // C rank = 1 point
@@ -125,10 +125,28 @@ public class MessageTextTests
     [Fact]
     public void Week_summary_names_every_winner_and_is_skipped_when_nobody_scored()
     {
-        Assert.Null(MessageText.WeekSummary("2026-11-02", []));
-        Assert.Equal("🏁 **Week 45 is over!**\n🏆 <@1> wins with 41 pts and 17 wins.\nA new week starts now.",
-            MessageText.WeekSummary("2026-11-02", [new StandingEntry(1, 41, 17)]));
-        Assert.Contains("<@1>, <@2> win with 10 pts and 4 wins", MessageText.WeekSummary("2026-11-02", [new StandingEntry(1, 10, 4), new StandingEntry(2, 10, 4)]));
+        var names = new Dictionary<ulong, string> { [1] = "Ann", [2] = "Bo", [3] = "Cy" };
+        Assert.Null(MessageText.WeekSummary("2026-11-02", [], names));
+        Assert.Null(MessageText.WeekSummary("2026-11-02", [new StandingEntry(1, 0, 0)], names));
+        Assert.Contains("🏁 **Week 45 is over!**\n🏆 <@1> wins with 41 pts and 17 wins.",
+            MessageText.WeekSummary("2026-11-02", [new StandingEntry(1, 41, 17)], names));
+        Assert.Contains("<@1>, <@2> win with 10 pts and 4 wins",
+            MessageText.WeekSummary("2026-11-02", [new StandingEntry(1, 10, 4), new StandingEntry(2, 10, 4)], names));
+    }
+
+    [Fact]
+    public void Week_summary_lists_every_player_who_scored_in_a_table()
+    {
+        var names = new Dictionary<ulong, string> { [1] = "Ann", [2] = "Bo" };
+        var text = MessageText.WeekSummary("2026-11-02",
+            [new StandingEntry(1, 20, 2), new StandingEntry(2, 10, 1), new StandingEntry(3, 0, 0)], names)!;
+
+        Assert.Contains("📊 **Final standings**\n```", text);
+        Assert.Contains("* 1  Ann", text);   // the winner is marked
+        Assert.Contains("  2  Bo", text);
+        Assert.Contains("  3  3 ", text);    // no known name: falls back to the id
+        Assert.EndsWith("A new week starts now.", text);
+        Assert.True(text.Length <= 2000);
     }
 
     [Fact]
@@ -147,11 +165,11 @@ public class MessageTextTests
     }
 
     [Theory]
-    [InlineData(0.5050, "**Rank X** · 5🔥")]
-    [InlineData(0.5090, "**Rank S** · 4🔥")]
-    [InlineData(0.5130, "**Rank A** · 3🔥")]
-    [InlineData(0.5170, "**Rank B** · 2🔥")]
-    [InlineData(0.5210, "**Rank C** · 1🔥")]
+    [InlineData(0.5050, "**Rank X**")]
+    [InlineData(0.5090, "**Rank S**")]
+    [InlineData(0.5130, "**Rank A**")]
+    [InlineData(0.5170, "**Rank B**")]
+    [InlineData(0.5210, "**Rank C**")]
     public void Round_description_shows_the_difficulty_rank_open_and_closed(double winnerShare, string expected)
     {
         var round = Round();

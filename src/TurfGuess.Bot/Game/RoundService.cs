@@ -306,6 +306,9 @@ public sealed class RoundService(
         var votes = repo.GetVotes(round.Id);
         await channel.CloseRoundMessageAsync(round, options.Game.ShowVoteCount ? repo.GetVoters(round.Id) : null, ct);
 
+        // The old week's summary goes first, so the reveal below (whose standings are already the new week's) reads as the start of the new week.
+        await PostFinishedWeeksAsync(round, ct);
+
         ulong? revealId = await channel.FindRevealMessageAsync(round, ct);
         if (revealId is null)
         {
@@ -323,7 +326,6 @@ public sealed class RoundService(
 
         repo.MarkDone(round.Id, (long)revealId.Value);
         await NotifySubscribersAsync(round, votes, revealId.Value, ct);
-        await PostFinishedWeeksAsync(round, ct);
     }
 
     /// <summary>
@@ -421,7 +423,8 @@ public sealed class RoundService(
             RightVotes: votes.Count(v => v.ChoiceSide == Side.Right),
             Winners: outcomes.Where(o => o.Item1).Select(o => o.Item2).ToList(),
             Losers: outcomes.Where(o => !o.Item1).Select(o => o.Item2).ToList(),
-            Standings: scores.Standings(week));
+            Standings: scores.Standings(week),
+            Week: Weekly.WeekNumber(week));
     }
 
     /// <summary>
@@ -435,8 +438,9 @@ public sealed class RoundService(
         {
             try
             {
-                var winners = Weekly.WeekWinners(scores.Standings(week));
-                string? text = MessageText.WeekSummary(week, winners);
+                var standings = scores.Standings(week);
+                var winners = Weekly.WeekWinners(standings);
+                string? text = MessageText.WeekSummary(week, standings, scores.LatestNames(standings.Select(s => s.UserId)));
                 if (text is not null) await channel.PostWeekSummaryAsync(text, ct);
                 scores.CloseWeek(week, winners);
                 logger.LogInformation("Week of {Week}: finished, winners: {Winners}.", week,

@@ -192,7 +192,7 @@ public sealed class DiscordRoundChannel(DiscordSocketClient client, BotOptions o
         .WithTitle(MessageText.RoundTitle(round))
         .WithDescription(description)
         .WithImageUrl(MessageText.AttachmentUrl(fileName))
-        .WithFooter(MessageText.RoundFooter(round))
+        .WithFooter(MessageText.RoundFooter(round, options.Game.ParsedTimeZone))
         .WithTimestamp(round.RevealAtTime) // shown in the footer in each viewer's own time zone
         .Build();
 

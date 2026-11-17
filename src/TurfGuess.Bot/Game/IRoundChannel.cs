@@ -55,4 +55,5 @@ public sealed record RevealSummary(
     int RightVotes,
     IReadOnlyList<PlayerOutcome> Winners,
     IReadOnlyList<PlayerOutcome> Losers,
-    IReadOnlyList<StandingEntry> Standings);
+    IReadOnlyList<StandingEntry> Standings,
+    int Week = 0); // ISO number of the week the standings are for; 0 when there are none (regular battles)

@@ -290,7 +290,7 @@ Each database write happens **before** the Discord call it prepares for, and eac
 
 ### Messages (`Game/MessageText.cs` + `Discord/DiscordRoundChannel.cs`)
 
-- **Round message:** an embed with a title, a description with `<t:unix:R>` timestamps (each client shows them in its own time zone), an attached PNG and the footer `Round #{id}`, plus two grey buttons with the team emoji and name. Every edit (voter list, closing) builds the embed from scratch with the image as `attachment://round_{id}.png`. Copying the existing embed would bring the image back as a CDN link, and Discord would then show the attachment a second time above the embed.
+- **Round message:** an embed with a title, a description with `<t:unix:R>` timestamps (each client shows them in its own time zone), an attached PNG and the footer `Round #{id} (week W, day D/7)` (ranked rounds; the week and day of the reveal time in the game's time zone), plus two grey buttons with the team emoji and name. Every edit (voter list, closing) builds the embed from scratch with the image as `attachment://round_{id}.png`. Copying the existing embed would bring the image back as a CDN link, and Discord would then show the attachment a second time above the embed.
 - **Reveal:** an embed in the winner's color, with the winner, coverage, unpainted share and vote counts, the correct guessers as `<@id>` mentions, the reveal PNG and the footer `Round #{id} · Results`. It's sent with **`AllowedMentions.None`**, so names render but nobody is pinged. The list stops at `MaxListedWinners` and within 2000 characters ("…and N more"). The voter list on the round message uses the same mentions, capped at 50 names and the 4096-character embed limit.
 
 ### Logging

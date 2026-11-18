@@ -27,9 +27,40 @@ public static class MessageText
         $"{KindName(round.Kind)} · Round #{round.DisplayNumber}";
 
     /// <summary>The reminder under a ranked round shortly before its reveal. Links back to the round message.</summary>
-    public static string Reminder(RoundRecord round, int minutesLeft, string messageUrl) =>
-        $"**It's now or never!** Ranked Battle #{round.DisplayNumber} has {minutesLeft} {(minutesLeft == 1 ? "minute" : "minutes")} left.\n" +
-        $"[**Vote now!**]({messageUrl})";
+    public static string Reminder(RoundRecord round, int minutesLeft, string messageUrl, int leftVotes = 0, int rightVotes = 0,
+        (int Voters, int Correct)? previous = null)
+    {
+        var sb = new StringBuilder("**It's now or never!**\n");
+        sb.Append($"- Ranked Battle #{round.DisplayNumber} has {minutesLeft} {(minutesLeft == 1 ? "minute" : "minutes")} left.\n");
+
+        int voters = leftVotes + rightVotes;
+        if (voters == 0)
+            sb.Append("- Nobody has voted yet.\n");
+        else if (voters == 1)
+            sb.Append("- 1 person has voted already.\n"); // a split of one vote says nothing
+        else if (voters > 1)
+        {
+            // Only how lopsided the vote is, never which color is ahead.
+            int major = (int)Math.Round(100.0 * Math.Max(leftVotes, rightVotes) / voters, MidpointRounding.AwayFromZero);
+            string split = major switch
+            {
+                >= 86 => "with one color favoured heavily",
+                >= 56 => "with one color favoured over another",
+                _ => "with both colors favoured roughly equally",
+            };
+            sb.Append($"- {voters} people have voted already, {split}.\n");
+        }
+
+        if (previous is { Voters: > 0 } last)
+        {
+            sb.Append(last.Voters == 1
+                ? $"- Last time, 1 person voted, and they were {(last.Correct == 1 ? "right" : "wrong")}.\n"
+                : $"- Last time, {last.Voters} people voted. {(int)Math.Round(100.0 * last.Correct / last.Voters, MidpointRounding.AwayFromZero)}% were right.\n");
+        }
+
+        sb.Append($"[**Vote now!**]({messageUrl})");
+        return sb.ToString();
+    }
 
     /// <summary>
     /// Footer on the round message. A ranked round also says which week and day of the week it reveals in
@@ -157,6 +188,7 @@ public static class MessageText
             sb.AppendLine().AppendLine().AppendLine("**Admin commands**");
             sb.AppendLine("`/turf-admin status`: show the current ranked round");
             sb.AppendLine("`/turf-admin reveal-now`: reveal the current ranked round now and post the next one");
+            sb.AppendLine("`/turf-admin remind`: post the \"now or never\" reminder for the current ranked round now");
             sb.AppendLine("`/turf-admin reset-round`: cancel the current ranked round and start a new one");
             sb.AppendLine("`/turf-admin reset-scores`: wipe all weekly scores (asks for confirmation)");
             sb.Append("`/turf-admin set-ranked-channel`: choose the channel ranked battles are posted in");
@@ -170,6 +202,9 @@ public static class MessageText
 
     public static string RankedChannelUnusable(ulong channelId, string missing) =>
         $"I can't use <#{channelId}>: I'm missing the {missing} permission there. Give me access and run the command again.";
+
+    public const string NoRankedRoundToRemind = "There's no open ranked round to remind people about right now.";
+    public const string ReminderPosted = "Posted the reminder. The automatic one still goes out at its usual time.";
 
     public const string NoBattleRunning = "There's no Regular Battle running right now.";
     public const string BattleRevealNotAllowed = "Only the player who started this Regular Battle, or an admin, can reveal it early.";

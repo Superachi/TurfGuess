@@ -194,13 +194,7 @@ public sealed class RoundService(
         var postedAt = round.PostedAt is { } p ? DateTimeOffset.FromUnixTimeSeconds(p) : now;
         if (postedAt <= due)
         {
-            // Late (the bot was down at the due time) still says the truth: it counts the minutes that are really left.
-            int minutesLeft = Math.Max(1, (int)Math.Ceiling((round.RevealAtTime - now).TotalMinutes));
-            try
-            {
-                var id = await channel.PostReminderAsync(round, minutesLeft, ct);
-                logger.LogInformation("Round {RoundId}: posted the reminder (message {MessageId}), {Minutes} minutes before the reveal.", round.Id, id, minutesLeft);
-            }
+            try { await PostReminderAsync(round, now, ct); }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 logger.LogWarning(ex, "Round {RoundId}: couldn't post the reminder; skipping it.", round.Id);
@@ -209,6 +203,33 @@ public sealed class RoundService(
 
         repo.MarkReminderSent(round.Id); // also when skipped, so it isn't reconsidered
         return null;
+    }
+
+    /// <summary>
+    /// Posts the "now or never" reminder for the open ranked round right away (admin command). It doesn't touch the
+    /// automatic reminder, which still goes out at its usual time. Returns the minutes left that the reminder
+    /// states, or null when there is no open ranked round to remind about. A failed post throws.
+    /// </summary>
+    public async Task<int?> RemindNowAsync(DateTimeOffset now, CancellationToken ct)
+    {
+        await _gate.WaitAsync(ct);
+        try
+        {
+            var round = repo.GetActive(RoundKind.Ranked);
+            if (round is not { Status: RoundStatus.Open, MessageId: not null } || now >= round.RevealAtTime) return null;
+            return await PostReminderAsync(round, now, ct);
+        }
+        finally { _gate.Release(); }
+    }
+
+    /// <summary>Posts the reminder with the minutes that are really left (late reminders still say the truth). Returns that number.</summary>
+    private async Task<int> PostReminderAsync(RoundRecord round, DateTimeOffset now, CancellationToken ct)
+    {
+        int minutesLeft = Math.Max(1, (int)Math.Ceiling((round.RevealAtTime - now).TotalMinutes));
+        var (left, right) = repo.CountVotesBySide(round.Id);
+        var id = await channel.PostReminderAsync(round, minutesLeft, left, right, repo.GetPreviousRankedTurnout(round.Id), ct);
+        logger.LogInformation("Round {RoundId}: posted the reminder (message {MessageId}), {Minutes} minutes before the reveal.", round.Id, id, minutesLeft);
+        return minutesLeft;
     }
 
     /// <summary>Moves the open round's reveal to now. Returns false when no round of that kind is open.</summary>

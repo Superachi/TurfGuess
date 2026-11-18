@@ -74,7 +74,7 @@ public class ChannelTests
     {
         string admin = MessageText.Help(isAdmin: true);
         Assert.Contains("/turf battle", admin);
-        foreach (var command in new[] { "status", "reveal-now", "reset-round", "reset-scores", "set-ranked-channel" })
+        foreach (var command in new[] { "status", "reveal-now", "remind", "reset-round", "reset-scores", "set-ranked-channel" })
             Assert.Contains("/turf-admin " + command, admin);
     }
 }
@@ -161,6 +161,32 @@ public class ReminderTests
     }
 
     [Fact]
+    public async Task An_admin_can_post_the_reminder_now_and_the_automatic_one_still_follows()
+    {
+        using var env = new TestEnvironment();
+        var round = await OpenRankedAsync(env);
+
+        Assert.NotNull(await env.Rounds.RemindNowAsync(Now, default));
+        var (id, minutes) = Assert.Single(env.Channel.Reminders);
+        Assert.Equal(round.Id, id);
+        Assert.Equal((int)Math.Ceiling((round.RevealAtTime - Now).TotalMinutes), minutes);
+
+        await env.Rounds.AdvanceAsync(round.RevealAtTime.AddMinutes(-60), default);
+        Assert.Equal(2, env.Channel.Reminders.Count);
+    }
+
+    [Fact]
+    public async Task Reminding_needs_an_open_ranked_round()
+    {
+        using var env = new TestEnvironment();
+        Assert.Null(await env.Rounds.RemindNowAsync(Now, default)); // nothing posted yet
+
+        var round = await OpenRankedAsync(env);
+        Assert.Null(await env.Rounds.RemindNowAsync(round.RevealAtTime.AddMinutes(1), default)); // voting is over
+        Assert.Empty(env.Channel.Reminders);
+    }
+
+    [Fact]
     public async Task The_scheduler_is_woken_at_the_reminder_time()
     {
         using var env = new TestEnvironment();
@@ -228,8 +254,32 @@ public class ReminderTests
     public void The_text_and_validation()
     {
         var round = new RoundRecord { Id = 12, Number = 12 };
-        Assert.Equal("**It's now or never!** Ranked Battle #12 has 60 minutes left.\n[**Vote now!**](https://x/y)", MessageText.Reminder(round, 60, "https://x/y"));
+        Assert.Equal("**It's now or never!**\n- Ranked Battle #12 has 60 minutes left.\n- Nobody has voted yet.\n[**Vote now!**](https://x/y)", MessageText.Reminder(round, 60, "https://x/y"));
         Assert.Contains("1 minute left", MessageText.Reminder(round, 1, "u"));
+
+        Assert.Equal("**It's now or never!**\n- Ranked Battle #12 has 60 minutes left.\n- 8 people have voted already, with one color favoured over another.\n" +
+                     "- Last time, 7 people voted. 43% were right.\n[**Vote now!**](https://x/y)",
+            MessageText.Reminder(round, 60, "https://x/y", leftVotes: 3, rightVotes: 5, previous: (7, 3)));
+
+        // One voter: no split.
+        var single = MessageText.Reminder(round, 5, "u", 1, 0);
+        Assert.Contains("- 1 person has voted already.\n", single);
+        Assert.DoesNotContain("favoured", single);
+
+        // Bands, whichever team leads: up to 55% roughly equal, 56%+ favoured, 86%+ heavily.
+        foreach (var (a, b) in new[] { (5, 5), (11, 9), (6, 4), (4, 6), (17, 3), (3, 17) })
+        {
+            string text = MessageText.Reminder(round, 5, "u", a, b);
+            int major = (int)Math.Round(100.0 * Math.Max(a, b) / (a + b), MidpointRounding.AwayFromZero);
+            string expected = major >= 86 ? "favoured heavily" : major >= 56 ? "favoured over another" : "favoured roughly equally";
+            Assert.Contains(expected, text);
+        }
+        Assert.Contains("with both colors favoured roughly equally", MessageText.Reminder(round, 5, "u", 11, 9));
+        Assert.Contains("with one color favoured over another", MessageText.Reminder(round, 5, "u", 3, 2));
+        Assert.Contains("with one color favoured heavily", MessageText.Reminder(round, 5, "u", 0, 7));
+
+        Assert.Contains("- Last time, 1 person voted, and they were right.\n", MessageText.Reminder(round, 5, "u", previous: (1, 1)));
+        Assert.Contains("- Last time, 1 person voted, and they were wrong.\n", MessageText.Reminder(round, 5, "u", previous: (1, 0)));
 
         var o = new TurfGuess.Bot.Options.BotOptions { Discord = { Token = "t", ChannelId = 1 }, Game = { ReminderMinutes = -1 } };
         Assert.Contains(TurfGuess.Bot.Options.BotOptionsValidator.Validate(o), e => e.Contains("ReminderMinutes"));

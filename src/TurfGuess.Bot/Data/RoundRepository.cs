@@ -231,6 +231,32 @@ public sealed class RoundRepository(Database db)
         return c.Query<long>("SELECT user_id FROM bets WHERE round_id = @roundId", new { roundId }).ToHashSet();
     }
 
+    /// <summary>How many voters picked each team.</summary>
+    public (int Left, int Right) CountVotesBySide(long roundId)
+    {
+        using var c = db.Open();
+        var (left, right) = c.Query<(long LeftVotes, long RightVotes)>("""
+            SELECT COALESCE(SUM(choice = @left), 0) AS LeftVotes, COALESCE(SUM(choice = @right), 0) AS RightVotes
+            FROM votes WHERE round_id = @roundId
+            """, new { roundId, left = SideCodec.Format(Side.Left), right = SideCodec.Format(Side.Right) }).Single();
+        return ((int)left, (int)right);
+    }
+
+    /// <summary>
+    /// How many people voted in the last finished ranked round before <paramref name="roundId"/>, and how many of them guessed right.
+    /// Null when there is no such round, or nobody voted in it.
+    /// </summary>
+    public (int Voters, int Correct)? GetPreviousRankedTurnout(long roundId)
+    {
+        using var c = db.Open();
+        var (voters, correct) = c.Query<(long Voters, long Correct)>("""
+            SELECT COUNT(*) AS Voters, COALESCE(SUM(v.choice = r.winner), 0) AS Correct
+            FROM votes v JOIN rounds r ON r.id = v.round_id
+            WHERE v.round_id = (SELECT MAX(id) FROM rounds WHERE kind = 'Ranked' AND status = 'Done' AND id < @roundId)
+            """, new { roundId }).Single(); // an aggregate query always returns one row
+        return voters > 0 ? ((int)voters, (int)correct) : null;
+    }
+
     public int CountVotes(long roundId)
     {
         using var c = db.Open();

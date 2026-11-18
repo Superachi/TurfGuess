@@ -100,6 +100,15 @@ public static partial class MessagePreview
         sb.AppendLine(Show(MessageText.RoundDescription(round, voters, closed: false, difficulty: options.Generator.Difficulty)));
         sb.AppendLine();
 
+        Section(sb, "3b. \"Now or never\" reminder (posted automatically before the reveal, or by /turf-admin remind)");
+        const string sampleLink = "https://discord.com/channels/1/2/3";
+        Messages(sb,
+            Show(MessageText.Reminder(round, 60, sampleLink)) + "  (nobody has voted yet)",
+            Show(MessageText.Reminder(round, 60, sampleLink, leftVotes: 1, rightVotes: 0, previous: (7, 3))) + "  (one voter)",
+            Show(MessageText.Reminder(round, 60, sampleLink, leftVotes: 4, rightVotes: 4, previous: (7, 3))) + "  (an even vote)",
+            Show(MessageText.Reminder(round, 60, sampleLink, leftVotes: 3, rightVotes: 5, previous: (7, 3))) + "  (one color favoured)",
+            Show(MessageText.Reminder(round, 15, sampleLink, leftVotes: 1, rightVotes: 11, previous: (1, 1))) + "  (one color favoured heavily)");
+
         Section(sb, "4. Clicking after voting closed (only the clicker sees this)");
         sb.AppendLine(MessageText.VotingClosed);
         sb.AppendLine();

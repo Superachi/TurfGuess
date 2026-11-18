@@ -481,6 +481,7 @@ Admin commands live under their own top-level command, **`/turf-admin`**. Discor
 | Command | Who | Status |
 |---|---|---|
 | `/turf-admin reveal-now` | Admins | ✅ Reveals the open round now and posts the next one. Handy for testing. |
+| `/turf-admin remind` | Admins | ✅ Posts the "now or never" reminder for the open ranked round now. The automatic one is unaffected. |
 | `/turf-admin status` | Admins | ✅ Shows the current round, its colors, reveal time and vote count. |
 | `/turf stats` | Everyone | Later (milestone 4): your accuracy and streak |
 | `/turf leaderboard` | Everyone | Later (milestone 4) |

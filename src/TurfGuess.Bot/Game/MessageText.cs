@@ -27,9 +27,21 @@ public static class MessageText
         $"{KindName(round.Kind)} · Round #{round.DisplayNumber}";
 
     /// <summary>The reminder under a ranked round shortly before its reveal. Links back to the round message.</summary>
-    public static string Reminder(RoundRecord round, int minutesLeft, string messageUrl) =>
-        $"**It's now or never!** Ranked Battle #{round.DisplayNumber} has {minutesLeft} {(minutesLeft == 1 ? "minute" : "minutes")} left.\n" +
-        $"[**Vote now!**]({messageUrl})";
+    public static string Reminder(RoundRecord round, int minutesLeft, string messageUrl, int leftVotes = 0, int rightVotes = 0)
+    {
+        int voters = leftVotes + rightVotes;
+        string votes = "";
+        if (voters > 0)
+        {
+            // Larger share first, e.g. "60/40%"; the votes don't say which team is ahead.
+            int major = (int)Math.Round(100.0 * Math.Max(leftVotes, rightVotes) / voters, MidpointRounding.AwayFromZero);
+            votes = $"{voters} {(voters == 1 ? "person has" : "people have")} voted already, with a {major}/{100 - major}% split.\n";
+        }
+
+        return $"**It's now or never!** Ranked Battle #{round.DisplayNumber} has {minutesLeft} {(minutesLeft == 1 ? "minute" : "minutes")} left.\n" +
+               votes +
+               $"[**Vote now!**]({messageUrl})";
+    }
 
     /// <summary>
     /// Footer on the round message. A ranked round also says which week and day of the week it reveals in

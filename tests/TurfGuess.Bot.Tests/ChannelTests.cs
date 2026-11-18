@@ -230,6 +230,9 @@ public class ReminderTests
         var round = new RoundRecord { Id = 12, Number = 12 };
         Assert.Equal("**It's now or never!** Ranked Battle #12 has 60 minutes left.\n[**Vote now!**](https://x/y)", MessageText.Reminder(round, 60, "https://x/y"));
         Assert.Contains("1 minute left", MessageText.Reminder(round, 1, "u"));
+        Assert.Equal("**It's now or never!** Ranked Battle #12 has 60 minutes left.\n8 people have voted already, with a 63/37% split.\n[**Vote now!**](https://x/y)",
+            MessageText.Reminder(round, 60, "https://x/y", leftVotes: 3, rightVotes: 5));
+        Assert.Contains("1 person has voted already, with a 100/0% split.", MessageText.Reminder(round, 5, "u", 1, 0));
 
         var o = new TurfGuess.Bot.Options.BotOptions { Discord = { Token = "t", ChannelId = 1 }, Game = { ReminderMinutes = -1 } };
         Assert.Contains(TurfGuess.Bot.Options.BotOptionsValidator.Validate(o), e => e.Contains("ReminderMinutes"));

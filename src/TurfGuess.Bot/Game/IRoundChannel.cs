@@ -42,8 +42,11 @@ public interface IRoundChannel
     /// <summary>Posts the reveal (text + image). Returns the message id.</summary>
     Task<ulong> PostRevealAsync(RoundRecord round, RevealSummary summary, string imagePath, CancellationToken ct);
 
-    /// <summary>Posts a reminder to vote in the round's channel, linking to the round message. Returns the message id.</summary>
-    Task<ulong> PostReminderAsync(RoundRecord round, int minutesLeft, CancellationToken ct);
+    /// <summary>
+    /// Posts a reminder to vote in the round's channel, linking to the round message, with how many voted for each team so far.
+    /// Returns the message id.
+    /// </summary>
+    Task<ulong> PostReminderAsync(RoundRecord round, int minutesLeft, int leftVotes, int rightVotes, CancellationToken ct);
 
     /// <summary>Posts the summary of a finished week in the ranked channel (text only, nobody is pinged).</summary>
     Task PostWeekSummaryAsync(string text, CancellationToken ct);

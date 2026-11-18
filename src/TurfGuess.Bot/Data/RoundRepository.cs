@@ -231,6 +231,17 @@ public sealed class RoundRepository(Database db)
         return c.Query<long>("SELECT user_id FROM bets WHERE round_id = @roundId", new { roundId }).ToHashSet();
     }
 
+    /// <summary>How many voters picked each team.</summary>
+    public (int Left, int Right) CountVotesBySide(long roundId)
+    {
+        using var c = db.Open();
+        int left = c.ExecuteScalar<int>("SELECT COUNT(*) FROM votes WHERE round_id = @roundId AND choice = @choice",
+            new { roundId, choice = SideCodec.Format(Side.Left) });
+        int right = c.ExecuteScalar<int>("SELECT COUNT(*) FROM votes WHERE round_id = @roundId AND choice = @choice",
+            new { roundId, choice = SideCodec.Format(Side.Right) });
+        return (left, right);
+    }
+
     public int CountVotes(long roundId)
     {
         using var c = db.Open();

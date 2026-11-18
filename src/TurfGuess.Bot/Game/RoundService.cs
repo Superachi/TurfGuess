@@ -198,7 +198,8 @@ public sealed class RoundService(
             int minutesLeft = Math.Max(1, (int)Math.Ceiling((round.RevealAtTime - now).TotalMinutes));
             try
             {
-                var id = await channel.PostReminderAsync(round, minutesLeft, ct);
+                var (left, right) = repo.CountVotesBySide(round.Id);
+                var id = await channel.PostReminderAsync(round, minutesLeft, left, right, ct);
                 logger.LogInformation("Round {RoundId}: posted the reminder (message {MessageId}), {Minutes} minutes before the reveal.", round.Id, id, minutesLeft);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)

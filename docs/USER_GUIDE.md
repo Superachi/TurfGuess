@@ -48,6 +48,7 @@ Every round has a difficulty rank from C (easiest) to X (hardest), worth 1 to 5 
 
 - **A correct guess earns the round's points.** A wrong guess costs nothing.
 - **Press 🎲 Bet** to risk those points: a correct guess earns **double**, a wrong guess **loses** the round's points. Press it again to take the bet back. You can change your bet, like your vote, until the reveal. A bet only counts if you voted too.
+- **Press ℹ️ Info** to check what you voted and whether your bet is on. Only you see the answer.
 - **Your weekly score never drops below 0**, so you can always catch up.
 - The reveal lists winners and losers with their points (🎲 marks a bet, `~` means no change) and the top 3 of the week. The footer of a ranked round says which week and day it is, like `Round #5 (week 47, day 2/7)`.
 - **Weeks run Monday to Monday** in the game's time zone (`Game:TimeZone`). Right before the first reveal of a new week, the bot announces last week's winner (the most points, then the most wins, i.e. correct guesses) with the final standings of everyone who scored. Players still tied all win. Everyone starts the new week at 0.

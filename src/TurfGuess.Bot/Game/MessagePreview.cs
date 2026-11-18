@@ -68,7 +68,7 @@ public static partial class MessagePreview
             .ToString("d MMMM yyyy HH:mm", CultureInfo.InvariantCulture); // Discord shows the footer timestamp in the viewer's own time zone
         string Show(string text) => raw ? text : Humanize(text, options.Game.ParsedTimeZone, now);
         string buttons(bool disabled) =>
-            $"[ {round.LeftEmoji} {round.LeftName} ]  [ {round.RightEmoji} {round.RightName} ]  [ {MessageText.BetButtonEmoji} {MessageText.BetButtonLabel} ]" +
+            $"[ {round.LeftEmoji} {round.LeftName} ]  [ {round.RightEmoji} {round.RightName} ]  [ {MessageText.BetButtonEmoji} {MessageText.BetButtonLabel} ]  [ {MessageText.InfoButtonEmoji} {MessageText.InfoButtonLabel} ]" +
             (disabled ? "  (disabled)" : "");
 
         var sb = new StringBuilder();
@@ -94,6 +94,14 @@ public static partial class MessagePreview
             Show(MessageText.BetToggled(round, bet: true, hasVoted: true, options.Generator.Difficulty)),
             Show(MessageText.BetToggled(round, bet: true, hasVoted: false, options.Generator.Difficulty)),
             Show(MessageText.BetToggled(round, bet: false, hasVoted: true, options.Generator.Difficulty)));
+
+        Section(sb, "2c. Pressing the Info button (only the player sees this)");
+        var difficulty = options.Generator.Difficulty;
+        Messages(sb,
+            "Voted, bet on:\n" + Show(MessageText.MyVoteInfo(round, Side.Left, bet: true, difficulty)),
+            "Voted, no bet:\n" + Show(MessageText.MyVoteInfo(round, Side.Right, bet: false, difficulty)),
+            "Not voted yet, bet on:\n" + Show(MessageText.MyVoteInfo(round, null, bet: true, difficulty)),
+            "Not voted yet, no bet:\n" + Show(MessageText.MyVoteInfo(round, null, bet: false, difficulty)));
 
         Section(sb, "3. Round message, live voter list (edited at most every " +
                     $"{options.Discord.VoteCountInterval.TotalSeconds:0} s)");
@@ -149,7 +157,7 @@ public static partial class MessagePreview
             RightEmoji = battle.RightEmoji, Winner = battle.Winner, WinnerShare = battle.WinnerShare,
         };
         var battleVoters = ids.Select((id, i) => new Voter(id, false, i < 6 ? Side.Left : Side.Right)).ToList();
-        string battleButtons = $"[ {round.LeftEmoji} {round.LeftName} ]  [ {round.RightEmoji} {round.RightName} ]  [ {MessageText.BattleRevealButtonLabel} ]";
+        string battleButtons = $"[ {round.LeftEmoji} {round.LeftName} ]  [ {round.RightEmoji} {round.RightName} ]  [ {MessageText.BattleRevealButtonLabel} ]  [ {MessageText.InfoButtonEmoji} {MessageText.InfoButtonLabel} ]";
         var battleWinners = winners.Select(o => o with { Bet = false, Delta = 0 }).ToList();
         var battleLosers = losers.Select(o => o with { Bet = false, Delta = 0 }).ToList();
         var battleSummary = new RevealSummary(summary.LeftVotes, summary.RightVotes, battleWinners, battleLosers, []);
@@ -175,6 +183,10 @@ public static partial class MessagePreview
         sb.AppendLine($"Buttons: {battleButtons}");
         sb.AppendLine(Show(MessageText.VoteAccepted(publicBattle, Side.Left)));
         sb.AppendLine();
+        sb.AppendLine("Pressing Info (hidden votes / public votes):");
+        Messages(sb,
+            Show(MessageText.MyVoteInfo(battle, Side.Left, bet: false, options.Generator.Difficulty)),
+            Show(MessageText.MyVoteInfo(publicBattle, Side.Left, bet: false, options.Generator.Difficulty)));
 
         Section(sb, "10. Regular Battle reveal (no points, no weekly standings, no pings)");
         Embed(sb, null, Show(MessageText.Reveal(battle, battleSummary, options.Game.MaxListedWinners, difficulty: options.Generator.Difficulty)),

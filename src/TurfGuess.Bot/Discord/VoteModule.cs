@@ -29,6 +29,21 @@ public sealed class VoteModule(VoteService votes, RoundRepository repo, BotOptio
             : MessageText.VoteAccepted(round, side, repo.HasBet(roundId, (long)Context.User.Id), options.Generator.Difficulty), ephemeral: true);
     }
 
+    [ComponentInteraction("info:*", ignoreGroupNames: true)]
+    public async Task InfoAsync(string roundIdText)
+    {
+        var round = long.TryParse(roundIdText, out long roundId) ? repo.Get(roundId) : null;
+        if (round is not { Status: RoundStatus.Open })
+        {
+            await RespondAsync(MessageText.VotingClosed, ephemeral: true);
+            return;
+        }
+
+        long userId = (long)Context.User.Id;
+        var vote = repo.GetVote(roundId, userId);
+        await RespondAsync(MessageText.MyVoteInfo(round, vote?.ChoiceSide, repo.HasBet(roundId, userId), options.Generator.Difficulty), ephemeral: true);
+    }
+
     [ComponentInteraction("bet:*", ignoreGroupNames: true)]
     public async Task BetAsync(string roundIdText)
     {

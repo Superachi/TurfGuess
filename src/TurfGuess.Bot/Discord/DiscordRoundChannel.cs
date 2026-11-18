@@ -214,6 +214,8 @@ public sealed class DiscordRoundChannel(DiscordSocketClient client, BotOptions o
         else
             builder.WithButton(MessageText.BattleRevealButtonLabel, MessageText.BattleRevealButtonId(round.Id), ButtonStyle.Primary,
                 disabled: disabled);
+        builder.WithButton(MessageText.InfoButtonLabel, MessageText.InfoButtonId(round.Id), ButtonStyle.Secondary,
+            emote: new Emoji(MessageText.InfoButtonEmoji), disabled: disabled);
         return builder.Build();
     }
 

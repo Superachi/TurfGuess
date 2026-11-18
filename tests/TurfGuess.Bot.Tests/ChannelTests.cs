@@ -232,7 +232,12 @@ public class ReminderTests
         Assert.Contains("1 minute left", MessageText.Reminder(round, 1, "u"));
         Assert.Equal("**It's now or never!** Ranked Battle #12 has 60 minutes left.\n8 people have voted already, with a 63/37% split.\n[**Vote now!**](https://x/y)",
             MessageText.Reminder(round, 60, "https://x/y", leftVotes: 3, rightVotes: 5));
-        Assert.Contains("1 person has voted already, with a 100/0% split.", MessageText.Reminder(round, 5, "u", 1, 0));
+        var single = MessageText.Reminder(round, 5, "u", 1, 0);
+        Assert.Contains("1 person has voted already.\n", single);
+        Assert.DoesNotContain("split", single);
+        // The bigger percentage always comes first, whichever team leads.
+        Assert.Contains("a 75/25% split", MessageText.Reminder(round, 5, "u", leftVotes: 1, rightVotes: 3));
+        Assert.Contains("a 75/25% split", MessageText.Reminder(round, 5, "u", leftVotes: 3, rightVotes: 1));
 
         var o = new TurfGuess.Bot.Options.BotOptions { Discord = { Token = "t", ChannelId = 1 }, Game = { ReminderMinutes = -1 } };
         Assert.Contains(TurfGuess.Bot.Options.BotOptionsValidator.Validate(o), e => e.Contains("ReminderMinutes"));

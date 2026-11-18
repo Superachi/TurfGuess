@@ -35,7 +35,9 @@ public static class MessageText
         {
             // Larger share first, e.g. "60/40%"; the votes don't say which team is ahead.
             int major = (int)Math.Round(100.0 * Math.Max(leftVotes, rightVotes) / voters, MidpointRounding.AwayFromZero);
-            votes = $"{voters} {(voters == 1 ? "person has" : "people have")} voted already, with a {major}/{100 - major}% split.\n";
+            votes = voters == 1
+                ? "1 person has voted already.\n" // a split of one vote says nothing
+                : $"{voters} people have voted already, with a {major}/{100 - major}% split.\n";
         }
 
         return $"**It's now or never!** Ranked Battle #{round.DisplayNumber} has {minutesLeft} {(minutesLeft == 1 ? "minute" : "minutes")} left.\n" +

@@ -20,6 +20,9 @@ public class MessagePreviewTests
         Assert.Contains("Which team do you think painted more? Cast your vote!", text);
         Assert.Contains("You voted", text);
         Assert.Contains("**11 players have voted:** 🎲@Player1, @Player2, 🎲@Player3", text);
+        Assert.Contains("**It's now or never!**", text);
+        Assert.Contains("- Nobody has voted yet.", text);
+        Assert.Contains("favoured heavily", text);
         Assert.Contains(MessageText.VotingClosed, text);
         Assert.Contains("(disabled)", text);
         Assert.Contains("wins!", text);

@@ -281,7 +281,7 @@ dotnet run --project src\TurfGuess.Bot -c Release -- --preview-messages
 ```
 
 This builds a sample round with the real generator and prints every message for it, numbered in the output:
-- the ranked round post with its buttons, the vote and bet replies, the live list of who has voted, the "voting is closed" reply, and the round post after it closes,
+- the ranked round post with its buttons, the vote and bet replies, the live list of who has voted, the "now or never" reminder, the "voting is closed" reply, and the round post after it closes,
 - the reveal and the weekly summary (the summary is posted before the first reveal of a new week),
 - the Regular Battle messages, their reveal, and the replies to `/turf battle` and `/turf battle-reveal`,
 - the `/turf subscribe` and `/turf unsubscribe` replies and the private result messages,

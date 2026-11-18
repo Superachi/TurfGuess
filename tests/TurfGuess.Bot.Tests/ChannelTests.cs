@@ -228,16 +228,32 @@ public class ReminderTests
     public void The_text_and_validation()
     {
         var round = new RoundRecord { Id = 12, Number = 12 };
-        Assert.Equal("**It's now or never!** Ranked Battle #12 has 60 minutes left.\n[**Vote now!**](https://x/y)", MessageText.Reminder(round, 60, "https://x/y"));
+        Assert.Equal("**It's now or never!**\n- Ranked Battle #12 has 60 minutes left.\n[**Vote now!**](https://x/y)", MessageText.Reminder(round, 60, "https://x/y"));
         Assert.Contains("1 minute left", MessageText.Reminder(round, 1, "u"));
-        Assert.Equal("**It's now or never!** Ranked Battle #12 has 60 minutes left.\n8 people have voted already, with a 63/37% split.\n[**Vote now!**](https://x/y)",
-            MessageText.Reminder(round, 60, "https://x/y", leftVotes: 3, rightVotes: 5));
+
+        Assert.Equal("**It's now or never!**\n- Ranked Battle #12 has 60 minutes left.\n- 8 people have voted already, with one color favoured over another.\n" +
+                     "- Last time, 7 people voted. 43% were right.\n[**Vote now!**](https://x/y)",
+            MessageText.Reminder(round, 60, "https://x/y", leftVotes: 3, rightVotes: 5, previous: (7, 3)));
+
+        // One voter: no split.
         var single = MessageText.Reminder(round, 5, "u", 1, 0);
-        Assert.Contains("1 person has voted already.\n", single);
-        Assert.DoesNotContain("split", single);
-        // The bigger percentage always comes first, whichever team leads.
-        Assert.Contains("a 75/25% split", MessageText.Reminder(round, 5, "u", leftVotes: 1, rightVotes: 3));
-        Assert.Contains("a 75/25% split", MessageText.Reminder(round, 5, "u", leftVotes: 3, rightVotes: 1));
+        Assert.Contains("- 1 person has voted already.\n", single);
+        Assert.DoesNotContain("favoured", single);
+
+        // Bands, whichever team leads: up to 55% roughly equal, 56%+ favoured, 86%+ heavily.
+        foreach (var (a, b) in new[] { (5, 5), (11, 9), (6, 4), (4, 6), (17, 3), (3, 17) })
+        {
+            string text = MessageText.Reminder(round, 5, "u", a, b);
+            int major = (int)Math.Round(100.0 * Math.Max(a, b) / (a + b), MidpointRounding.AwayFromZero);
+            string expected = major >= 86 ? "favoured heavily" : major >= 56 ? "favoured over another" : "favoured roughly equally";
+            Assert.Contains(expected, text);
+        }
+        Assert.Contains("with both colors favoured roughly equally", MessageText.Reminder(round, 5, "u", 11, 9));
+        Assert.Contains("with one color favoured over another", MessageText.Reminder(round, 5, "u", 3, 2));
+        Assert.Contains("with one color favoured heavily", MessageText.Reminder(round, 5, "u", 0, 7));
+
+        Assert.Contains("- Last time, 1 person voted, and they were right.\n", MessageText.Reminder(round, 5, "u", previous: (1, 1)));
+        Assert.Contains("- Last time, 1 person voted, and they were wrong.\n", MessageText.Reminder(round, 5, "u", previous: (1, 0)));
 
         var o = new TurfGuess.Bot.Options.BotOptions { Discord = { Token = "t", ChannelId = 1 }, Game = { ReminderMinutes = -1 } };
         Assert.Contains(TurfGuess.Bot.Options.BotOptionsValidator.Validate(o), e => e.Contains("ReminderMinutes"));

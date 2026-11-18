@@ -242,6 +242,21 @@ public sealed class RoundRepository(Database db)
         return (left, right);
     }
 
+    /// <summary>
+    /// How many people voted in the last finished ranked round before <paramref name="roundId"/>, and how many of them guessed right.
+    /// Null when there is no such round, or nobody voted in it.
+    /// </summary>
+    public (int Voters, int Correct)? GetPreviousRankedTurnout(long roundId)
+    {
+        using var c = db.Open();
+        var (voters, correct) = c.Query<(long Voters, long Correct)>("""
+            SELECT COUNT(*) AS Voters, COALESCE(SUM(v.choice = r.winner), 0) AS Correct
+            FROM votes v JOIN rounds r ON r.id = v.round_id
+            WHERE v.round_id = (SELECT MAX(id) FROM rounds WHERE kind = 'Ranked' AND status = 'Done' AND id < @roundId)
+            """, new { roundId }).Single(); // an aggregate query always returns one row
+        return voters > 0 ? ((int)voters, (int)correct) : null;
+    }
+
     public int CountVotes(long roundId)
     {
         using var c = db.Open();

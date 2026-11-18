@@ -169,7 +169,7 @@ public sealed class FakeChannel : IRoundChannel
     public List<(long RoundId, int MinutesLeft)> Reminders { get; } = [];
     public bool FailReminders { get; set; }
 
-    public Task<ulong> PostReminderAsync(RoundRecord round, int minutesLeft, int leftVotes, int rightVotes, CancellationToken ct)
+    public Task<ulong> PostReminderAsync(RoundRecord round, int minutesLeft, int leftVotes, int rightVotes, (int Voters, int Correct)? previous, CancellationToken ct)
     {
         if (FailReminders) throw new InvalidOperationException("Missing permissions.");
         Reminders.Add((round.Id, minutesLeft));

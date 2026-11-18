@@ -199,7 +199,7 @@ public sealed class RoundService(
             try
             {
                 var (left, right) = repo.CountVotesBySide(round.Id);
-                var id = await channel.PostReminderAsync(round, minutesLeft, left, right, ct);
+                var id = await channel.PostReminderAsync(round, minutesLeft, left, right, repo.GetPreviousRankedTurnout(round.Id), ct);
                 logger.LogInformation("Round {RoundId}: posted the reminder (message {MessageId}), {Minutes} minutes before the reveal.", round.Id, id, minutesLeft);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)

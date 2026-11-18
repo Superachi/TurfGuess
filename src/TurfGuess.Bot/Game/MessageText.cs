@@ -27,22 +27,37 @@ public static class MessageText
         $"{KindName(round.Kind)} · Round #{round.DisplayNumber}";
 
     /// <summary>The reminder under a ranked round shortly before its reveal. Links back to the round message.</summary>
-    public static string Reminder(RoundRecord round, int minutesLeft, string messageUrl, int leftVotes = 0, int rightVotes = 0)
+    public static string Reminder(RoundRecord round, int minutesLeft, string messageUrl, int leftVotes = 0, int rightVotes = 0,
+        (int Voters, int Correct)? previous = null)
     {
+        var sb = new StringBuilder("**It's now or never!**\n");
+        sb.Append($"- Ranked Battle #{round.DisplayNumber} has {minutesLeft} {(minutesLeft == 1 ? "minute" : "minutes")} left.\n");
+
         int voters = leftVotes + rightVotes;
-        string votes = "";
-        if (voters > 0)
+        if (voters == 1)
+            sb.Append("- 1 person has voted already.\n"); // a split of one vote says nothing
+        else if (voters > 1)
         {
-            // Larger share first, e.g. "60/40%"; the votes don't say which team is ahead.
+            // Only how lopsided the vote is, never which color is ahead.
             int major = (int)Math.Round(100.0 * Math.Max(leftVotes, rightVotes) / voters, MidpointRounding.AwayFromZero);
-            votes = voters == 1
-                ? "1 person has voted already.\n" // a split of one vote says nothing
-                : $"{voters} people have voted already, with a {major}/{100 - major}% split.\n";
+            string split = major switch
+            {
+                >= 86 => "with one color favoured heavily",
+                >= 56 => "with one color favoured over another",
+                _ => "with both colors favoured roughly equally",
+            };
+            sb.Append($"- {voters} people have voted already, {split}.\n");
         }
 
-        return $"**It's now or never!** Ranked Battle #{round.DisplayNumber} has {minutesLeft} {(minutesLeft == 1 ? "minute" : "minutes")} left.\n" +
-               votes +
-               $"[**Vote now!**]({messageUrl})";
+        if (previous is { Voters: > 0 } last)
+        {
+            sb.Append(last.Voters == 1
+                ? $"- Last time, 1 person voted, and they were {(last.Correct == 1 ? "right" : "wrong")}.\n"
+                : $"- Last time, {last.Voters} people voted. {(int)Math.Round(100.0 * last.Correct / last.Voters, MidpointRounding.AwayFromZero)}% were right.\n");
+        }
+
+        sb.Append($"[**Vote now!**]({messageUrl})");
+        return sb.ToString();
     }
 
     /// <summary>

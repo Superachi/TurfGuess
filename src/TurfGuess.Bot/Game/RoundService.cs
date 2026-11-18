@@ -113,14 +113,15 @@ public sealed class RoundService(
     /// <summary>
     /// Cancels the current round (admin reset): its message is disabled, it is never revealed or scored,
     /// and the next <see cref="AdvanceAsync"/> starts a new round. Weekly scores are untouched.
-    /// Returns the cancelled round, or null when there was none.
+    /// Returns the cancelled round, or null when there was none. With <see cref="RoundKind.Regular"/> it
+    /// clears a stuck regular battle (say, one whose reveal keeps failing) so a new one can be started.
     /// </summary>
-    public async Task<RoundRecord?> ResetRoundAsync(CancellationToken ct)
+    public async Task<RoundRecord?> ResetRoundAsync(CancellationToken ct, RoundKind kind = RoundKind.Ranked)
     {
         await _gate.WaitAsync(ct);
         try
         {
-            var round = repo.GetActive();
+            var round = repo.GetActive(kind);
             if (round is null) return null;
 
             repo.Abandon(round.Id);

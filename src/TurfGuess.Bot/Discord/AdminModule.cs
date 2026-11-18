@@ -54,6 +54,21 @@ public sealed class AdminModule(
             ephemeral: true);
     }
 
+    [SlashCommand("reset-battle", "Cancel a stuck Regular Battle so a new one can be started.")]
+    public async Task ResetBattleAsync()
+    {
+        await DeferAsync(ephemeral: true);
+        var cancelled = await rounds.ResetRoundAsync(default, RoundKind.Regular);
+        logger.LogInformation("Admin {UserName} ({UserId}) ran /turf-admin reset-battle; {Result}.",
+            Context.User.Username, Context.User.Id, cancelled is null ? "there was no running battle" : $"battle {cancelled.Id} was cancelled");
+
+        scheduler.Wake();
+        await FollowupAsync(cancelled is null
+            ? MessageText.NoBattleRunning
+            : $"Regular Battle #{cancelled.DisplayNumber} is cancelled. Anyone can start a new one with `/turf battle` now.",
+            ephemeral: true);
+    }
+
     private const string WipeConfirmId = "admin-wipe-scores:confirm";
     private const string WipeCancelId = "admin-wipe-scores:cancel";
 

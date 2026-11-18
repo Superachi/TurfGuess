@@ -158,6 +158,7 @@ public static class MessageText
             sb.AppendLine("`/turf-admin status`: show the current ranked round");
             sb.AppendLine("`/turf-admin reveal-now`: reveal the current ranked round now and post the next one");
             sb.AppendLine("`/turf-admin reset-round`: cancel the current ranked round and start a new one");
+            sb.AppendLine("`/turf-admin reset-battle`: cancel a stuck Regular Battle so a new one can be started");
             sb.AppendLine("`/turf-admin reset-scores`: wipe all weekly scores (asks for confirmation)");
             sb.Append("`/turf-admin set-ranked-channel`: choose the channel ranked battles are posted in");
         }

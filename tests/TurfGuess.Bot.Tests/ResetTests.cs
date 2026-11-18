@@ -22,6 +22,24 @@ public class ResetTests
     }
 
     [Fact]
+    public async Task Resetting_a_stuck_battle_frees_the_slot_and_leaves_the_ranked_round_alone()
+    {
+        using var env = new TestEnvironment();
+        await env.Rounds.AdvanceAsync(Local(10, 12), default);
+        var ranked = env.Repo.GetActive()!;
+        var (battle, started) = await env.Rounds.StartBattleAsync(1, false, Local(10, 12), default);
+        Assert.True(started);
+
+        var cancelled = await env.Rounds.ResetRoundAsync(default, RoundKind.Regular);
+
+        Assert.Equal(battle.Id, cancelled!.Id);
+        Assert.Null(env.Repo.GetActive(RoundKind.Regular));
+        Assert.Equal(ranked.Id, env.Repo.GetActive()!.Id);
+        var (_, startedAgain) = await env.Rounds.StartBattleAsync(1, false, Local(10, 13), default);
+        Assert.True(startedAgain);
+    }
+
+    [Fact]
     public async Task Reset_cancels_the_open_round_starts_a_new_one_and_keeps_the_weekly_scores()
     {
         using var env = new TestEnvironment();

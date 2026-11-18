@@ -198,7 +198,9 @@ public sealed class DiscordRoundChannel(DiscordSocketClient client, BotOptions o
 
     /// <summary>The file name of the image attached to the round message (kept on edits).</summary>
     private static string AttachedFileName(IUserMessage message, RoundRecord round) =>
-        message.Attachments.FirstOrDefault()?.Filename ?? Path.GetFileName(round.ImagePath);
+        message.Attachments.FirstOrDefault()?.Filename is { Length: > 0 } name ? name
+        : Path.GetFileName(round.ImagePath) is { Length: > 0 } stored ? stored
+        : $"round_{round.Id}.png"; // an empty name makes "attachment://", which Discord rejects as an invalid URL
 
     /// <summary>The two team buttons, plus Bet for ranked rounds (regular battles aren't scored, so there is nothing to bet on).</summary>
     private static MessageComponent Buttons(RoundRecord round, bool disabled)

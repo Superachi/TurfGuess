@@ -74,7 +74,7 @@ public class ChannelTests
     {
         string admin = MessageText.Help(isAdmin: true);
         Assert.Contains("/turf battle", admin);
-        foreach (var command in new[] { "status", "reveal-now", "reset-round", "reset-scores", "set-ranked-channel" })
+        foreach (var command in new[] { "status", "reveal-now", "reset-round", "reset-battle", "reset-scores", "set-ranked-channel" })
             Assert.Contains("/turf-admin " + command, admin);
     }
 }

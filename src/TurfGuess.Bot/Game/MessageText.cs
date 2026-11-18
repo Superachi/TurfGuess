@@ -34,7 +34,9 @@ public static class MessageText
         sb.Append($"- Ranked Battle #{round.DisplayNumber} has {minutesLeft} {(minutesLeft == 1 ? "minute" : "minutes")} left.\n");
 
         int voters = leftVotes + rightVotes;
-        if (voters == 1)
+        if (voters == 0)
+            sb.Append("- Nobody has voted yet.\n");
+        else if (voters == 1)
             sb.Append("- 1 person has voted already.\n"); // a split of one vote says nothing
         else if (voters > 1)
         {

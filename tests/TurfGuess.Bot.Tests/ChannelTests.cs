@@ -228,7 +228,7 @@ public class ReminderTests
     public void The_text_and_validation()
     {
         var round = new RoundRecord { Id = 12, Number = 12 };
-        Assert.Equal("**It's now or never!**\n- Ranked Battle #12 has 60 minutes left.\n[**Vote now!**](https://x/y)", MessageText.Reminder(round, 60, "https://x/y"));
+        Assert.Equal("**It's now or never!**\n- Ranked Battle #12 has 60 minutes left.\n- Nobody has voted yet.\n[**Vote now!**](https://x/y)", MessageText.Reminder(round, 60, "https://x/y"));
         Assert.Contains("1 minute left", MessageText.Reminder(round, 1, "u"));
 
         Assert.Equal("**It's now or never!**\n- Ranked Battle #12 has 60 minutes left.\n- 8 people have voted already, with one color favoured over another.\n" +

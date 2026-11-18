@@ -39,6 +39,25 @@ public sealed class AdminModule(
         await RespondAsync("Revealing the current round now. The next round follows straight after.", ephemeral: true);
     }
 
+    [SlashCommand("remind", "Post the \"now or never\" reminder for the current ranked round now.")]
+    public async Task RemindAsync()
+    {
+        await DeferAsync(ephemeral: true);
+        try
+        {
+            var minutes = await rounds.RemindNowAsync(clock.GetUtcNow(), default);
+            logger.LogInformation("Admin {UserName} ({UserId}) ran /turf-admin remind; {Result}.",
+                Context.User.Username, Context.User.Id, minutes is null ? "no ranked round was open" : $"posted it with {minutes} minutes left");
+            await FollowupAsync(minutes is null ? MessageText.NoRankedRoundToRemind : MessageText.ReminderPosted, ephemeral: true);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex, "Admin {UserName} ({UserId}) ran /turf-admin remind, but the reminder couldn't be posted.",
+                Context.User.Username, Context.User.Id);
+            await FollowupAsync("I couldn't post the reminder. Check that I can send messages in the ranked channel.", ephemeral: true);
+        }
+    }
+
     [SlashCommand("reset-round", "Cancel the current round and start a new one. Weekly scores are kept.")]
     public async Task ResetRoundAsync()
     {

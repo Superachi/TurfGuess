@@ -188,6 +188,7 @@ public static class MessageText
             sb.AppendLine().AppendLine().AppendLine("**Admin commands**");
             sb.AppendLine("`/turf-admin status`: show the current ranked round");
             sb.AppendLine("`/turf-admin reveal-now`: reveal the current ranked round now and post the next one");
+            sb.AppendLine("`/turf-admin remind`: post the \"now or never\" reminder for the current ranked round now");
             sb.AppendLine("`/turf-admin reset-round`: cancel the current ranked round and start a new one");
             sb.AppendLine("`/turf-admin reset-scores`: wipe all weekly scores (asks for confirmation)");
             sb.Append("`/turf-admin set-ranked-channel`: choose the channel ranked battles are posted in");
@@ -201,6 +202,9 @@ public static class MessageText
 
     public static string RankedChannelUnusable(ulong channelId, string missing) =>
         $"I can't use <#{channelId}>: I'm missing the {missing} permission there. Give me access and run the command again.";
+
+    public const string NoRankedRoundToRemind = "There's no open ranked round to remind people about right now.";
+    public const string ReminderPosted = "Posted the reminder. The automatic one still goes out at its usual time.";
 
     public const string NoBattleRunning = "There's no Regular Battle running right now.";
     public const string BattleRevealNotAllowed = "Only the player who started this Regular Battle, or an admin, can reveal it early.";

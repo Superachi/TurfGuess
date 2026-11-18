@@ -74,7 +74,7 @@ public class ChannelTests
     {
         string admin = MessageText.Help(isAdmin: true);
         Assert.Contains("/turf battle", admin);
-        foreach (var command in new[] { "status", "reveal-now", "reset-round", "reset-scores", "set-ranked-channel" })
+        foreach (var command in new[] { "status", "reveal-now", "remind", "reset-round", "reset-scores", "set-ranked-channel" })
             Assert.Contains("/turf-admin " + command, admin);
     }
 }
@@ -158,6 +158,32 @@ public class ReminderTests
         var (id, minutes) = Assert.Single(env.Channel.Reminders);
         Assert.Equal(round.Id, id);
         Assert.Equal(60, minutes);
+    }
+
+    [Fact]
+    public async Task An_admin_can_post_the_reminder_now_and_the_automatic_one_still_follows()
+    {
+        using var env = new TestEnvironment();
+        var round = await OpenRankedAsync(env);
+
+        Assert.NotNull(await env.Rounds.RemindNowAsync(Now, default));
+        var (id, minutes) = Assert.Single(env.Channel.Reminders);
+        Assert.Equal(round.Id, id);
+        Assert.Equal((int)Math.Ceiling((round.RevealAtTime - Now).TotalMinutes), minutes);
+
+        await env.Rounds.AdvanceAsync(round.RevealAtTime.AddMinutes(-60), default);
+        Assert.Equal(2, env.Channel.Reminders.Count);
+    }
+
+    [Fact]
+    public async Task Reminding_needs_an_open_ranked_round()
+    {
+        using var env = new TestEnvironment();
+        Assert.Null(await env.Rounds.RemindNowAsync(Now, default)); // nothing posted yet
+
+        var round = await OpenRankedAsync(env);
+        Assert.Null(await env.Rounds.RemindNowAsync(round.RevealAtTime.AddMinutes(1), default)); // voting is over
+        Assert.Empty(env.Channel.Reminders);
     }
 
     [Fact]

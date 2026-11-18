@@ -235,11 +235,11 @@ public sealed class RoundRepository(Database db)
     public (int Left, int Right) CountVotesBySide(long roundId)
     {
         using var c = db.Open();
-        int left = c.ExecuteScalar<int>("SELECT COUNT(*) FROM votes WHERE round_id = @roundId AND choice = @choice",
-            new { roundId, choice = SideCodec.Format(Side.Left) });
-        int right = c.ExecuteScalar<int>("SELECT COUNT(*) FROM votes WHERE round_id = @roundId AND choice = @choice",
-            new { roundId, choice = SideCodec.Format(Side.Right) });
-        return (left, right);
+        var (left, right) = c.Query<(long LeftVotes, long RightVotes)>("""
+            SELECT COALESCE(SUM(choice = @left), 0) AS LeftVotes, COALESCE(SUM(choice = @right), 0) AS RightVotes
+            FROM votes WHERE round_id = @roundId
+            """, new { roundId, left = SideCodec.Format(Side.Left), right = SideCodec.Format(Side.Right) }).Single();
+        return ((int)left, (int)right);
     }
 
     /// <summary>

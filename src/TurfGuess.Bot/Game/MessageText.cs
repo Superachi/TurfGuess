@@ -61,6 +61,11 @@ public static class MessageText
     public const string BetButtonLabel = "Bet";
     public const string BetButtonEmoji = "🎲";
 
+    public static string InfoButtonId(long roundId) => $"info:{roundId}";
+
+    public const string InfoButtonLabel = "Info";
+    public const string InfoButtonEmoji = "ℹ️";
+
     /// <summary>Discord's limit for an embed description.</summary>
     public const int EmbedDescriptionLimit = 4096;
 
@@ -229,7 +234,35 @@ public static class MessageText
         return text;
     }
 
-    public const string VotingClosed = "Voting for this round is closed.";
+    /// <summary>
+    /// Only the player sees this, after pressing Info: their own vote and, in a ranked round, their bet.
+    /// A short recap of the vote and bet replies. <paramref name="vote"/> is null when they haven't voted.
+    /// </summary>
+    public static string MyVoteInfo(RoundRecord round, Side? vote, bool bet, DifficultyOptions? difficulty = null)
+    {
+        var sb = new StringBuilder();
+        sb.Append(vote is { } side
+            ? $"**Your vote:** {round.TeamEmoji(side)} **{round.TeamName(side)}**"
+            : "**Your vote:** none yet");
+
+        if (round.Kind == RoundKind.Ranked)
+        {
+            int points = PointsFor(round, difficulty);
+            sb.Append(bet
+                ? $"\n**Your bet:** 🎲 on · win +{2 * points} / lose −{points}"
+                : $"\n**Your bet:** off · a correct guess earns +{points}");
+            if (bet && vote is null) sb.Append("\nA bet only counts if you vote too.");
+        }
+        else if (round.ShowVotes && vote is not null)
+        {
+            sb.Append("\nYour vote is public in this battle.");
+        }
+
+        sb.Append("\nYou can change it until the reveal.");
+        return sb.ToString();
+    }
+
+    public const string VotingClosed ="Voting for this round is closed.";
 
     /// <summary>Shown on a round message after an admin cancelled the round.</summary>
     public const string RoundCancelled = "**This round was cancelled by an admin.** Voting is closed.";

@@ -123,6 +123,25 @@ public class MessageTextTests
     }
 
     [Fact]
+    public void Info_reply_recaps_the_players_vote_and_bet()
+    {
+        var round = Round();
+        round.WinnerShare = 0.5130;
+        var on = MessageText.MyVoteInfo(round, Side.Left, bet: true);
+        Assert.Contains(round.TeamName(Side.Left), on);
+        Assert.Contains("Your bet:** 🎲 on · win +6 / lose −3", on);
+        Assert.Contains("Your bet:** off · a correct guess earns +3", MessageText.MyVoteInfo(round, Side.Left, bet: false));
+        var none = MessageText.MyVoteInfo(round, null, bet: true);
+        Assert.Contains("none yet", none);
+        Assert.Contains("only counts if you vote too", none);
+        Assert.DoesNotContain("only counts", MessageText.MyVoteInfo(round, null, bet: false));
+
+        var battle = Round();
+        battle.Kind = RoundKind.Regular;
+        Assert.DoesNotContain("bet", MessageText.MyVoteInfo(battle, Side.Left, bet: false));
+    }
+
+    [Fact]
     public void Week_summary_names_every_winner_and_is_skipped_when_nobody_scored()
     {
         var names = new Dictionary<ulong, string> { [1] = "Ann", [2] = "Bo", [3] = "Cy" };

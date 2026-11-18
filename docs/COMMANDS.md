@@ -22,6 +22,7 @@ Replies to all of these are ephemeral: only you see them.
 |---|---|---|
 | Team buttons (🔴 / 🔵 …) | Ranked and regular rounds | Cast or change your vote until the reveal. Only you see the confirmation, so nobody learns how you voted (except in a `show-votes` battle). |
 | 🎲 Bet | Ranked rounds only | Toggles your bet: a correct guess earns double points, a wrong one loses the round's points (your weekly score never drops below 0). A bet only counts if you also voted. If you have 0 points this week, the bet is switched on automatically the first time you vote, since you have nothing to lose. |
+| ℹ️ Info | Ranked and regular rounds | Shows only you what you voted and, in a ranked round, whether your bet is on and what it is worth. |
 | Reveal | Running regular battle | Same as `/turf battle-reveal`: the starter or an admin reveals it early. |
 | 🔁 Reset | Finished regular battle | Turns the message into a fresh battle. If another battle is already running, the button becomes a Reveal button for it. |
 
